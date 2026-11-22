@@ -62,6 +62,26 @@ func _ready() -> void:
 	_chk_btn.pressed.connect(_on_check_pressed)
 	box.add_child(_chk_btn)
 
+	# Extra left / right margin for phones whose camera notch still covers content in landscape.
+	var em_lbl := UiTheme.make_label("")
+	box.add_child(em_lbl)
+	var em_slider := HSlider.new()
+	em_slider.min_value = 0
+	em_slider.max_value = 120
+	em_slider.step = 4
+	var em_cur = SaveManager.get_setting("edge_margin")
+	em_slider.value = float(em_cur) if em_cur != null else 0.0
+	em_slider.custom_minimum_size = Vector2(0, 40)
+	em_slider.scrollable = false
+	em_lbl.text = "Screen edge margin (camera notch): %d" % int(em_slider.value)
+	em_slider.value_changed.connect(func(v: float):
+		SaveManager.set_setting("edge_margin", int(v), false)
+		em_lbl.text = "Screen edge margin (camera notch): %d" % int(v)
+		get_tree().root.size_changed.emit())  # every margin container re-reads the insets
+	em_slider.drag_ended.connect(func(_changed: bool): SaveManager.save_game())
+	em_slider.tree_exiting.connect(func(): SaveManager.save_game())
+	box.add_child(em_slider)
+
 	box.add_child(UiTheme.make_label("Default AI difficulty"))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)

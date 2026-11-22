@@ -154,11 +154,66 @@ static func make_background() -> TextureRect:
 	return r
 
 
+## Left / right insets (in UI units) that keep content clear of the camera cutout (notch / punch hole) and
+## system bars in full-screen (immersive) mode. The background stays full-bleed; only the content is inset.
+static func safe_insets() -> Vector2:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or DisplayServer.get_name() == "headless":
+		return Vector2.ZERO
+	var win := Vector2(DisplayServer.window_get_size())
+	var vis := tree.root.get_visible_rect().size
+	if win.x <= 0.0 or win.y <= 0.0 or vis.x <= 0.0:
+		return Vector2.ZERO
+	var scale := win.x / vis.x  # window pixels per UI unit (stretch mode canvas_items, aspect expand: uniform)
+	var left := 0.0
+	var right := 0.0
+	var safe := Rect2(DisplayServer.get_display_safe_area())
+	if safe.size.x > 0.0 and safe.size.y > 0.0:
+		left = maxf(0.0, safe.position.x)
+		right = maxf(0.0, win.x - safe.end.x)
+	# Cutouts that touch the left / right edge (landscape camera bezel), in case the safe area does not include them.
+	for cut in DisplayServer.get_display_cutouts():
+		var r := Rect2(cut)
+		if r.size.x <= 0.0 or r.size.y <= 0.0:
+			continue
+		if r.position.x <= win.x * 0.25:
+			left = maxf(left, r.end.x)
+		elif r.end.x >= win.x * 0.75:
+			right = maxf(right, win.x - r.position.x)
+	# Older phones (e.g. OPPO A3s on Android 8.1, A11k) have a waterdrop notch but report no cutout / safe area.
+	# On a long Android screen with no reported insets, assume the notch could sit on either short edge.
+	if OS.get_name() == "Android" and left <= 0.0 and right <= 0.0 and win.x / win.y >= 1.9:
+		left = win.y * 0.06
+		right = win.y * 0.06
+	# Manual extra margin from Settings ("Screen edge margin"), in UI units, for any device that still overlaps.
+	var extra := 0.0
+	var em: Variant = SaveManager.get_setting("edge_margin")
+	if em != null:
+		extra = clampf(float(em), 0.0, 120.0)
+	# Cap: a bogus value must never squeeze the layout.
+	return Vector2(minf(left / scale, 160.0) + extra, minf(right / scale, 160.0) + extra)
+
+
+## Full-rect margin container. Left / right margins grow by the display's safe-area insets and follow
+## window changes (rotation, fold, resize).
 static func make_margin(px: int) -> MarginContainer:
 	var m := MarginContainer.new()
 	m.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
-		m.add_theme_constant_override("margin_" + side, px)
+	m.add_theme_constant_override("margin_top", px)
+	m.add_theme_constant_override("margin_bottom", px)
+	var apply := func() -> void:
+		if not is_instance_valid(m):
+			return
+		var ins := safe_insets()
+		m.add_theme_constant_override("margin_left", px + int(ceil(ins.x)))
+		m.add_theme_constant_override("margin_right", px + int(ceil(ins.y)))
+	apply.call()
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		tree.root.size_changed.connect(apply)
+		m.tree_exited.connect(func() -> void:
+			if tree.root.size_changed.is_connected(apply):
+				tree.root.size_changed.disconnect(apply))
 	return m
 
 
