@@ -151,7 +151,7 @@ func _build_ui() -> void:
 	root.move_child(left, root.get_child_count() - 1)
 	var head := HBoxContainer.new()
 	left.add_child(head)
-	status_label = UiTheme.make_label("", 17, UiTheme.COL_GOLD)
+	status_label = UiTheme.make_label("", 15, UiTheme.COL_GOLD)  # 15 px so both prep lines fit the narrow column at 16:9 and 4:3
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.add_child(status_label)
@@ -192,8 +192,9 @@ func _build_ui() -> void:
 	bench_grid.columns = int(GameData.b("prep_slots"))
 	bench_grid.add_theme_constant_override("h_separation", 4)
 	bench_grid.add_theme_constant_override("v_separation", 3)
-	bench_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bench_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	center.add_child(bench_grid)
+	grid.resized.connect(func(): bench_grid.custom_minimum_size.x = grid.size.x)  # bench row is exactly as wide as the board
 	var push := Control.new()  # pushes Auto Deploy + Level Up to the bottom
 	push.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	prep_panel.add_child(push)
@@ -315,7 +316,7 @@ func _on_start_pressed() -> void:
 # ------------------------------------------------------------------ preparation
 
 func _refresh_prep() -> void:
-	status_label.text = "Gold %d  |  Budget %d\nLevel %d  |  Capacity %d/%d" % [prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
+	status_label.text = "Gold %d | Budget %d\nLevel %d | Capacity %d/%d" % [prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
 	for c in shop_box.get_children():
 		shop_box.remove_child(c)
 		c.queue_free()
