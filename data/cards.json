@@ -145,64 +145,80 @@
 			"slot": 3
 		},
 		{
-			"id": "rook_citadel_warden",
-			"name": "Citadel Warden",
+			"id": "rook_solvaris_sunwall_bastion",
+			"name": "Sunwall Bastion",
 			"chess": "rook",
-			"faction": "valdoria",
+			"faction": "solvaris",
 			"role": "Tank",
 			"rarity": "rare",
-			"hp": 220,
+			"hp": 210,
 			"atk": 12,
 			"range": 1,
 			"move": 2,
 			"skill": {
-				"id": "bulwark",
-				"name": "Bulwark",
-				"desc": "On its first action, taunts adjacent enemies for 6 ticks."
+				"id": "gilded_bulwark",
+				"name": "Gilded Bulwark",
+				"desc": "On its first action, taunts adjacent enemies for 5 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 5
+				}
 			},
-			"slot": 2
+			"slot": -1,
+			"continent": "aetherion"
 		},
 		{
-			"id": "rook_siege_tower",
-			"name": "Siege Tower",
+			"id": "rook_solvaris_sunspear_ballista",
+			"name": "Sunspear Ballista",
 			"chess": "rook",
 			"faction": "solvaris",
 			"role": "Marksman",
 			"rarity": "rare",
-			"hp": 180,
+			"hp": 185,
 			"atk": 16,
 			"range": 2,
 			"move": 2,
 			"skill": {
-				"id": "ballista_volley",
-				"name": "Ballista Volley",
-				"desc": "Every 12 ticks hits the 3 nearest enemies."
+				"id": "radiant_volley",
+				"name": "Radiant Volley",
+				"desc": "Every 12 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 12,
+					"targets": 3
+				}
 			},
-			"slot": 0
+			"slot": -1,
+			"continent": "aetherion"
 		},
 		{
-			"id": "knight_dawnlancer",
-			"name": "Dawnlancer Knight",
+			"id": "knight_solvaris_dawnbreaker_paladin",
+			"name": "Dawnbreaker Paladin",
 			"chess": "knight",
 			"faction": "solvaris",
 			"role": "Fighter",
 			"rarity": "rare",
-			"hp": 150,
-			"atk": 18,
+			"hp": 155,
+			"atk": 17,
 			"range": 1,
 			"move": 3,
 			"skill": {
-				"id": "charge",
-				"name": "Charge",
-				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks."
+				"id": "daybreak_charge",
+				"name": "Daybreak Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
 			},
-			"slot": 0
+			"slot": -1,
+			"continent": "aetherion"
 		},
 		{
-			"id": "knight_nightfall_rider",
-			"name": "Nightfall Rider",
+			"id": "knight_solvaris_goldmane_outrider",
+			"name": "Goldmane Outrider",
 			"chess": "knight",
-			"faction": "nocthyr",
+			"faction": "solvaris",
 			"role": "Assassin",
 			"rarity": "rare",
 			"hp": 120,
@@ -210,15 +226,503 @@
 			"range": 1,
 			"move": 3,
 			"skill": {
-				"id": "night_gallop",
-				"name": "Night Gallop",
-				"desc": "On its first action, teleports next to the weakest enemy."
+				"id": "lionheart_gallop",
+				"name": "Lionheart Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
 			},
-			"slot": 1
+			"slot": -1,
+			"continent": "aetherion"
 		},
 		{
-			"id": "bishop_elarion_seer",
-			"name": "Elarion Seer",
+			"id": "bishop_solvaris_heliomancer",
+			"name": "Heliomancer",
+			"chess": "bishop",
+			"faction": "solvaris",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "solar_barrage",
+				"name": "Solar Barrage",
+				"desc": "Every 7th attack also hits enemies within 2 cells of the target for 70%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 7,
+					"splash_pct": 0.7
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "bishop_solvaris_sunlit_chaplain",
+			"name": "Sunlit Chaplain",
+			"chess": "bishop",
+			"faction": "solvaris",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "healing_dawn",
+				"name": "Healing Dawn",
+				"desc": "Heals all allies for 11% max HP every 9 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 9,
+					"heal_pct": 0.11
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "queen_solvaris_queen_solenne_the_dawn",
+			"name": "Queen Solenne the Dawn",
+			"chess": "queen",
+			"faction": "solvaris",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 265,
+			"atk": 26,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "decree_of_dawn",
+				"name": "Decree of Dawn",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "rook_nocthyr_duskwall_keep",
+			"name": "Duskwall Keep",
+			"chess": "rook",
+			"faction": "nocthyr",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 205,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "veil_lure",
+				"name": "Veil Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "rook_nocthyr_shadowspike_crossbow",
+			"name": "Shadowspike Crossbow",
+			"chess": "rook",
+			"faction": "nocthyr",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "gloom_volley",
+				"name": "Gloom Volley",
+				"desc": "Every 14 ticks hits the 4 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 14,
+					"targets": 4
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "knight_nocthyr_eclipse_cavalier",
+			"name": "Eclipse Cavalier",
+			"chess": "knight",
+			"faction": "nocthyr",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 135,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "umbra_charge",
+				"name": "Umbra Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "knight_nocthyr_moonshade_stalker",
+			"name": "Moonshade Stalker",
+			"chess": "knight",
+			"faction": "nocthyr",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 23,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "shadow_gallop",
+				"name": "Shadow Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "bishop_nocthyr_gloomcaller",
+			"name": "Gloomcaller",
+			"chess": "bishop",
+			"faction": "nocthyr",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 90,
+			"atk": 22,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "void_barrage",
+				"name": "Void Barrage",
+				"desc": "Every 4th attack also hits enemies within 2 cells of the target for 35%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 4,
+					"splash_pct": 0.35
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "bishop_nocthyr_vesper_confessor",
+			"name": "Vesper Confessor",
+			"chess": "bishop",
+			"faction": "nocthyr",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "nocturne_mend",
+				"name": "Nocturne Mend",
+				"desc": "Heals all allies for 11% max HP every 11 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 11,
+					"heal_pct": 0.11
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "queen_nocthyr_queen_noctavia",
+			"name": "Queen Noctavia",
+			"chess": "queen",
+			"faction": "nocthyr",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 250,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_night",
+				"name": "Edict of Night",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "rook_valdoria_ironbanner_fortress",
+			"name": "Ironbanner Fortress",
+			"chess": "rook",
+			"faction": "valdoria",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 245,
+			"atk": 11,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "banner_lure",
+				"name": "Banner Lure",
+				"desc": "On its first action, taunts adjacent enemies for 4 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "rook_valdoria_ironbolt_ballista",
+			"name": "Ironbolt Ballista",
+			"chess": "rook",
+			"faction": "valdoria",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 190,
+			"atk": 15,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "heavy_volley",
+				"name": "Heavy Volley",
+				"desc": "Every 9 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 9,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "knight_valdoria_ironguard_lancer",
+			"name": "Ironguard Lancer",
+			"chess": "knight",
+			"faction": "valdoria",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "phalanx_charge",
+				"name": "Phalanx Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 4 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "knight_valdoria_scarlet_raider",
+			"name": "Scarlet Raider",
+			"chess": "knight",
+			"faction": "valdoria",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "raid_gallop",
+				"name": "Raid Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "bishop_valdoria_warmage_of_the_legion",
+			"name": "Warmage of the Legion",
+			"chess": "bishop",
+			"faction": "valdoria",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 18,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "legion_barrage",
+				"name": "Legion Barrage",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 45%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.45
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "bishop_valdoria_field_chaplain",
+			"name": "Field Chaplain",
+			"chess": "bishop",
+			"faction": "valdoria",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 9,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "camp_mend",
+				"name": "Camp Mend",
+				"desc": "Heals all allies for 12% max HP every 14 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 14,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "queen_valdoria_marshal_valdrea",
+			"name": "Marshal Valdrea",
+			"chess": "queen",
+			"faction": "valdoria",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 275,
+			"atk": 25,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "marshal_s_order",
+				"name": "Marshal's Order",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "rook_elarion_starstone_ward",
+			"name": "Starstone Ward",
+			"chess": "rook",
+			"faction": "elarion",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 205,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "lunar_lure",
+				"name": "Lunar Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "rook_elarion_comet_arbalest",
+			"name": "Comet Arbalest",
+			"chess": "rook",
+			"faction": "elarion",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "falling_star_volley",
+				"name": "Falling Star Volley",
+				"desc": "Every 11 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 11,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "knight_elarion_starlance_knight",
+			"name": "Starlance Knight",
+			"chess": "knight",
+			"faction": "elarion",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 140,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "meteor_charge",
+				"name": "Meteor Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "knight_elarion_moonblade_rider",
+			"name": "Moonblade Rider",
+			"chess": "knight",
+			"faction": "elarion",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 22,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "lunar_gallop",
+				"name": "Lunar Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "bishop_elarion_astral_seer",
+			"name": "Astral Seer",
 			"chess": "bishop",
 			"faction": "elarion",
 			"role": "Mage",
@@ -228,17 +732,1794 @@
 			"range": 4,
 			"move": 2,
 			"skill": {
-				"id": "arcane_barrage",
-				"name": "Arcane Barrage",
-				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 50%."
+				"id": "constellation_barrage",
+				"name": "Constellation Barrage",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 60%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.6
+				}
 			},
-			"slot": 3
+			"slot": -1,
+			"continent": "aetherion"
 		},
 		{
-			"id": "bishop_valdoria_chaplain",
-			"name": "Valdoria Chaplain",
+			"id": "bishop_elarion_moonweaver_priestess",
+			"name": "Moonweaver Priestess",
 			"chess": "bishop",
-			"faction": "valdoria",
+			"faction": "elarion",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "silver_mend",
+				"name": "Silver Mend",
+				"desc": "Heals all allies for 8% max HP every 8 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 8,
+					"heal_pct": 0.08
+				}
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "queen_elarion_queen_seraphel",
+			"name": "Queen Seraphel",
+			"chess": "queen",
+			"faction": "elarion",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 250,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "celestial_mandate",
+				"name": "Celestial Mandate",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "aetherion"
+		},
+		{
+			"id": "rook_astralis_orrery_sentinel",
+			"name": "Orrery Sentinel",
+			"chess": "rook",
+			"faction": "astralis",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 210,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "gravity_lure",
+				"name": "Gravity Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_astralis_nova_obelisk",
+			"name": "Nova Obelisk",
+			"chess": "rook",
+			"faction": "astralis",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 165,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "nova_volley",
+				"name": "Nova Volley",
+				"desc": "Every 13 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 13,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_astralis_comet_cavalier",
+			"name": "Comet Cavalier",
+			"chess": "knight",
+			"faction": "astralis",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 145,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "astral_charge",
+				"name": "Astral Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 1 tick.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 1
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_astralis_void_skimmer",
+			"name": "Void Skimmer",
+			"chess": "knight",
+			"faction": "astralis",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 22,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "starstep_gallop",
+				"name": "Starstep Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +20% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.2
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_astralis_astromancer",
+			"name": "Astromancer",
+			"chess": "bishop",
+			"faction": "astralis",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 95,
+			"atk": 21,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "starburst_cascade",
+				"name": "Starburst Cascade",
+				"desc": "Every 8th attack also hits enemies within 2 cells of the target for 80%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 8,
+					"splash_pct": 0.8
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_astralis_celestial_attendant",
+			"name": "Celestial Attendant",
+			"chess": "bishop",
+			"faction": "astralis",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "stellar_mend",
+				"name": "Stellar Mend",
+				"desc": "Heals all allies for 9% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.09
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "queen_astralis_archmage_queen_astrelle",
+			"name": "Archmage Queen Astrelle",
+			"chess": "queen",
+			"faction": "astralis",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 240,
+			"atk": 28,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "mandate_of_stars",
+				"name": "Mandate of Stars",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_ignivar_magma_bastion",
+			"name": "Magma Bastion",
+			"chess": "rook",
+			"faction": "ignivar",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 195,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "molten_lure",
+				"name": "Molten Lure",
+				"desc": "On its first action, taunts adjacent enemies for 8 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 8
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_ignivar_pyre_cannon_spire",
+			"name": "Pyre Cannon Spire",
+			"chess": "rook",
+			"faction": "ignivar",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 170,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "flame_volley",
+				"name": "Flame Volley",
+				"desc": "Every 16 ticks hits the 5 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 16,
+					"targets": 5
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_ignivar_ember_lancer",
+			"name": "Ember Lancer",
+			"chess": "knight",
+			"faction": "ignivar",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 145,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "fire_charge",
+				"name": "Fire Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_ignivar_ashstalker",
+			"name": "Ashstalker",
+			"chess": "knight",
+			"faction": "ignivar",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 24,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "cinder_gallop",
+				"name": "Cinder Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_ignivar_pyromancer",
+			"name": "Pyromancer",
+			"chess": "bishop",
+			"faction": "ignivar",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 90,
+			"atk": 21,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "inferno_cascade",
+				"name": "Inferno Cascade",
+				"desc": "Every 5th attack also hits enemies within 2 cells of the target for 40%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 5,
+					"splash_pct": 0.4
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_ignivar_flamekeeper",
+			"name": "Flamekeeper",
+			"chess": "bishop",
+			"faction": "ignivar",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 95,
+			"atk": 11,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "hearthfire_mend",
+				"name": "Hearthfire Mend",
+				"desc": "Heals all allies for 12% max HP every 12 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 12,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "queen_ignivar_queen_ignasia",
+			"name": "Queen Ignasia",
+			"chess": "queen",
+			"faction": "ignivar",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 245,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_flame",
+				"name": "Edict of Flame",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_cryndel_glacier_bulwark",
+			"name": "Glacier Bulwark",
+			"chess": "rook",
+			"faction": "cryndel",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 240,
+			"atk": 11,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "frostbind_lure",
+				"name": "Frostbind Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_cryndel_icicle_battery",
+			"name": "Icicle Battery",
+			"chess": "rook",
+			"faction": "cryndel",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 200,
+			"atk": 14,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "hail_volley",
+				"name": "Hail Volley",
+				"desc": "Every 10 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 10,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_cryndel_frostbite_cavalier",
+			"name": "Frostbite Cavalier",
+			"chess": "knight",
+			"faction": "cryndel",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "avalanche_charge",
+				"name": "Avalanche Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_cryndel_snowshade_courser",
+			"name": "Snowshade Courser",
+			"chess": "knight",
+			"faction": "cryndel",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 130,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "blizzard_gallop",
+				"name": "Blizzard Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_cryndel_cryomancer",
+			"name": "Cryomancer",
+			"chess": "bishop",
+			"faction": "cryndel",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 19,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "sleet_cascade",
+				"name": "Sleet Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 50%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.5
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_cryndel_frostlight_healer",
+			"name": "Frostlight Healer",
+			"chess": "bishop",
+			"faction": "cryndel",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 9,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "thaw_mend",
+				"name": "Thaw Mend",
+				"desc": "Heals all allies for 10% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "queen_cryndel_queen_glaciora",
+			"name": "Queen Glaciora",
+			"chess": "queen",
+			"faction": "cryndel",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 290,
+			"atk": 24,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_winter",
+				"name": "Edict of Winter",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_umbrael_crypt_warden",
+			"name": "Crypt Warden",
+			"chess": "rook",
+			"faction": "umbrael",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 230,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "grave_lure",
+				"name": "Grave Lure",
+				"desc": "On its first action, taunts adjacent enemies for 5 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 5
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_umbrael_soulpiercer_spire",
+			"name": "Soulpiercer Spire",
+			"chess": "rook",
+			"faction": "umbrael",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 16,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "wraith_volley",
+				"name": "Wraith Volley",
+				"desc": "Every 12 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 12,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_umbrael_revenant_knight",
+			"name": "Revenant Knight",
+			"chess": "knight",
+			"faction": "umbrael",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 150,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "wail_charge",
+				"name": "Wail Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "knight_umbrael_phantom_reaper",
+			"name": "Phantom Reaper",
+			"chess": "knight",
+			"faction": "umbrael",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 23,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "wraith_gallop",
+				"name": "Wraith Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_umbrael_necromancer",
+			"name": "Necromancer",
+			"chess": "bishop",
+			"faction": "umbrael",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "soulfire_cascade",
+				"name": "Soulfire Cascade",
+				"desc": "Every 7th attack also hits enemies within 2 cells of the target for 70%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 7,
+					"splash_pct": 0.7
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "bishop_umbrael_gravetender",
+			"name": "Gravetender",
+			"chess": "bishop",
+			"faction": "umbrael",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "marrow_mend",
+				"name": "Marrow Mend",
+				"desc": "Heals all allies for 11% max HP every 9 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 9,
+					"heal_pct": 0.11
+				}
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "queen_umbrael_queen_morwenna",
+			"name": "Queen Morwenna",
+			"chess": "queen",
+			"faction": "umbrael",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 255,
+			"atk": 26,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_the_hollow",
+				"name": "Edict of the Hollow",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "arcanum"
+		},
+		{
+			"id": "rook_ferrum_ironclad_rampart",
+			"name": "Ironclad Rampart",
+			"chess": "rook",
+			"faction": "ferrum",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 235,
+			"atk": 11,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "anvil_lure",
+				"name": "Anvil Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_ferrum_siege_howitzer",
+			"name": "Siege Howitzer",
+			"chess": "rook",
+			"faction": "ferrum",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 195,
+			"atk": 15,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "shell_volley",
+				"name": "Shell Volley",
+				"desc": "Every 14 ticks hits the 4 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 14,
+					"targets": 4
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_ferrum_ironhorse_charger",
+			"name": "Ironhorse Charger",
+			"chess": "knight",
+			"faction": "ferrum",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 155,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "steam_charge",
+				"name": "Steam Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_ferrum_rustblade_skirmisher",
+			"name": "Rustblade Skirmisher",
+			"chess": "knight",
+			"faction": "ferrum",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 130,
+			"atk": 20,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "piston_gallop",
+				"name": "Piston Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_ferrum_foundry_savant",
+			"name": "Foundry Savant",
+			"chess": "bishop",
+			"faction": "ferrum",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 18,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "furnace_cascade",
+				"name": "Furnace Cascade",
+				"desc": "Every 4th attack also hits enemies within 2 cells of the target for 35%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 4,
+					"splash_pct": 0.35
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_ferrum_rivet_medic",
+			"name": "Rivet Medic",
+			"chess": "bishop",
+			"faction": "ferrum",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "welding_mend",
+				"name": "Welding Mend",
+				"desc": "Heals all allies for 11% max HP every 11 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 11,
+					"heal_pct": 0.11
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "queen_ferrum_empress_ferra",
+			"name": "Empress Ferra",
+			"chess": "queen",
+			"faction": "ferrum",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 280,
+			"atk": 24,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "foundry_command",
+				"name": "Foundry Command",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_voltrix_faraday_bulwark",
+			"name": "Faraday Bulwark",
+			"chess": "rook",
+			"faction": "voltrix",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 200,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "static_lure",
+				"name": "Static Lure",
+				"desc": "On its first action, taunts adjacent enemies for 4 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_voltrix_arc_coil_tower",
+			"name": "Arc Coil Tower",
+			"chess": "rook",
+			"faction": "voltrix",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 18,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "lightning_volley",
+				"name": "Lightning Volley",
+				"desc": "Every 9 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 9,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_voltrix_tesla_lancer",
+			"name": "Tesla Lancer",
+			"chess": "knight",
+			"faction": "voltrix",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 140,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "surge_charge",
+				"name": "Surge Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 4 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_voltrix_spark_courser",
+			"name": "Spark Courser",
+			"chess": "knight",
+			"faction": "voltrix",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 23,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "short_circuit_gallop",
+				"name": "Short-Circuit Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_voltrix_storm_engineer",
+			"name": "Storm Engineer",
+			"chess": "bishop",
+			"faction": "voltrix",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 90,
+			"atk": 22,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "thunder_cascade",
+				"name": "Thunder Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 45%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.45
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_voltrix_capacitor_medic",
+			"name": "Capacitor Medic",
+			"chess": "bishop",
+			"faction": "voltrix",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 11,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "jolt_mend",
+				"name": "Jolt Mend",
+				"desc": "Heals all allies for 12% max HP every 14 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 14,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "queen_voltrix_empress_voltara",
+			"name": "Empress Voltara",
+			"chess": "queen",
+			"faction": "voltrix",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 230,
+			"atk": 28,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "grid_command",
+				"name": "Grid Command",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_chronex_clockwork_citadel",
+			"name": "Clockwork Citadel",
+			"chess": "rook",
+			"faction": "chronex",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 210,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "pendulum_lure",
+				"name": "Pendulum Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_chronex_escapement_cannon",
+			"name": "Escapement Cannon",
+			"chess": "rook",
+			"faction": "chronex",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 185,
+			"atk": 16,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "tick_volley",
+				"name": "Tick Volley",
+				"desc": "Every 11 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 11,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_chronex_pendulum_lancer",
+			"name": "Pendulum Lancer",
+			"chess": "knight",
+			"faction": "chronex",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 155,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "mainspring_charge",
+				"name": "Mainspring Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_chronex_cogstep_assassin",
+			"name": "Cogstep Assassin",
+			"chess": "knight",
+			"faction": "chronex",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 22,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "tick_tock_gallop",
+				"name": "Tick-Tock Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_chronex_horologist",
+			"name": "Horologist",
+			"chess": "bishop",
+			"faction": "chronex",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "chime_cascade",
+				"name": "Chime Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 60%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.6
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_chronex_gearwright_healer",
+			"name": "Gearwright Healer",
+			"chess": "bishop",
+			"faction": "chronex",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "rewind_mend",
+				"name": "Rewind Mend",
+				"desc": "Heals all allies for 8% max HP every 8 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 8,
+					"heal_pct": 0.08
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "queen_chronex_empress_chronia",
+			"name": "Empress Chronia",
+			"chess": "queen",
+			"faction": "chronex",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 265,
+			"atk": 26,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "command_of_hours",
+				"name": "Command of Hours",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_nexaris_firewall_sentinel",
+			"name": "Firewall Sentinel",
+			"chess": "rook",
+			"faction": "nexaris",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 235,
+			"atk": 11,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "packet_lure",
+				"name": "Packet Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_nexaris_data_spire_battery",
+			"name": "Data Spire Battery",
+			"chess": "rook",
+			"faction": "nexaris",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 195,
+			"atk": 15,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "pulse_volley",
+				"name": "Pulse Volley",
+				"desc": "Every 13 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 13,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_nexaris_node_charger",
+			"name": "Node Charger",
+			"chess": "knight",
+			"faction": "nexaris",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 155,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "uplink_charge",
+				"name": "Uplink Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 1 tick.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 1
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "knight_nexaris_ghost_protocol_rider",
+			"name": "Ghost Protocol Rider",
+			"chess": "knight",
+			"faction": "nexaris",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "proxy_gallop",
+				"name": "Proxy Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +20% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.2
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_nexaris_algorithm_mage",
+			"name": "Algorithm Mage",
+			"chess": "bishop",
+			"faction": "nexaris",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "recursive_cascade",
+				"name": "Recursive Cascade",
+				"desc": "Every 8th attack also hits enemies within 2 cells of the target for 80%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 8,
+					"splash_pct": 0.8
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "bishop_nexaris_repair_swarm",
+			"name": "Repair Swarm",
+			"chess": "bishop",
+			"faction": "nexaris",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "nanite_weave",
+				"name": "Nanite Weave",
+				"desc": "Heals all allies for 9% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.09
+				}
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "queen_nexaris_empress_nexa",
+			"name": "Empress Nexa",
+			"chess": "queen",
+			"faction": "nexaris",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 280,
+			"atk": 24,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "root_command",
+				"name": "Root Command",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "machina"
+		},
+		{
+			"id": "rook_verdantia_elderwood_bastion",
+			"name": "Elderwood Bastion",
+			"chess": "rook",
+			"faction": "verdantia",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 245,
+			"atk": 11,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "rootbound_lure",
+				"name": "Rootbound Lure",
+				"desc": "On its first action, taunts adjacent enemies for 8 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 8
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_verdantia_thornvine_ballista",
+			"name": "Thornvine Ballista",
+			"chess": "rook",
+			"faction": "verdantia",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 190,
+			"atk": 15,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "briar_volley",
+				"name": "Briar Volley",
+				"desc": "Every 16 ticks hits the 5 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 16,
+					"targets": 5
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_verdantia_oakhart_knight",
+			"name": "Oakhart Knight",
+			"chess": "knight",
+			"faction": "verdantia",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "stampede_charge",
+				"name": "Stampede Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_verdantia_mossfoot_prowler",
+			"name": "Mossfoot Prowler",
+			"chess": "knight",
+			"faction": "verdantia",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "canopy_gallop",
+				"name": "Canopy Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_verdantia_druid_of_the_grove",
+			"name": "Druid of the Grove",
+			"chess": "bishop",
+			"faction": "verdantia",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 18,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "verdant_cascade",
+				"name": "Verdant Cascade",
+				"desc": "Every 5th attack also hits enemies within 2 cells of the target for 40%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 5,
+					"splash_pct": 0.4
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_verdantia_seedtender",
+			"name": "Seedtender",
+			"chess": "bishop",
+			"faction": "verdantia",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 9,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "greenmend",
+				"name": "Greenmend",
+				"desc": "Heals all allies for 12% max HP every 12 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 12,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "queen_verdantia_queen_verdeline",
+			"name": "Queen Verdeline",
+			"chess": "queen",
+			"faction": "verdantia",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 275,
+			"atk": 25,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "call_of_the_grove",
+				"name": "Call of the Grove",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_besthara_boarback_mammoth",
+			"name": "Boarback Mammoth",
+			"chess": "rook",
+			"faction": "besthara",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 205,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "thunder_lure",
+				"name": "Thunder Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_besthara_tusk_hurler",
+			"name": "Tusk Hurler",
+			"chess": "rook",
+			"faction": "besthara",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "spear_volley",
+				"name": "Spear Volley",
+				"desc": "Every 10 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 10,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_besthara_rhino_rider",
+			"name": "Rhino Rider",
+			"chess": "knight",
+			"faction": "besthara",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 140,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "gore_charge",
+				"name": "Gore Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_besthara_wolfpack_alpha",
+			"name": "Wolfpack Alpha",
+			"chess": "knight",
+			"faction": "besthara",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 22,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "hunt_gallop",
+				"name": "Hunt Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_besthara_totem_shaman",
+			"name": "Totem Shaman",
+			"chess": "bishop",
+			"faction": "besthara",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "spirit_cascade",
+				"name": "Spirit Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 50%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.5
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_besthara_pack_healer",
+			"name": "Pack Healer",
+			"chess": "bishop",
+			"faction": "besthara",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "den_mend",
+				"name": "Den Mend",
+				"desc": "Heals all allies for 10% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "queen_besthara_queen_ursara",
+			"name": "Queen Ursara",
+			"chess": "queen",
+			"faction": "besthara",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 250,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "call_of_the_pack",
+				"name": "Call of the Pack",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_floralis_petalwall_guardian",
+			"name": "Petalwall Guardian",
+			"chess": "rook",
+			"faction": "floralis",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 220,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "pollen_lure",
+				"name": "Pollen Lure",
+				"desc": "On its first action, taunts adjacent enemies for 5 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 5
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_floralis_bloom_catapult",
+			"name": "Bloom Catapult",
+			"chess": "rook",
+			"faction": "floralis",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "blossom_volley",
+				"name": "Blossom Volley",
+				"desc": "Every 12 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 12,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_floralis_thornrose_cavalier",
+			"name": "Thornrose Cavalier",
+			"chess": "knight",
+			"faction": "floralis",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 155,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "bramble_charge",
+				"name": "Bramble Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_floralis_nightbloom_dancer",
+			"name": "Nightbloom Dancer",
+			"chess": "knight",
+			"faction": "floralis",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "petal_gallop",
+				"name": "Petal Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_floralis_faerie_sorceress",
+			"name": "Faerie Sorceress",
+			"chess": "bishop",
+			"faction": "floralis",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "pollen_cascade",
+				"name": "Pollen Cascade",
+				"desc": "Every 7th attack also hits enemies within 2 cells of the target for 70%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 7,
+					"splash_pct": 0.7
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_floralis_lily_mender",
+			"name": "Lily Mender",
+			"chess": "bishop",
+			"faction": "floralis",
 			"role": "Support",
 			"rarity": "rare",
 			"hp": 110,
@@ -246,17 +2527,345 @@
 			"range": 3,
 			"move": 2,
 			"skill": {
-				"id": "blessed_mend",
-				"name": "Blessed Mend",
-				"desc": "Heals all allies for 10% max HP every 10 ticks."
+				"id": "nectar_mend",
+				"name": "Nectar Mend",
+				"desc": "Heals all allies for 11% max HP every 9 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 9,
+					"heal_pct": 0.11
+				}
 			},
-			"slot": 2
+			"slot": -1,
+			"continent": "sylvaris"
 		},
 		{
-			"id": "queen_aurelia",
-			"name": "Empress Aurelia",
+			"id": "queen_floralis_queen_floriana",
+			"name": "Queen Floriana",
 			"chess": "queen",
-			"faction": "solvaris",
+			"faction": "floralis",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 250,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_bloom",
+				"name": "Edict of Bloom",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_terragorn_granite_colossus",
+			"name": "Granite Colossus",
+			"chess": "rook",
+			"faction": "terragorn",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 230,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "quake_lure",
+				"name": "Quake Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_terragorn_boulder_slinger",
+			"name": "Boulder Slinger",
+			"chess": "rook",
+			"faction": "terragorn",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 200,
+			"atk": 15,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "rockfall_volley",
+				"name": "Rockfall Volley",
+				"desc": "Every 14 ticks hits the 4 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 14,
+					"targets": 4
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_terragorn_cragborn_charger",
+			"name": "Cragborn Charger",
+			"chess": "knight",
+			"faction": "terragorn",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 170,
+			"atk": 16,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "landslide_charge",
+				"name": "Landslide Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "knight_terragorn_dustwalker",
+			"name": "Dustwalker",
+			"chess": "knight",
+			"faction": "terragorn",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "sandstep_gallop",
+				"name": "Sandstep Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_terragorn_geomancer",
+			"name": "Geomancer",
+			"chess": "bishop",
+			"faction": "terragorn",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 19,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "tremor_cascade",
+				"name": "Tremor Cascade",
+				"desc": "Every 4th attack also hits enemies within 2 cells of the target for 35%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 4,
+					"splash_pct": 0.35
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "bishop_terragorn_clay_mender",
+			"name": "Clay Mender",
+			"chess": "bishop",
+			"faction": "terragorn",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "mudpack_mend",
+				"name": "Mudpack Mend",
+				"desc": "Heals all allies for 11% max HP every 11 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 11,
+					"heal_pct": 0.11
+				}
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "queen_terragorn_queen_terra_magna",
+			"name": "Queen Terra Magna",
+			"chess": "queen",
+			"faction": "terragorn",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 285,
+			"atk": 24,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "decree_of_the_peak",
+				"name": "Decree of the Peak",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "sylvaris"
+		},
+		{
+			"id": "rook_drakhan_dragonscale_bulwark",
+			"name": "Dragonscale Bulwark",
+			"chess": "rook",
+			"faction": "drakhan",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 215,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "wyrmroar_lure",
+				"name": "Wyrmroar Lure",
+				"desc": "On its first action, taunts adjacent enemies for 4 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_drakhan_drake_ballista",
+			"name": "Drake Ballista",
+			"chess": "rook",
+			"faction": "drakhan",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 180,
+			"atk": 16,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "breath_volley",
+				"name": "Breath Volley",
+				"desc": "Every 9 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 9,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_drakhan_wyrmrider",
+			"name": "Wyrmrider",
+			"chess": "knight",
+			"faction": "drakhan",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 140,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "plunge_charge",
+				"name": "Plunge Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 4 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_drakhan_wyvern_scout",
+			"name": "Wyvern Scout",
+			"chess": "knight",
+			"faction": "drakhan",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 23,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "talon_gallop",
+				"name": "Talon Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_drakhan_flame_oracle",
+			"name": "Flame Oracle",
+			"chess": "bishop",
+			"faction": "drakhan",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 90,
+			"atk": 21,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "dragonbreath_cascade",
+				"name": "Dragonbreath Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 45%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.45
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_drakhan_eggkeeper",
+			"name": "Eggkeeper",
+			"chess": "bishop",
+			"faction": "drakhan",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "warmth_mend",
+				"name": "Warmth Mend",
+				"desc": "Heals all allies for 12% max HP every 14 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 14,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "queen_drakhan_dragonqueen_drakara",
+			"name": "Dragonqueen Drakara",
+			"chess": "queen",
+			"faction": "drakhan",
 			"role": "Fighter",
 			"rarity": "epic",
 			"hp": 260,
@@ -264,11 +2873,1784 @@
 			"range": 2,
 			"move": 4,
 			"skill": {
-				"id": "sovereign_decree",
-				"name": "Sovereign Decree",
-				"desc": "Allies gain +15% ATK while she lives."
+				"id": "edict_of_wings",
+				"name": "Edict of Wings",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
 			},
-			"slot": 0
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_inferna_hellgate_keeper",
+			"name": "Hellgate Keeper",
+			"chess": "rook",
+			"faction": "inferna",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 220,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "hellfire_lure",
+				"name": "Hellfire Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_inferna_brimstone_mortar",
+			"name": "Brimstone Mortar",
+			"chess": "rook",
+			"faction": "inferna",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 170,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "pitch_volley",
+				"name": "Pitch Volley",
+				"desc": "Every 11 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 11,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_inferna_pit_fiend_charger",
+			"name": "Pit Fiend Charger",
+			"chess": "knight",
+			"faction": "inferna",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 145,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "abyssal_charge",
+				"name": "Abyssal Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_inferna_imp_assassin",
+			"name": "Imp Assassin",
+			"chess": "knight",
+			"faction": "inferna",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 23,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "hellmare_gallop",
+				"name": "Hellmare Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_inferna_hexweaver",
+			"name": "Hexweaver",
+			"chess": "bishop",
+			"faction": "inferna",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "cursefire_cascade",
+				"name": "Cursefire Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 60%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.6
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_inferna_soul_priestess",
+			"name": "Soul Priestess",
+			"chess": "bishop",
+			"faction": "inferna",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "pact_mend",
+				"name": "Pact Mend",
+				"desc": "Heals all allies for 8% max HP every 8 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 8,
+					"heal_pct": 0.08
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "queen_inferna_queen_infernia",
+			"name": "Queen Infernia",
+			"chess": "queen",
+			"faction": "inferna",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 245,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_torment",
+				"name": "Edict of Torment",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_bloodfang_bonewall_juggernaut",
+			"name": "Bonewall Juggernaut",
+			"chess": "rook",
+			"faction": "bloodfang",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 200,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "gore_lure",
+				"name": "Gore Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_bloodfang_blood_harpoon",
+			"name": "Blood Harpoon",
+			"chess": "rook",
+			"faction": "bloodfang",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 165,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "harpoon_volley",
+				"name": "Harpoon Volley",
+				"desc": "Every 13 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 13,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_bloodfang_bloodrider",
+			"name": "Bloodrider",
+			"chess": "knight",
+			"faction": "bloodfang",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 130,
+			"atk": 20,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "frenzy_charge",
+				"name": "Frenzy Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 1 tick.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 1
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_bloodfang_night_fang",
+			"name": "Night Fang",
+			"chess": "knight",
+			"faction": "bloodfang",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 23,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "crimson_gallop",
+				"name": "Crimson Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +20% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.2
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_bloodfang_hemomancer",
+			"name": "Hemomancer",
+			"chess": "bishop",
+			"faction": "bloodfang",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 95,
+			"atk": 21,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "bloodstorm_cascade",
+				"name": "Bloodstorm Cascade",
+				"desc": "Every 8th attack also hits enemies within 2 cells of the target for 80%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 8,
+					"splash_pct": 0.8
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_bloodfang_plague_surgeon",
+			"name": "Plague Surgeon",
+			"chess": "bishop",
+			"faction": "bloodfang",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 11,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "transfusion_mend",
+				"name": "Transfusion Mend",
+				"desc": "Heals all allies for 9% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.09
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "queen_bloodfang_queen_sanguina",
+			"name": "Queen Sanguina",
+			"chess": "queen",
+			"faction": "bloodfang",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 240,
+			"atk": 28,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_blood",
+				"name": "Edict of Blood",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_warborn_warhulk_brute",
+			"name": "Warhulk Brute",
+			"chess": "rook",
+			"faction": "warborn",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 230,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "warcry_lure",
+				"name": "Warcry Lure",
+				"desc": "On its first action, taunts adjacent enemies for 8 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 8
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_warborn_skullshot_ballista",
+			"name": "Skullshot Ballista",
+			"chess": "rook",
+			"faction": "warborn",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 180,
+			"atk": 16,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "bone_volley",
+				"name": "Bone Volley",
+				"desc": "Every 16 ticks hits the 5 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 16,
+					"targets": 5
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_warborn_boar_rider",
+			"name": "Boar Rider",
+			"chess": "knight",
+			"faction": "warborn",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "charge_of_the_horde",
+				"name": "Charge of the Horde",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "knight_warborn_knifeear_raider",
+			"name": "Knifeear Raider",
+			"chess": "knight",
+			"faction": "warborn",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 130,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "raiding_gallop",
+				"name": "Raiding Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_warborn_warchanter",
+			"name": "Warchanter",
+			"chess": "bishop",
+			"faction": "warborn",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "drumfire_cascade",
+				"name": "Drumfire Cascade",
+				"desc": "Every 5th attack also hits enemies within 2 cells of the target for 40%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 5,
+					"splash_pct": 0.4
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "bishop_warborn_bone_healer",
+			"name": "Bone Healer",
+			"chess": "bishop",
+			"faction": "warborn",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "tribal_mend",
+				"name": "Tribal Mend",
+				"desc": "Heals all allies for 12% max HP every 12 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 12,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "queen_warborn_queen_grukka",
+			"name": "Queen Grukka",
+			"chess": "queen",
+			"faction": "warborn",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 260,
+			"atk": 26,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_the_horde",
+				"name": "Edict of the Horde",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "drakmor"
+		},
+		{
+			"id": "rook_abyssal_deepsea_leviathan",
+			"name": "Deepsea Leviathan",
+			"chess": "rook",
+			"faction": "abyssal",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 220,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "abyssal_lure",
+				"name": "Abyssal Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_abyssal_trench_harpooner",
+			"name": "Trench Harpooner",
+			"chess": "rook",
+			"faction": "abyssal",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 190,
+			"atk": 15,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "depth_volley",
+				"name": "Depth Volley",
+				"desc": "Every 10 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 10,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_abyssal_kraken_knight",
+			"name": "Kraken Knight",
+			"chess": "knight",
+			"faction": "abyssal",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "maelstrom_charge",
+				"name": "Maelstrom Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_abyssal_dread_eel_stalker",
+			"name": "Dread Eel Stalker",
+			"chess": "knight",
+			"faction": "abyssal",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 22,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "undertow_gallop",
+				"name": "Undertow Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_abyssal_deep_oracle",
+			"name": "Deep Oracle",
+			"chess": "bishop",
+			"faction": "abyssal",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 19,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "whirlpool_cascade",
+				"name": "Whirlpool Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 50%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.5
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_abyssal_black_pearl_cleric",
+			"name": "Black Pearl Cleric",
+			"chess": "bishop",
+			"faction": "abyssal",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "abyssal_mend",
+				"name": "Abyssal Mend",
+				"desc": "Heals all allies for 10% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "queen_abyssal_queen_nerithia",
+			"name": "Queen Nerithia",
+			"chess": "queen",
+			"faction": "abyssal",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 275,
+			"atk": 25,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_the_deep",
+				"name": "Edict of the Deep",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_pelagia_coral_bastion",
+			"name": "Coral Bastion",
+			"chess": "rook",
+			"faction": "pelagia",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 235,
+			"atk": 11,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "reef_lure",
+				"name": "Reef Lure",
+				"desc": "On its first action, taunts adjacent enemies for 5 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 5
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_pelagia_conch_cannon",
+			"name": "Conch Cannon",
+			"chess": "rook",
+			"faction": "pelagia",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 195,
+			"atk": 15,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "shell_volley",
+				"name": "Shell Volley",
+				"desc": "Every 12 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 12,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_pelagia_seahorse_lancer",
+			"name": "Seahorse Lancer",
+			"chess": "knight",
+			"faction": "pelagia",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 155,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "tide_charge",
+				"name": "Tide Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_pelagia_reefshade_darter",
+			"name": "Reefshade Darter",
+			"chess": "knight",
+			"faction": "pelagia",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "current_gallop",
+				"name": "Current Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_pelagia_tidecaller",
+			"name": "Tidecaller",
+			"chess": "bishop",
+			"faction": "pelagia",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "surging_cascade",
+				"name": "Surging Cascade",
+				"desc": "Every 7th attack also hits enemies within 2 cells of the target for 70%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 7,
+					"splash_pct": 0.7
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_pelagia_tidemother_s_handmaid",
+			"name": "Tidemother's Handmaid",
+			"chess": "bishop",
+			"faction": "pelagia",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "gentle_tide",
+				"name": "Gentle Tide",
+				"desc": "Heals all allies for 11% max HP every 9 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 9,
+					"heal_pct": 0.11
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "queen_pelagia_queen_pelagra",
+			"name": "Queen Pelagra",
+			"chess": "queen",
+			"faction": "pelagia",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 280,
+			"atk": 24,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_the_tides",
+				"name": "Edict of the Tides",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_tempestra_stormwall_rampart",
+			"name": "Stormwall Rampart",
+			"chess": "rook",
+			"faction": "tempestra",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 210,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "gale_lure",
+				"name": "Gale Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_tempestra_lightning_rod_cannon",
+			"name": "Lightning Rod Cannon",
+			"chess": "rook",
+			"faction": "tempestra",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "bolt_volley",
+				"name": "Bolt Volley",
+				"desc": "Every 14 ticks hits the 4 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 14,
+					"targets": 4
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_tempestra_squall_cavalier",
+			"name": "Squall Cavalier",
+			"chess": "knight",
+			"faction": "tempestra",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 140,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "cyclone_charge",
+				"name": "Cyclone Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_tempestra_gale_dancer",
+			"name": "Gale Dancer",
+			"chess": "knight",
+			"faction": "tempestra",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 24,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "gust_gallop",
+				"name": "Gust Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_tempestra_stormcaller",
+			"name": "Stormcaller",
+			"chess": "bishop",
+			"faction": "tempestra",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 95,
+			"atk": 21,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "tempest_cascade",
+				"name": "Tempest Cascade",
+				"desc": "Every 4th attack also hits enemies within 2 cells of the target for 35%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 4,
+					"splash_pct": 0.35
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_tempestra_rainbringer",
+			"name": "Rainbringer",
+			"chess": "bishop",
+			"faction": "tempestra",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "downpour_mend",
+				"name": "Downpour Mend",
+				"desc": "Heals all allies for 11% max HP every 11 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 11,
+					"heal_pct": 0.11
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "queen_tempestra_queen_tempesta",
+			"name": "Queen Tempesta",
+			"chess": "queen",
+			"faction": "tempestra",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 235,
+			"atk": 28,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_thunder",
+				"name": "Edict of Thunder",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_corsaria_ironclad_hulk",
+			"name": "Ironclad Hulk",
+			"chess": "rook",
+			"faction": "corsaria",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 205,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "anchor_lure",
+				"name": "Anchor Lure",
+				"desc": "On its first action, taunts adjacent enemies for 4 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_corsaria_gunnery_brig",
+			"name": "Gunnery Brig",
+			"chess": "rook",
+			"faction": "corsaria",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "broadside_volley",
+				"name": "Broadside Volley",
+				"desc": "Every 9 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 9,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_corsaria_cutlass_cavalier",
+			"name": "Cutlass Cavalier",
+			"chess": "knight",
+			"faction": "corsaria",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 140,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "boarding_charge",
+				"name": "Boarding Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 4 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 4
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "knight_corsaria_cutthroat_corsair",
+			"name": "Cutthroat Corsair",
+			"chess": "knight",
+			"faction": "corsaria",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 22,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "plank_gallop",
+				"name": "Plank Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_corsaria_powder_mage",
+			"name": "Powder Mage",
+			"chess": "bishop",
+			"faction": "corsaria",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "powder_keg_cascade",
+				"name": "Powder Keg Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 45%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.45
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "bishop_corsaria_ship_s_surgeon",
+			"name": "Ship's Surgeon",
+			"chess": "bishop",
+			"faction": "corsaria",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "grog_mend",
+				"name": "Grog Mend",
+				"desc": "Heals all allies for 12% max HP every 14 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 14,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "queen_corsaria_queen_redwave",
+			"name": "Queen Redwave",
+			"chess": "queen",
+			"faction": "corsaria",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 250,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "captain_s_command",
+				"name": "Captain's Command",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "thalassia"
+		},
+		{
+			"id": "rook_solstice_equinox_sentinel",
+			"name": "Equinox Sentinel",
+			"chess": "rook",
+			"faction": "solstice",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 220,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "zenith_lure",
+				"name": "Zenith Lure",
+				"desc": "On its first action, taunts adjacent enemies for 7 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 7
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "rook_solstice_solar_array",
+			"name": "Solar Array",
+			"chess": "rook",
+			"faction": "solstice",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "solstice_volley",
+				"name": "Solstice Volley",
+				"desc": "Every 11 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 11,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_solstice_dayturn_lancer",
+			"name": "Dayturn Lancer",
+			"chess": "knight",
+			"faction": "solstice",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 155,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "dawnrise_charge",
+				"name": "Dawnrise Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_solstice_twilight_courser",
+			"name": "Twilight Courser",
+			"chess": "knight",
+			"faction": "solstice",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 125,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "dusk_gallop",
+				"name": "Dusk Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +10% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_solstice_sunwheel_mage",
+			"name": "Sunwheel Mage",
+			"chess": "bishop",
+			"faction": "solstice",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "eclipse_cascade",
+				"name": "Eclipse Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 60%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.6
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_solstice_aurora_priest",
+			"name": "Aurora Priest",
+			"chess": "bishop",
+			"faction": "solstice",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "daylight_mend",
+				"name": "Daylight Mend",
+				"desc": "Heals all allies for 8% max HP every 8 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 8,
+					"heal_pct": 0.08
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "queen_solstice_empress_solara",
+			"name": "Empress Solara",
+			"chess": "queen",
+			"faction": "solstice",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 250,
+			"atk": 27,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_seasons",
+				"name": "Edict of Seasons",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "rook_paradox_loop_bastion",
+			"name": "Loop Bastion",
+			"chess": "rook",
+			"faction": "paradox",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 200,
+			"atk": 13,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "causal_lure",
+				"name": "Causal Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "rook_paradox_anomaly_cannon",
+			"name": "Anomaly Cannon",
+			"chess": "rook",
+			"faction": "paradox",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 175,
+			"atk": 16,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "glitch_volley",
+				"name": "Glitch Volley",
+				"desc": "Every 13 ticks hits the 3 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 13,
+					"targets": 3
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_paradox_mirage_lancer",
+			"name": "Mirage Lancer",
+			"chess": "knight",
+			"faction": "paradox",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 150,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "phase_charge",
+				"name": "Phase Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 1 tick.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 1
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_paradox_doppel_stalker",
+			"name": "Doppel Stalker",
+			"chess": "knight",
+			"faction": "paradox",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 115,
+			"atk": 23,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "shift_gallop",
+				"name": "Shift Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +20% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.2
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_paradox_entropy_mage",
+			"name": "Entropy Mage",
+			"chess": "bishop",
+			"faction": "paradox",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 95,
+			"atk": 21,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "chaos_cascade",
+				"name": "Chaos Cascade",
+				"desc": "Every 8th attack also hits enemies within 2 cells of the target for 80%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 8,
+					"splash_pct": 0.8
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_paradox_fractured_healer",
+			"name": "Fractured Healer",
+			"chess": "bishop",
+			"faction": "paradox",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 11,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "splitmend",
+				"name": "Splitmend",
+				"desc": "Heals all allies for 9% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.09
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "queen_paradox_empress_paradoxia",
+			"name": "Empress Paradoxia",
+			"chess": "queen",
+			"faction": "paradox",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 255,
+			"atk": 26,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_maybe",
+				"name": "Edict of Maybe",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "rook_eternis_timeless_monolith",
+			"name": "Timeless Monolith",
+			"chess": "rook",
+			"faction": "eternis",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 240,
+			"atk": 11,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "stasis_lure",
+				"name": "Stasis Lure",
+				"desc": "On its first action, taunts adjacent enemies for 8 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 8
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "rook_eternis_eon_beam_tower",
+			"name": "Eon Beam Tower",
+			"chess": "rook",
+			"faction": "eternis",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 200,
+			"atk": 14,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "millennium_volley",
+				"name": "Millennium Volley",
+				"desc": "Every 16 ticks hits the 5 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 16,
+					"targets": 5
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_eternis_ageless_knight",
+			"name": "Ageless Knight",
+			"chess": "knight",
+			"faction": "eternis",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "eon_charge",
+				"name": "Eon Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 3 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 3
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_eternis_dustweaver",
+			"name": "Dustweaver",
+			"chess": "knight",
+			"faction": "eternis",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 130,
+			"atk": 21,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "hourglass_gallop",
+				"name": "Hourglass Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +15% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.15
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_eternis_chronicler",
+			"name": "Chronicler",
+			"chess": "bishop",
+			"faction": "eternis",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 19,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "epoch_cascade",
+				"name": "Epoch Cascade",
+				"desc": "Every 5th attack also hits enemies within 2 cells of the target for 40%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 5,
+					"splash_pct": 0.4
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_eternis_elder_mender",
+			"name": "Elder Mender",
+			"chess": "bishop",
+			"faction": "eternis",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 9,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "evergreen_mend",
+				"name": "Evergreen Mend",
+				"desc": "Heals all allies for 12% max HP every 12 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 12,
+					"heal_pct": 0.12
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "queen_eternis_empress_eternia",
+			"name": "Empress Eternia",
+			"chess": "queen",
+			"faction": "eternis",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 290,
+			"atk": 24,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_ages",
+				"name": "Edict of Ages",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "rook_oblivion_void_gate_keeper",
+			"name": "Void Gate Keeper",
+			"chess": "rook",
+			"faction": "oblivion",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 210,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "null_lure",
+				"name": "Null Lure",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks.",
+				"mechanic": "bulwark",
+				"params": {
+					"taunt_ticks": 6
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "rook_oblivion_entropy_driver",
+			"name": "Entropy Driver",
+			"chess": "rook",
+			"faction": "oblivion",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 160,
+			"atk": 17,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "annihilation_volley",
+				"name": "Annihilation Volley",
+				"desc": "Every 10 ticks hits the 2 nearest enemies.",
+				"mechanic": "ballista_volley",
+				"params": {
+					"interval": 10,
+					"targets": 2
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_oblivion_voidrider",
+			"name": "Voidrider",
+			"chess": "knight",
+			"faction": "oblivion",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 140,
+			"atk": 19,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "rift_charge",
+				"name": "Rift Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks.",
+				"mechanic": "charge",
+				"params": {
+					"stun_ticks": 2
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "knight_oblivion_starless_reaver",
+			"name": "Starless Reaver",
+			"chess": "knight",
+			"faction": "oblivion",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 24,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "oblivion_gallop",
+				"name": "Oblivion Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy; its next attack deals +5% damage.",
+				"mechanic": "night_gallop",
+				"params": {
+					"strike_bonus": 0.05
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_oblivion_nullcaster",
+			"name": "Nullcaster",
+			"chess": "bishop",
+			"faction": "oblivion",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 95,
+			"atk": 21,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "collapse_cascade",
+				"name": "Collapse Cascade",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 50%.",
+				"mechanic": "arcane_barrage",
+				"params": {
+					"every": 6,
+					"splash_pct": 0.5
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "bishop_oblivion_black_hole_medic",
+			"name": "Black Hole Medic",
+			"chess": "bishop",
+			"faction": "oblivion",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 105,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "absorption_mend",
+				"name": "Absorption Mend",
+				"desc": "Heals all allies for 10% max HP every 10 ticks.",
+				"mechanic": "blessed_mend",
+				"params": {
+					"interval": 10,
+					"heal_pct": 0.1
+				}
+			},
+			"slot": -1,
+			"continent": "eclipsia"
+		},
+		{
+			"id": "queen_oblivion_empress_nihila",
+			"name": "Empress Nihila",
+			"chess": "queen",
+			"faction": "oblivion",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 235,
+			"atk": 28,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "edict_of_nothing",
+				"name": "Edict of Nothing",
+				"desc": "Allies gain +15% ATK while she lives.",
+				"mechanic": "sovereign_decree"
+			},
+			"slot": -1,
+			"continent": "eclipsia"
 		}
 	],
 	"supports": [
@@ -502,6 +4884,989 @@
 			"value": 1,
 			"description": "Your next Battle Shop reroll is free.",
 			"owned_default": true
+		},
+		{
+			"id": "sup_call_to_arms",
+			"name": "Call to Arms",
+			"category": "Creation",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "summon_pawns",
+			"value": 1,
+			"description": "Create 1 Pawn in your deployment area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_spark",
+			"name": "Spark",
+			"category": "Magic",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "area_damage",
+			"value": 40,
+			"description": "Deal 40 damage in a 3x3 area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_flame_burst",
+			"name": "Flame Burst",
+			"category": "Magic",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "area_damage",
+			"value": 60,
+			"description": "Deal 60 damage in a 3x3 area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_minor_mend",
+			"name": "Minor Mend",
+			"category": "Magic",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "heal_all",
+			"value": 10,
+			"description": "Heal all allies for 10% max HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_healing_light",
+			"name": "Healing Light",
+			"category": "Magic",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "heal_all",
+			"value": 15,
+			"description": "Heal all allies for 15% max HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_chill_touch",
+			"name": "Chill Touch",
+			"category": "Magic",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "freeze_area",
+			"value": 1,
+			"description": "Freeze enemies in a 3x3 area for 1 second.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_whetstone",
+			"name": "Whetstone",
+			"category": "Artifact",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "buff_atk",
+			"value": 10,
+			"description": "Equip a unit: +10% ATK.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_padded_vest",
+			"name": "Padded Vest",
+			"category": "Artifact",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "buff_hp",
+			"value": 10,
+			"description": "Equip a unit: +10% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_rallying_drum",
+			"name": "Rallying Drum",
+			"category": "Skill",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "team_atk",
+			"value": 5,
+			"description": "All allies gain +5% ATK for 6 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_quickstep",
+			"name": "Quickstep",
+			"category": "Skill",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "team_speed",
+			"value": 10,
+			"description": "All allies gain bonus attack speed for 4 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_minor_ward",
+			"name": "Minor Ward",
+			"category": "Blessing",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "shield_all",
+			"value": 15,
+			"description": "All allies gain a 15-point shield.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_sacred_aegis",
+			"name": "Sacred Aegis",
+			"category": "Blessing",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "shield_all",
+			"value": 20,
+			"description": "All allies gain a 20-point shield.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_pocket_change",
+			"name": "Pocket Change",
+			"category": "Blessing",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "gold_on_win",
+			"value": 25,
+			"description": "Gain 25 Dominion Gold if you win this duel.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_tithe",
+			"name": "Tithe",
+			"category": "Blessing",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "gold_on_win",
+			"value": 75,
+			"description": "Gain 75 Dominion Gold if you win this duel.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_squire_s_loan",
+			"name": "Squire's Loan",
+			"category": "Contract",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "temp_capacity",
+			"value": 1,
+			"description": "+1 deployment capacity for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_hired_blades",
+			"name": "Hired Blades",
+			"category": "Contract",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "temp_capacity",
+			"value": 2,
+			"description": "+2 deployment capacity for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_minor_pact",
+			"name": "Minor Pact",
+			"category": "Contract",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "lifesteal_pact",
+			"value": 5,
+			"cost": 5,
+			"description": "Allies heal 5% of damage dealt; you lose 5 Gold.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_crimson_pact",
+			"name": "Crimson Pact",
+			"category": "Contract",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "lifesteal_pact",
+			"value": 10,
+			"cost": 10,
+			"description": "Allies heal 10% of damage dealt; you lose 10 Gold.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_bargain_hunter",
+			"name": "Bargain Hunter",
+			"category": "Contract",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "free_reroll",
+			"value": 2,
+			"description": "Your next 2 Battle Shop rerolls are free.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_muster_the_guard",
+			"name": "Muster the Guard",
+			"category": "Creation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "summon_pawns",
+			"value": 3,
+			"description": "Create 3 Pawns in your deployment area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_stone_palisade",
+			"name": "Stone Palisade",
+			"category": "Creation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "create_wall",
+			"value": 2,
+			"description": "Create a barrier tile that blocks movement for 8 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_twin_familiars",
+			"name": "Twin Familiars",
+			"category": "Creation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "summon_familiar",
+			"value": 2,
+			"description": "Create 2 free Mage familiars.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_field_promotion",
+			"name": "Field Promotion",
+			"category": "Transformation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "promote_pawn",
+			"value": 2,
+			"description": "Transform 2 Pawns into Knights for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_hex",
+			"name": "Hex",
+			"category": "Transformation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "polymorph_enemy",
+			"value": 2,
+			"description": "Turn the 2 strongest enemy units into weak creatures for 4 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_inferno",
+			"name": "Inferno",
+			"category": "Magic",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "area_damage",
+			"value": 120,
+			"description": "Deal 120 damage in a 3x3 area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_greater_heal",
+			"name": "Greater Heal",
+			"category": "Magic",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "heal_all",
+			"value": 40,
+			"description": "Heal all allies for 40% max HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_deep_freeze",
+			"name": "Deep Freeze",
+			"category": "Magic",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "freeze_area",
+			"value": 3,
+			"description": "Freeze enemies in a 3x3 area for 3 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_blade_of_fury",
+			"name": "Blade of Fury",
+			"category": "Artifact",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "buff_atk",
+			"value": 30,
+			"description": "Equip a unit: +30% ATK.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_plate_mail",
+			"name": "Plate Mail",
+			"category": "Artifact",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "buff_hp",
+			"value": 40,
+			"description": "Equip a unit: +40% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_courier_boots",
+			"name": "Courier Boots",
+			"category": "Artifact",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "buff_move",
+			"value": 2,
+			"description": "Equip a unit: +2 Movement.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_warhorn",
+			"name": "Warhorn",
+			"category": "Skill",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "team_atk",
+			"value": 15,
+			"description": "All allies gain +15% ATK for 6 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_war_chant",
+			"name": "War Chant",
+			"category": "Skill",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "team_atk",
+			"value": 20,
+			"description": "All allies gain +20% ATK for 6 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_double_focus",
+			"name": "Double Focus",
+			"category": "Skill",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "instant_skill",
+			"value": 2,
+			"description": "2 different units cast their skill immediately.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_haste",
+			"name": "Haste",
+			"category": "Skill",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "team_speed",
+			"value": 20,
+			"description": "All allies gain bonus attack speed for 8 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_windfall",
+			"name": "Windfall",
+			"category": "Blessing",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "gold_on_win",
+			"value": 100,
+			"description": "Gain 100 Dominion Gold if you win this duel.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_mending_angel",
+			"name": "Mending Angel",
+			"category": "Blessing",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "revive_once",
+			"value": 1,
+			"hp_pct": 75,
+			"description": "Revive the first fallen unit with 75% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_conscript_levy",
+			"name": "Conscript Levy",
+			"category": "Contract",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "temp_capacity",
+			"value": 4,
+			"description": "+4 deployment capacity for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_vampiric_bargain",
+			"name": "Vampiric Bargain",
+			"category": "Contract",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "lifesteal_pact",
+			"value": 20,
+			"cost": 30,
+			"description": "Allies heal 20% of damage dealt; you lose 30 Gold.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_merchant_guild",
+			"name": "Merchant Guild",
+			"category": "Contract",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "free_reroll",
+			"value": 3,
+			"description": "Your next 3 Battle Shop rerolls are free.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_raise_the_banner",
+			"name": "Raise the Banner",
+			"category": "Creation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "summon_pawns",
+			"value": 4,
+			"description": "Create 4 Pawns in your deployment area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_iron_rampart",
+			"name": "Iron Rampart",
+			"category": "Creation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "create_wall",
+			"value": 3,
+			"description": "Create a barrier tile that blocks movement for 12 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_obsidian_bulwark",
+			"name": "Obsidian Bulwark",
+			"category": "Creation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "create_wall",
+			"value": 4,
+			"description": "Create a barrier tile that blocks movement for 16 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_familiar_pack",
+			"name": "Familiar Pack",
+			"category": "Creation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "summon_familiar",
+			"value": 3,
+			"description": "Create 3 free Mage familiars.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_familiar_swarm",
+			"name": "Familiar Swarm",
+			"category": "Creation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "summon_familiar",
+			"value": 4,
+			"description": "Create 4 free Mage familiars.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_knighthood",
+			"name": "Knighthood",
+			"category": "Transformation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "promote_pawn",
+			"value": 3,
+			"description": "Transform 3 Pawns into Knights for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_order_of_knights",
+			"name": "Order of Knights",
+			"category": "Transformation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "promote_pawn",
+			"value": 4,
+			"description": "Transform 4 Pawns into Knights for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_mass_polymorph",
+			"name": "Mass Polymorph",
+			"category": "Transformation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "polymorph_enemy",
+			"value": 3,
+			"description": "Turn the 3 strongest enemy units into weak creatures for 4 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_sheep_storm",
+			"name": "Sheep Storm",
+			"category": "Transformation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "polymorph_enemy",
+			"value": 4,
+			"description": "Turn the 4 strongest enemy units into weak creatures for 4 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_twin_ascension",
+			"name": "Twin Ascension",
+			"category": "Transformation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "ascend_unit",
+			"value": 2,
+			"description": "Grant 2 different units +1 star for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_meteor_strike",
+			"name": "Meteor Strike",
+			"category": "Magic",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "area_damage",
+			"value": 160,
+			"description": "Deal 160 damage in a 3x3 area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_phoenix_breath",
+			"name": "Phoenix Breath",
+			"category": "Magic",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "heal_all",
+			"value": 60,
+			"description": "Heal all allies for 60% max HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_glacial_prison",
+			"name": "Glacial Prison",
+			"category": "Magic",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "freeze_area",
+			"value": 4,
+			"description": "Freeze enemies in a 3x3 area for 4 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_absolute_zero",
+			"name": "Absolute Zero",
+			"category": "Magic",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "freeze_area",
+			"value": 5,
+			"description": "Freeze enemies in a 3x3 area for 5 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_warlord_s_gauntlet",
+			"name": "Warlord's Gauntlet",
+			"category": "Artifact",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "buff_atk",
+			"value": 40,
+			"description": "Equip a unit: +40% ATK.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_titan_armor",
+			"name": "Titan Armor",
+			"category": "Artifact",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "buff_hp",
+			"value": 60,
+			"description": "Equip a unit: +60% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_stormstriders",
+			"name": "Stormstriders",
+			"category": "Artifact",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "buff_move",
+			"value": 3,
+			"description": "Equip a unit: +3 Movement.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_phantom_treads",
+			"name": "Phantom Treads",
+			"category": "Artifact",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "buff_move",
+			"value": 4,
+			"description": "Equip a unit: +4 Movement.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_berserker_roar",
+			"name": "Berserker Roar",
+			"category": "Skill",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "team_atk",
+			"value": 30,
+			"description": "All allies gain +30% ATK for 6 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_triple_focus",
+			"name": "Triple Focus",
+			"category": "Skill",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "instant_skill",
+			"value": 3,
+			"description": "3 different units cast their skill immediately.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_mind_surge",
+			"name": "Mind Surge",
+			"category": "Skill",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "instant_skill",
+			"value": 4,
+			"description": "4 different units cast their skill immediately.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_tempest_tempo",
+			"name": "Tempest Tempo",
+			"category": "Skill",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "team_speed",
+			"value": 25,
+			"description": "All allies gain bonus attack speed for 10 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_holy_bulwark",
+			"name": "Holy Bulwark",
+			"category": "Blessing",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "shield_all",
+			"value": 50,
+			"description": "All allies gain a 50-point shield.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_royal_bounty",
+			"name": "Royal Bounty",
+			"category": "Blessing",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "gold_on_win",
+			"value": 150,
+			"description": "Gain 150 Dominion Gold if you win this duel.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_radiant_resurrection",
+			"name": "Radiant Resurrection",
+			"category": "Blessing",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "revive_once",
+			"value": 1,
+			"hp_pct": 100,
+			"description": "Revive the first fallen unit with 100% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_twin_angels",
+			"name": "Twin Angels",
+			"category": "Blessing",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "revive_once",
+			"value": 2,
+			"hp_pct": 50,
+			"description": "Revive the first 2 fallen units with 50% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_royal_conscription",
+			"name": "Royal Conscription",
+			"category": "Contract",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "temp_capacity",
+			"value": 5,
+			"description": "+5 deployment capacity for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_sanguine_covenant",
+			"name": "Sanguine Covenant",
+			"category": "Contract",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "lifesteal_pact",
+			"value": 25,
+			"cost": 40,
+			"description": "Allies heal 25% of damage dealt; you lose 40 Gold.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_black_market_pass",
+			"name": "Black Market Pass",
+			"category": "Contract",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "free_reroll",
+			"value": 4,
+			"description": "Your next 4 Battle Shop rerolls are free.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_legion_call",
+			"name": "Legion Call",
+			"category": "Creation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "summon_pawns",
+			"value": 5,
+			"description": "Create 5 Pawns in your deployment area.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_citadel_wall",
+			"name": "Citadel Wall",
+			"category": "Creation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "create_wall",
+			"value": 5,
+			"description": "Create a barrier tile that blocks movement for 20 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_arcane_menagerie",
+			"name": "Arcane Menagerie",
+			"category": "Creation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "summon_familiar",
+			"value": 5,
+			"description": "Create 5 free Mage familiars.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_chivalric_decree",
+			"name": "Chivalric Decree",
+			"category": "Transformation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "promote_pawn",
+			"value": 5,
+			"description": "Transform 5 Pawns into Knights for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_great_transmutation",
+			"name": "Great Transmutation",
+			"category": "Transformation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "polymorph_enemy",
+			"value": 5,
+			"description": "Turn the 5 strongest enemy units into weak creatures for 4 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_rite_of_ascent",
+			"name": "Rite of Ascent",
+			"category": "Transformation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "ascend_unit",
+			"value": 3,
+			"description": "Grant 3 different units +1 star for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_grand_ascension",
+			"name": "Grand Ascension",
+			"category": "Transformation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "ascend_unit",
+			"value": 4,
+			"description": "Grant 4 different units +1 star for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_apotheosis",
+			"name": "Apotheosis",
+			"category": "Transformation",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "ascend_unit",
+			"value": 5,
+			"description": "Grant 5 different units +1 star for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_dragonfang",
+			"name": "Dragonfang",
+			"category": "Artifact",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "buff_atk",
+			"value": 50,
+			"description": "Equip a unit: +50% ATK.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_dragon_scale",
+			"name": "Dragon Scale",
+			"category": "Artifact",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "buff_hp",
+			"value": 80,
+			"description": "Equip a unit: +80% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_wings_of_mercury",
+			"name": "Wings of Mercury",
+			"category": "Artifact",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "buff_move",
+			"value": 5,
+			"description": "Equip a unit: +5 Movement.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_unleash",
+			"name": "Unleash",
+			"category": "Skill",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "instant_skill",
+			"value": 5,
+			"description": "5 different units cast their skill immediately.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_overdrive",
+			"name": "Overdrive",
+			"category": "Skill",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "team_speed",
+			"value": 30,
+			"description": "All allies gain bonus attack speed for 12 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_divine_barrier",
+			"name": "Divine Barrier",
+			"category": "Blessing",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "shield_all",
+			"value": 70,
+			"description": "All allies gain a 70-point shield.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_choir_of_angels",
+			"name": "Choir of Angels",
+			"category": "Blessing",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "revive_once",
+			"value": 3,
+			"hp_pct": 50,
+			"description": "Revive the first 3 fallen units with 50% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_golden_ledger",
+			"name": "Golden Ledger",
+			"category": "Contract",
+			"rarity": "legendary",
+			"uses": 1,
+			"effect": "free_reroll",
+			"value": 5,
+			"description": "Your next 5 Battle Shop rerolls are free.",
+			"owned_default": false
 		}
-	]
+	],
+	"legacy_ids": {
+		"rook_citadel_warden": "rook_solvaris_sunwall_bastion",
+		"rook_siege_tower": "rook_solvaris_sunspear_ballista",
+		"knight_dawnlancer": "knight_solvaris_dawnbreaker_paladin",
+		"knight_nightfall_rider": "knight_solvaris_goldmane_outrider",
+		"bishop_elarion_seer": "bishop_solvaris_heliomancer",
+		"bishop_valdoria_chaplain": "bishop_solvaris_sunlit_chaplain",
+		"queen_aurelia": "queen_solvaris_queen_solenne_the_dawn",
+		"rook_arcanum_runestone_bastion": "rook_astralis_orrery_sentinel",
+		"rook_arcanum_spellspire_obelisk": "rook_astralis_nova_obelisk",
+		"knight_arcanum_blink_cavalier": "knight_astralis_comet_cavalier",
+		"knight_arcanum_phantom_courser": "knight_astralis_void_skimmer",
+		"bishop_arcanum_mana_oracle": "bishop_astralis_astromancer",
+		"bishop_arcanum_wellspring_warden": "bishop_astralis_celestial_attendant",
+		"queen_arcanum_archmage_queen_vaelora": "queen_astralis_archmage_queen_astrelle",
+		"rook_machina_boilerplate_bulwark": "rook_ferrum_ironclad_rampart",
+		"rook_machina_tesla_coil_battery": "rook_ferrum_siege_howitzer",
+		"knight_machina_piston_lancer": "knight_ferrum_ironhorse_charger",
+		"knight_machina_clockwork_stalker": "knight_ferrum_rustblade_skirmisher",
+		"bishop_machina_arc_engineer": "bishop_ferrum_foundry_savant",
+		"bishop_machina_nanite_medic": "bishop_ferrum_rivet_medic",
+		"queen_machina_empress_automata_regina": "queen_ferrum_empress_ferra",
+		"rook_sylvaris_elder_treant_warden": "rook_verdantia_elderwood_bastion",
+		"rook_sylvaris_briarthorn_ballista": "rook_verdantia_thornvine_ballista",
+		"knight_sylvaris_stag_knight": "knight_verdantia_oakhart_knight",
+		"knight_sylvaris_moonfang_rider": "knight_verdantia_mossfoot_prowler",
+		"bishop_sylvaris_spore_seer": "bishop_verdantia_druid_of_the_grove",
+		"bishop_sylvaris_lifebloom_priest": "bishop_verdantia_seedtender",
+		"queen_sylvaris_matriarch_sylvana": "queen_verdantia_queen_verdeline",
+		"rook_drakmor_wyrmscale_juggernaut": "rook_drakhan_dragonscale_bulwark",
+		"rook_drakmor_cinder_catapult": "rook_drakhan_drake_ballista",
+		"knight_drakmor_wyvern_knight": "knight_drakhan_wyrmrider",
+		"knight_drakmor_hellmare_raider": "knight_drakhan_wyvern_scout",
+		"bishop_drakmor_infernal_warlock": "bishop_drakhan_flame_oracle",
+		"bishop_drakmor_bloodpact_cleric": "bishop_drakhan_eggkeeper",
+		"queen_drakmor_warqueen_morgrath": "queen_drakhan_dragonqueen_drakara",
+		"rook_thalassia_reef_warden": "rook_abyssal_deepsea_leviathan",
+		"rook_thalassia_broadside_galleon": "rook_abyssal_trench_harpooner",
+		"knight_thalassia_riptide_cavalier": "knight_abyssal_kraken_knight",
+		"knight_thalassia_tideshadow_corsair": "knight_abyssal_dread_eel_stalker",
+		"bishop_thalassia_tempest_mage": "bishop_abyssal_deep_oracle",
+		"bishop_thalassia_tidemender": "bishop_abyssal_black_pearl_cleric",
+		"queen_thalassia_admiral_queen_marisol": "queen_abyssal_queen_nerithia",
+		"rook_eclipsia_chronolith_sentinel": "rook_solstice_equinox_sentinel",
+		"rook_eclipsia_star_rift_battery": "rook_solstice_solar_array",
+		"knight_eclipsia_epoch_lancer": "knight_solstice_dayturn_lancer",
+		"knight_eclipsia_echo_rider": "knight_solstice_twilight_courser",
+		"bishop_eclipsia_reality_weaver": "bishop_solstice_sunwheel_mage",
+		"bishop_eclipsia_hourglass_priest": "bishop_solstice_aurora_priest",
+		"queen_eclipsia_empress_kairos": "queen_solstice_empress_solara"
+	}
 }

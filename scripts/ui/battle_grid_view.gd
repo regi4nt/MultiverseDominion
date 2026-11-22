@@ -10,6 +10,7 @@ const GLYPHS := {"pawn": "P", "rook": "R", "knight": "N", "bishop": "B", "queen"
 var prep: BattlePrep
 var engine: BattleEngine
 var selected: UnitInstance
+var own_faction: String = ""  # faction of the human side (its Champion's): shared pieces are drawn in its colour in preparation
 var anim_speed: float = 1.0  # follows the battle speed buttons
 var _vis: Dictionary = {}  # unit uid -> Vector2 (cell units): smoothly follows the unit's real cell
 var _lunge: Dictionary = {}  # uid -> {"dir": Vector2, "t": float}: attack lunge
@@ -192,7 +193,7 @@ func _draw() -> void:
 		for u in prep.deployed_units():
 			var card := CardDatabase.get_unit(u.card_id)
 			var st := u.stats()
-			_draw_token(font, Vector2(u.cell), 0, u.chess(), String(card["faction"]), u.stars, int(st["hp"]), int(st["hp"]), 0, false, u == selected)
+			_draw_token(font, Vector2(u.cell), 0, u.chess(), CardDatabase.effective_faction(card, own_faction), u.stars, int(st["hp"]), int(st["hp"]), 0, false, u == selected)
 
 
 func _draw_token(font: Font, c: Vector2, side: int, chess: String, faction: String, stars: int, hp: int, max_hp: int, shield: int, king: bool, selected_flag: bool) -> void:

@@ -116,7 +116,7 @@ static func is_skipped(version: String) -> bool:
 ## The update dialog, shared by the main menu (automatic) and Settings (manual). `can_skip` adds "Skip this version".
 static func show_dialog(parent: Node, info: Dictionary, can_skip: bool) -> void:
 	var version := String(info.get("version", ""))
-	var dlg := ConfirmationDialog.new()
+	var dlg := UiDialog.new()
 	dlg.title = "Update available"
 	var notes := clean_notes(String(info.get("notes", "")))
 	dlg.dialog_text = "Version %s is available (you have %s).%s\n\nDownload it, then open the downloaded file to install.\nIf Android asks, allow installing from this source." % [

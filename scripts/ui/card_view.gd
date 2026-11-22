@@ -5,7 +5,7 @@ extends Control
 signal pressed(card_id: String)
 
 const RARITY_COLORS := {"common": Color("8d93ad"), "rare": Color("3f8fe0"), "epic": Color("a65cf0"), "legendary": Color("d4af37")}
-const GLYPHS := {"pawn": "P", "rook": "R", "knight": "N", "bishop": "B", "queen": "Q"}
+const GLYPHS := {"pawn": "P", "rook": "R", "knight": "N", "bishop": "B", "queen": "Q", "king": "K"}
 
 var card: Dictionary = {}
 var is_support: bool = false
@@ -48,6 +48,8 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _faction_color() -> Color:
+	if not is_support and CardDatabase.is_shared(card):
+		return Color("7d86ad")  # shared piece: neutral steel-blue, it takes the colour of whoever fields it
 	var f := GameData.get_faction(CardDatabase.active_continent, String(card.get("faction", "")))
 	return Color(f.get("color", "#555566"))
 

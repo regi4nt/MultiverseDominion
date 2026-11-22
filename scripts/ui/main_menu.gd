@@ -2,7 +2,7 @@ extends Control
 ## Main Menu. Entries for later phases are visible but disabled and marked TODO.
 
 
-var _quit_dialog: ConfirmationDialog
+var _quit_dialog: UiDialog
 
 
 ## Android Back button: ask before leaving the game.
@@ -51,6 +51,9 @@ func _ready() -> void:
 	var coll := UiTheme.make_button("Collection & Deck")
 	coll.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/card_collection/card_collection.tscn"))
 	right.add_child(coll)
+	var shop := UiTheme.make_button("Shop")
+	shop.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/shop/shop.tscn"))
+	right.add_child(shop)
 	var profile := UiTheme.make_button("Profile")
 	profile.pressed.connect(_show_profile)
 	right.add_child(profile)
@@ -60,8 +63,9 @@ func _ready() -> void:
 	var quit := UiTheme.make_button("Quit")
 	quit.pressed.connect(func(): _quit_dialog.popup_centered(Vector2i(460, 160)))
 	right.add_child(quit)
-	_quit_dialog = ConfirmationDialog.new()
-	_quit_dialog.dialog_text = "Quit Multiverse Dominion?"
+	_quit_dialog = UiDialog.new()
+	_quit_dialog.title = "Quit game?"
+	_quit_dialog.dialog_text = "Multiverse Dominion will close. A match in progress is saved at the start of each of your turns."
 	_quit_dialog.ok_button_text = "Quit"
 	_quit_dialog.cancel_button_text = "Stay"
 	_quit_dialog.confirmed.connect(func(): get_tree().quit())
@@ -81,10 +85,11 @@ func _ready() -> void:
 
 
 func _show_profile() -> void:
-	var s: Dictionary = SaveManager.data["stats"]
-	var dlg := AcceptDialog.new()
-	dlg.title = "Profile"
-	dlg.dialog_text = "%s\nMatches: %d   Wins: %d   Losses: %d\nRounds played: %d\nBest gold: %d" % [
-		SaveManager.data["profile"]["name"], s["matches_played"], s["wins"], s["losses"], s["total_rounds"], s["best_gold"]]
+	var dlg := UiDialog.new()
+	dlg.body_node = ProfileView.build()
+	dlg.show_cancel = false
+	dlg.ok_button_text = "Close"
+	dlg.confirmed.connect(dlg.queue_free)
+	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
-	dlg.popup_centered(Vector2i(520, 240))
+	dlg.popup_centered(Vector2i(640, 0))

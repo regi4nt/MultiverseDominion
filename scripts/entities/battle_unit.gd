@@ -18,6 +18,15 @@ var atk_range: int = 1
 var move: int = 1
 var skill_id: String = ""
 var skill_value: float = 0.0  # champion active skill strength (data: active_value)
+var params: Dictionary = {}  # per-continent skill numbers (data: skill.params); empty = base values
+var extra: String = ""  # the card's continent buff: effect type (data/card_buffs.json), see CardDatabase.BUFF_TYPES
+var extra_value: float = 0.0  # strength of the buff (a count for evade / stun_proc / chill)
+var kills: int = 0
+var burn_until: int = 0
+var burn_amount: int = 0
+var buff_next_tick: int = 0
+var strike_bonus: float = 0.0  # Knight (Assassin): damage bonus of the next attack, set by the teleport
+var second_life_used: bool = false
 var cell: Vector2i = Vector2i.ZERO
 var alive: bool = true
 var shield: int = 0

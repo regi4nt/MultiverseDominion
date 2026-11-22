@@ -15,7 +15,8 @@ var gold: int = 0
 var budget_left: int = 0
 var level: int = 3
 var offers: Array[String] = []
-var free_reroll: bool = false
+var free_reroll: bool = false  # true while at least one free Battle Shop reroll is left
+var free_rerolls_left: int = 0
 var merge_log: Array[String] = []
 var price_mult: float = 1.0  # Quartermaster passive
 var capacity_bonus: int = 0  # Mercenary Pact (Support card applied during preparation)
@@ -62,6 +63,7 @@ func apply_hand(hand: Array) -> void:
 			"temp_capacity":
 				capacity_bonus += int(s.get("value", 0))
 			"free_reroll":
+				free_rerolls_left += maxi(int(s.get("value", 1)), 1)
 				free_reroll = true
 
 
@@ -134,7 +136,9 @@ func refresh_offers(paid: bool) -> bool:
 			return false
 		gold -= cost
 		budget_left -= cost
-		free_reroll = false
+		if free_reroll:
+			free_rerolls_left -= 1
+			free_reroll = free_rerolls_left > 0
 	var back: Array[String] = []
 	for o in offers:
 		if o != "":

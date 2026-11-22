@@ -3,6 +3,10 @@ extends Node
 
 func _ready() -> void:
 	var fails := 0
+	# Orientation: sensor landscape (4) so the screen can flip to the opposite landscape; 0 would lock one direction.
+	if int(ProjectSettings.get_setting("display/window/handheld/orientation")) != 4:
+		fails += 1
+		push_error("orientation should be sensor landscape (4)")
 	# --- Battle Practice
 	var b: Control = load("res://scenes/battle_board/battle_board.tscn").instantiate()
 	add_child(b)

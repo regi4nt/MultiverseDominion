@@ -8,6 +8,7 @@ var continents: Array = []
 var champions: Dictionary = {}
 var events: Array = []
 var cards: Dictionary = {}
+var card_buffs: Dictionary = {}  # continent id -> card id -> buff {name, type, value, desc}
 var special_dice: Array = []
 
 
@@ -17,6 +18,7 @@ func _ready() -> void:
 	champions = _load_json("res://data/champions.json")
 	events = _load_json("res://data/events.json").get("events", [])
 	cards = _load_json("res://data/cards.json")
+	card_buffs = _load_json("res://data/card_buffs.json")
 	special_dice = _load_json("res://data/special_dice.json").get("dice", [])
 
 

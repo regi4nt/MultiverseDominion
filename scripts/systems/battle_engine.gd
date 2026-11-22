@@ -39,7 +39,8 @@ var ai_supports: Array = [false, true]
 var bonus_gold: Array = [0, 0]
 var gold_delta: Array = [0, 0]  # gold gained/lost by Support cards (e.g. Blood Oath), applied after the duel
 var walls: Dictionary = {}  # Vector2i -> tick when the wall expires (Forge Bastion)
-var revive_pending: Array = [false, false]
+var revive_pending: Array = [false, false]  # Guardian Angel family: number of revives left (bool-compatible)
+var revive_hp_pct: Array = [50, 50]
 var lifesteal: Array = [0.0, 0.0]
 var haste_until: Array = [0, 0]
 var finished: bool = false
@@ -48,6 +49,8 @@ var end_reason: String = ""
 var events: Array = []  # visual events of the last tick
 var log_lines: Array[String] = []
 var _uid: int = 0
+var _reflecting: bool = false  # guards Thorns against endless reflection
+const BUFF_INTERVAL := 8
 
 
 # ------------------------------------------------------------------ setup
@@ -64,21 +67,34 @@ func setup(cfg: Dictionary) -> void:
 		for sid in hands[side]:
 			if PREP_SUPPORTS.has(String(CardDatabase.get_support(String(sid)).get("effect", ""))):
 				(used_supports[side] as Array).append(sid)  # already applied in preparation
-		var synergy := _synergy(sc["units"])
+		var side_fac := _side_faction(side)
+		var synergy := _synergy(sc["units"], side_fac)
 		for fac in synergy:
 			_log("Side %d faction synergy: %s +%d%%" % [side, String(fac).capitalize(), int(float(synergy[fac]) * 100.0)])
 		for e in sc["units"]:
-			var fac: String = CardDatabase.get_unit(e["card_id"]).get("faction", "")
+			var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
 			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)))
+	for u in units:  # Queen of Machina: the side starts with shields
+		if u.extra == "opening_shield":
+			for a in units_of(u.side):
+				a.shield += int(round(a.max_hp * u.extra_value))
 	_log("Battle begins!")
 	_check_king_entries()
 
 
+## The faction a side fights for = the faction of its Champion.
+func _side_faction(side: int) -> String:
+	return String(GameData.get_champion(String(king_data[side])).get("faction", ""))
+
+
 ## Faction Synergy: 2+ units of one faction = +5%, 4+ = +15%, 6+ = +30% HP and ATK.
-func _synergy(list: Array) -> Dictionary:
+## Shared pieces (Rook, Knight, Bishop, Queen) count for the side's own faction; a side without a Champion has none.
+func _synergy(list: Array, side_fac: String = "") -> Dictionary:
 	var counts := {}
 	for e in list:
-		var fac: String = CardDatabase.get_unit(e["card_id"]).get("faction", "")
+		var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
+		if fac == "":
+			continue
 		counts[fac] = int(counts.get(fac, 0)) + 1
 	var out := {}
 	for fac in counts:
@@ -103,26 +119,62 @@ func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: 
 	u.display_name = card["name"]
 	u.chess = card["chess"]
 	u.role = card["role"]
-	u.faction = card["faction"]
+	u.faction = CardDatabase.effective_faction(card, _side_faction(side))
 	u.stars = stars
 	u.max_hp = int(round(float(st["hp"]) * (1.0 + bonus)))
 	u.hp = u.max_hp
 	u.base_atk = int(round(float(st["atk"]) * (1.0 + bonus) * WorldMods.atk_mult))
 	u.atk_range = int(card["range"])
 	u.move = int(card["move"])
-	u.skill_id = String(card["skill"].get("id", ""))
+	u.skill_id = CardDatabase.skill_mechanic(card)  # themed continent skills map to a base mechanic
 	u.cell = cell
-	u.next_skill_tick = _skill_interval(u.skill_id)
+	u.params = card["skill"].get("params", {})  # per-continent numbers of the skill (defaults = the Aetherion values)
+	var bf := CardDatabase.get_buff(card_id)  # the card's buff of its continent (data/card_buffs.json)
+	u.extra = String(bf.get("type", ""))
+	u.extra_value = float(bf.get("value", 0.0))
+	u.next_skill_tick = _skill_interval(u)
+	_init_buff(u)
 	units.append(u)
 	grid[cell] = u
 	return u
 
 
-func _skill_interval(skill_id: String) -> int:
-	match skill_id:
+## A numeric skill parameter of a unit (data: skill.params), falling back to the base value.
+func _p(u: BattleUnit, key: String, default: Variant) -> Variant:
+	return u.params.get(key, default)
+
+
+## Buff effects that change the unit when it is created.
+func _init_buff(u: BattleUnit) -> void:
+	match u.extra:
+		"swift":
+			u.move += int(u.extra_value)
+		"opener":
+			u.strike_bonus = u.extra_value
+		"ward":
+			u.shield += int(round(u.max_hp * u.extra_value))
+		"regen", "mend_self":
+			u.buff_next_tick = BUFF_INTERVAL
+
+
+## Periodic buff effects (their own timer, independent of the unit's skill).
+func _buff_periodic(u: BattleUnit) -> void:
+	if u.buff_next_tick == 0 or tick < u.buff_next_tick:
+		return
+	u.buff_next_tick = tick + BUFF_INTERVAL
+	match u.extra:
+		"regen":
+			for a in units_of(u.side):
+				_heal(a, int(round(a.max_hp * u.extra_value)))
+		"mend_self":
+			_heal(u, int(round(u.max_hp * u.extra_value)))
+
+
+func _skill_interval(u: BattleUnit) -> int:
+	match u.skill_id:
 		"rally_banner": return 8
-		"blessed_mend": return 10
-		"ballista_volley": return 12
+		"blessed_mend": return int(_p(u, "interval", 10))
+		"ballista_volley": return int(_p(u, "interval", 12))
 	return 0
 
 
@@ -174,6 +226,15 @@ func atk_now(u: BattleUnit) -> int:
 		if a.side == u.side and a.alive and a.skill_id == "sovereign_decree":
 			m *= 1.15
 			break
+	if u.extra == "rage" and u.hp * 2 < u.max_hp:
+		m *= 1.0 + u.extra_value
+	elif u.extra == "frenzy":
+		m *= 1.0 + u.extra_value * mini(u.kills, 5)
+	var aura := 0.0
+	for a in units:
+		if a != u and a.side == u.side and a.alive and a.extra == "aura_atk" and _dist(a.cell, u.cell) <= 1:
+			aura = maxf(aura, a.extra_value)
+	m *= 1.0 + aura
 	return int(round(float(u.base_atk) * m))
 
 
@@ -215,6 +276,10 @@ func step() -> void:
 	for wc in walls.keys():
 		if int(walls[wc]) <= tick:
 			walls.erase(wc)
+	if tick % 4 == 0:  # burning units take damage over time
+		for u in units:
+			if u.alive and u.burn_until > tick:
+				_damage(u, u.burn_amount)
 	var order: Array[BattleUnit] = []
 	for u in units:
 		if u.alive:
@@ -241,6 +306,7 @@ func _act(u: BattleUnit) -> void:
 	if u.slow_until > tick and tick % 2 == 1:
 		return
 	_periodic_skill(u)
+	_buff_periodic(u)
 	if not u.opened:
 		u.opened = true
 		if _opening_skill(u):
@@ -332,6 +398,11 @@ func _move_unit(u: BattleUnit, c: Vector2i) -> void:
 func _attack(u: BattleUnit, t: BattleUnit) -> void:
 	var dmg := float(atk_now(u))
 	u.attacks_made += 1
+	if u.strike_bonus > 0.0:  # Knight (Assassin): the first attack after the teleport hits harder
+		dmg *= 1.0 + u.strike_bonus
+		u.strike_bonus = 0.0
+	if u.extra == "execute" and t.hp * 10 < t.max_hp * 3:
+		dmg *= 1.0 + u.extra_value
 	match u.skill_id:
 		"radiant_strike":
 			if u.attacks_made % 3 == 0:
@@ -346,6 +417,8 @@ func _attack(u: BattleUnit, t: BattleUnit) -> void:
 	var amount := int(round(dmg))
 	var tcell := t.cell
 	var dealt := _damage(t, amount)
+	if not t.alive:
+		u.kills += 1
 	events.append({"type": "attack", "from": u.cell, "to": tcell, "dmg": dealt})
 	if float(lifesteal[u.side]) > 0.0:
 		_heal(u, int(round(dealt * float(lifesteal[u.side]))))
@@ -353,11 +426,31 @@ func _attack(u: BattleUnit, t: BattleUnit) -> void:
 		for e in units_of(1 - u.side):
 			if e != t and _dist(e.cell, tcell) <= 1:
 				_damage(e, int(round(amount * 0.25)))
-	elif u.skill_id == "arcane_barrage" and u.attacks_made % 6 == 0:
+	elif u.skill_id == "arcane_barrage" and u.attacks_made % int(_p(u, "every", 6)) == 0:
 		for e in units_of(1 - u.side):
 			if e != t and _dist(e.cell, tcell) <= 2:
-				_damage(e, int(round(amount * 0.5)))
+				_damage(e, int(round(amount * float(_p(u, "splash_pct", 0.5)))))
 		_log("%s unleashes Arcane Barrage!" % u.display_name)
+	match u.extra:  # Queen: continent-specific additional effect
+		"splash":
+			for e in units_of(1 - u.side):
+				if e != t and _dist(e.cell, tcell) <= 1:
+					_damage(e, int(round(amount * u.extra_value)))
+		"lifesteal":
+			_heal(u, int(round(dealt * u.extra_value)))
+		"chill":
+			t.slow_until = tick + int(u.extra_value)
+		"burn":
+			if t.alive:
+				t.burn_until = tick + 12
+				t.burn_amount = maxi(1, int(round(u.base_atk * u.extra_value)))
+		"stun_proc":
+			if t.alive and u.attacks_made % int(u.extra_value) == 0:
+				t.stun_until = tick + 2
+	if t.extra == "thorns" and t.alive and u.alive and dealt > 0 and not _reflecting:
+		_reflecting = true
+		_damage(u, maxi(1, int(round(dealt * t.extra_value))))
+		_reflecting = false
 
 
 ## Rally (team_speed): every 3rd attack comes a tick sooner (about +20% attack speed).
@@ -370,12 +463,21 @@ func _attack_interval(u: BattleUnit) -> int:
 func _damage(t: BattleUnit, amount: int) -> int:
 	if not t.alive:
 		return 0
+	if t.extra == "evade" and (t.hits_taken + 1) % int(t.extra_value) == 0:
+		t.hits_taken += 1  # every Nth hit is avoided
+		return 0
 	var dmg := float(amount)
+	if t.extra == "armor":
+		dmg *= 1.0 - t.extra_value
 	if t.skill_id == "shield_wall":
 		for a in units_of(t.side):
 			if a != t and _dist(a.cell, t.cell) <= 1:
 				dmg *= 0.8
 				break
+	for a in units:  # Queen of Aetherion: allies within 2 cells (and she herself) take less damage
+		if a.side == t.side and a.alive and a.extra == "guard" and _dist(a.cell, t.cell) <= 2:
+			dmg *= 1.0 - a.extra_value
+			break
 	if t.reduce_until > tick:
 		dmg *= 0.5
 	var d := int(round(dmg))
@@ -393,18 +495,34 @@ func _damage(t: BattleUnit, amount: int) -> int:
 
 
 func _kill(t: BattleUnit) -> void:
-	if bool(revive_pending[t.side]) and not t.is_king:
-		revive_pending[t.side] = false  # Guardian Angel: the first fallen unit returns at 50% HP
-		t.hp = maxi(1, int(t.max_hp * 0.5))
+	if int(revive_pending[t.side]) > 0 and not t.is_king:
+		revive_pending[t.side] = int(revive_pending[t.side]) - 1  # Guardian Angel: the first fallen unit(s) return with a share of HP
+		t.hp = maxi(1, int(t.max_hp * float(revive_hp_pct[t.side]) / 100.0))
 		t.shield = 0
 		events.append({"type": "fx", "cells": [t.cell]})
 		_log("%s is revived by a Guardian Angel!" % t.display_name)
+		return
+	if t.extra == "second_life" and not t.second_life_used and not t.is_king:
+		t.second_life_used = true  # Queen of Eclipsia: returns once at a share of her max HP
+		t.hp = maxi(1, int(t.max_hp * t.extra_value))
+		t.shield = 0
+		events.append({"type": "fx", "cells": [t.cell]})
+		_log("%s returns for a second life!" % t.display_name)
 		return
 	t.hp = 0
 	t.alive = false
 	grid.erase(t.cell)
 	events.append({"type": "death", "cell": t.cell})
 	_log("%s (side %d) falls." % [t.display_name, t.side])
+	match t.extra:
+		"last_rites":
+			for a in units_of(t.side):
+				if _dist(a.cell, t.cell) <= 1:
+					_heal(a, int(round(a.max_hp * t.extra_value)))
+		"death_burst":
+			for e in units_of(1 - t.side):
+				if _dist(e.cell, t.cell) <= 1:
+					_damage(e, int(round(t.base_atk * t.extra_value)))
 
 
 func _heal(t: BattleUnit, amount: int) -> void:
@@ -415,7 +533,7 @@ func _heal(t: BattleUnit, amount: int) -> void:
 func _periodic_skill(u: BattleUnit) -> void:
 	if u.next_skill_tick == 0 or tick < u.next_skill_tick:
 		return
-	u.next_skill_tick = tick + _skill_interval(u.skill_id)
+	u.next_skill_tick = tick + _skill_interval(u)
 	match u.skill_id:
 		"rally_banner":
 			var low: BattleUnit = null
@@ -426,11 +544,11 @@ func _periodic_skill(u: BattleUnit) -> void:
 				_heal(low, 15)
 		"blessed_mend":
 			for a in units_of(u.side):
-				_heal(a, int(round(a.max_hp * 0.1)))
+				_heal(a, int(round(a.max_hp * float(_p(u, "heal_pct", 0.1)))))
 		"ballista_volley":
 			var list := units_of(1 - u.side)
 			list.sort_custom(func(a: BattleUnit, b: BattleUnit) -> bool: return _dist(u.cell, a.cell) < _dist(u.cell, b.cell))
-			for i in range(mini(3, list.size())):
+			for i in range(mini(int(_p(u, "targets", 3)), list.size())):
 				var dealt := _damage(list[i], atk_now(u))
 				events.append({"type": "attack", "from": u.cell, "to": list[i].cell, "dmg": dealt})
 
@@ -442,7 +560,7 @@ func _opening_skill(u: BattleUnit) -> bool:
 			for e in units_of(1 - u.side):
 				if _dist(e.cell, u.cell) <= 1:
 					e.taunt_uid = u.uid
-					e.taunt_until = tick + 6
+					e.taunt_until = tick + int(_p(u, "taunt_ticks", 6))
 			return false
 		"charge":
 			var far := _extreme_enemy(u, true)
@@ -450,7 +568,7 @@ func _opening_skill(u: BattleUnit) -> bool:
 				var c := _free_adjacent(far.cell, u.cell)
 				if c.x >= 0:
 					_move_unit(u, c)
-					far.stun_until = tick + 3
+					far.stun_until = tick + int(_p(u, "stun_ticks", 2)) + 1
 					_log("%s charges %s!" % [u.display_name, far.display_name])
 					return true
 		"night_gallop":
@@ -462,6 +580,7 @@ func _opening_skill(u: BattleUnit) -> bool:
 				var c := _free_adjacent(weak.cell, Vector2i(weak.cell.x, 3 if u.side == 0 else 4))
 				if c.x >= 0:
 					_move_unit(u, c)
+					u.strike_bonus = float(_p(u, "strike_bonus", 0.0))
 					_log("%s teleports behind %s." % [u.display_name, weak.display_name])
 					return true
 	return false
@@ -659,10 +778,15 @@ func use_support(side: int, support_id: String) -> String:
 		"gold_on_win":
 			bonus_gold[side] += value
 		"summon_familiar":
-			var fc := _free_cell_near(Vector2i(3, 6) if side == 0 else Vector2i(4, 1))
-			if fc.x < 0:
+			var fam_made := 0
+			for i in range(maxi(value, 1)):  # value = number of familiars
+				var fc := _free_cell_near(Vector2i(3, 6) if side == 0 else Vector2i(4, 1))
+				if fc.x < 0:
+					break
+				_spawn_unit(side, "pawn_starling_initiate", 1, fc, 0.0)
+				fam_made += 1
+			if fam_made == 0:
 				return "No free cell."
-			_spawn_unit(side, "pawn_starling_initiate", 1, fc, 0.0)
 		"create_wall":
 			var wc := _wall_cell(side)
 			if wc.x < 0:
@@ -670,34 +794,49 @@ func use_support(side: int, support_id: String) -> String:
 			walls[wc] = tick + 16 * maxi(value, 1)
 			events.append({"type": "fx", "cells": [wc]})
 		"promote_pawn":
-			var pawn: BattleUnit = null
-			for a in units_of(side):
-				if a.chess == "pawn" and (pawn == null or a.hp > pawn.hp):
-					pawn = a
-			if pawn == null:
+			var promoted := 0
+			for i in range(maxi(value, 1)):  # value = number of Pawns promoted
+				var pawn: BattleUnit = null
+				for a in units_of(side):
+					if a.chess == "pawn" and (pawn == null or a.hp > pawn.hp):
+						pawn = a
+				if pawn == null:
+					break
+				pawn.chess = "knight"
+				pawn.move = 3
+				pawn.max_hp = int(pawn.max_hp * 1.5)
+				pawn.hp = int(pawn.hp * 1.5)
+				pawn.base_atk = int(pawn.base_atk * 1.3)
+				promoted += 1
+			if promoted == 0:
 				return "No Pawn to promote."
-			pawn.chess = "knight"
-			pawn.move = 3
-			pawn.max_hp = int(pawn.max_hp * 1.5)
-			pawn.hp = int(pawn.hp * 1.5)
-			pawn.base_atk = int(pawn.base_atk * 1.3)
 		"polymorph_enemy":
-			var strong := _best_unit(enemy_side, "atk")
-			if strong == null:
+			var poly_skip: Array = []
+			for i in range(maxi(value, 1)):  # value = number of enemies turned into weak creatures (strongest first)
+				var strong := _best_unit(enemy_side, "atk", false, poly_skip)
+				if strong == null:
+					break
+				poly_skip.append(strong)
+				strong.buff_mult = 0.2
+				strong.buff_until = tick + 16
+				strong.slow_until = tick + 16
+			if poly_skip.is_empty():
 				return "No target."
-			strong.buff_mult = 0.2
-			strong.buff_until = tick + 16
-			strong.slow_until = tick + 16
 		"ascend_unit":
-			var up := _best_unit(side, "power", true)
-			if up == null:
+			var asc_skip: Array = []
+			for i in range(maxi(value, 1)):  # value = number of different units that gain +1 star
+				var up := _best_unit(side, "power", true, asc_skip)
+				if up == null:
+					break
+				asc_skip.append(up)
+				var now := CardDatabase.unit_stats(up.card_id, up.stars)
+				var nxt := CardDatabase.unit_stats(up.card_id, up.stars + 1)
+				up.max_hp += int(nxt["hp"]) - int(now["hp"])
+				up.hp += int(nxt["hp"]) - int(now["hp"])
+				up.base_atk += int(nxt["atk"]) - int(now["atk"])
+				up.stars += 1
+			if asc_skip.is_empty():
 				return "No unit can ascend."
-			var now := CardDatabase.unit_stats(up.card_id, up.stars)
-			var nxt := CardDatabase.unit_stats(up.card_id, up.stars + 1)
-			up.max_hp += int(nxt["hp"]) - int(now["hp"])
-			up.hp += int(nxt["hp"]) - int(now["hp"])
-			up.base_atk += int(nxt["atk"]) - int(now["atk"])
-			up.stars += 1
 		"freeze_area":
 			var foes2 := units_of(enemy_side)
 			if foes2.is_empty():
@@ -736,16 +875,21 @@ func use_support(side: int, support_id: String) -> String:
 				return "No unit."
 			bm.move += value
 		"team_speed":
-			haste_until[side] = tick + 24
+			haste_until[side] = tick + int(round(24.0 * float(maxi(value, 1)) / 15.0))  # value 15 = 6 s; the duration scales with value
 		"instant_skill":
-			var err := _instant_skill(side)
-			if err != "":
-				return err
+			var cast_skip: Array = []
+			for i in range(maxi(value, 1)):  # value = number of different units that cast at once
+				var err := _instant_skill(side, cast_skip)
+				if err != "":
+					if cast_skip.is_empty():
+						return err
+					break
 		"revive_once":
-			revive_pending[side] = true
+			revive_pending[side] = maxi(value, 1)  # value = number of revives, "hp_pct" = HP they return with
+			revive_hp_pct[side] = int(s.get("hp_pct", 50))
 		"lifesteal_pact":
 			lifesteal[side] = value / 100.0
-			gold_delta[side] -= 20
+			gold_delta[side] -= int(s.get("cost", 20))  # "cost" (gold) defaults to 20
 		"temp_capacity", "free_reroll":
 			return "This card applies automatically during preparation."
 		_:
@@ -772,11 +916,13 @@ func _log(text: String) -> void:
 
 
 ## Auto-targeting helper: the best own/enemy unit by "atk", "hp" or "power" (hp + 6*atk).
-func _best_unit(side: int, kind: String, only_upgradable: bool = false) -> BattleUnit:
+func _best_unit(side: int, kind: String, only_upgradable: bool = false, skip: Array = []) -> BattleUnit:
 	var best: BattleUnit = null
 	var best_v := -1.0
 	for u in units_of(side):
 		if only_upgradable and (u.is_king or u.stars >= 3):
+			continue
+		if skip.has(u):
 			continue
 		var v := float(u.base_atk)
 		if kind == "hp":
@@ -806,21 +952,28 @@ func _wall_cell(side: int) -> Vector2i:
 
 
 ## Focus: one unit uses its skill right now (periodic skills fire; proc skills proc on the next attack).
-func _instant_skill(side: int) -> String:
+func _instant_skill(side: int, skip: Array = []) -> String:
 	var cands := units_of(side)
 	cands.sort_custom(func(a: BattleUnit, b: BattleUnit) -> bool: return a.base_atk > b.base_atk)
 	for u in cands:
-		if _skill_interval(u.skill_id) > 0:
+		if skip.has(u):
+			continue
+		if _skill_interval(u) > 0:
 			u.next_skill_tick = tick
 			_periodic_skill(u)
+			skip.append(u)
 			return ""
 	for u in cands:
+		if skip.has(u):
+			continue
 		if u.skill_id == "radiant_strike":
 			u.attacks_made = 2
 			u.next_attack_tick = tick
+			skip.append(u)
 			return ""
 		if u.skill_id == "arcane_barrage":
-			u.attacks_made = 5
+			u.attacks_made = int(_p(u, "every", 6)) - 1
 			u.next_attack_tick = tick
+			skip.append(u)
 			return ""
 	return "No unit with a castable skill."

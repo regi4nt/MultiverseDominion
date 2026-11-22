@@ -2,6 +2,7 @@
 	"champion_solvaris": {
 		"name": "Aurelian the Radiant King",
 		"faction": "solvaris",
+		"rarity": "legendary",
 		"continent": "aetherion",
 		"hp": 120,
 		"atk": 14,
@@ -18,6 +19,7 @@
 	"champion_nocthyr": {
 		"name": "Vesper Nightcrown",
 		"faction": "nocthyr",
+		"rarity": "legendary",
 		"continent": "aetherion",
 		"hp": 100,
 		"atk": 18,
@@ -34,6 +36,7 @@
 	"champion_valdoria": {
 		"name": "Lord Valdric Ironbanner",
 		"faction": "valdoria",
+		"rarity": "legendary",
 		"continent": "aetherion",
 		"hp": 140,
 		"atk": 12,
@@ -50,6 +53,7 @@
 	"champion_elarion": {
 		"name": "Queen Elarael Starweaver",
 		"faction": "elarion",
+		"rarity": "legendary",
 		"continent": "aetherion",
 		"hp": 95,
 		"atk": 15,
@@ -66,6 +70,7 @@
 	"champion_astralis": {
 		"name": "Seraphine Starcaller",
 		"faction": "astralis",
+		"rarity": "legendary",
 		"continent": "arcanum",
 		"hp": 95,
 		"atk": 17,
@@ -82,6 +87,7 @@
 	"champion_ignivar": {
 		"name": "Pyrrhus Emberlord",
 		"faction": "ignivar",
+		"rarity": "legendary",
 		"continent": "arcanum",
 		"hp": 105,
 		"atk": 18,
@@ -98,6 +104,7 @@
 	"champion_cryndel": {
 		"name": "Glacia Frostweaver",
 		"faction": "cryndel",
+		"rarity": "legendary",
 		"continent": "arcanum",
 		"hp": 110,
 		"atk": 14,
@@ -114,6 +121,7 @@
 	"champion_umbrael": {
 		"name": "Morrowen the Hollow",
 		"faction": "umbrael",
+		"rarity": "legendary",
 		"continent": "arcanum",
 		"hp": 98,
 		"atk": 16,
@@ -130,6 +138,7 @@
 	"champion_ferrum": {
 		"name": "Ironclad Goliath-7",
 		"faction": "ferrum",
+		"rarity": "legendary",
 		"continent": "machina",
 		"hp": 150,
 		"atk": 11,
@@ -146,6 +155,7 @@
 	"champion_voltrix": {
 		"name": "Tesla Voltarine",
 		"faction": "voltrix",
+		"rarity": "legendary",
 		"continent": "machina",
 		"hp": 90,
 		"atk": 19,
@@ -162,6 +172,7 @@
 	"champion_chronex": {
 		"name": "Horologe Chronarch",
 		"faction": "chronex",
+		"rarity": "legendary",
 		"continent": "machina",
 		"hp": 100,
 		"atk": 15,
@@ -178,6 +189,7 @@
 	"champion_nexaris": {
 		"name": "Nexus Prime Arbiter",
 		"faction": "nexaris",
+		"rarity": "legendary",
 		"continent": "machina",
 		"hp": 110,
 		"atk": 14,
@@ -194,6 +206,7 @@
 	"champion_verdantia": {
 		"name": "Elder Thornwarden",
 		"faction": "verdantia",
+		"rarity": "legendary",
 		"continent": "sylvaris",
 		"hp": 135,
 		"atk": 12,
@@ -210,6 +223,7 @@
 	"champion_besthara": {
 		"name": "Fangmother Besthara",
 		"faction": "besthara",
+		"rarity": "legendary",
 		"continent": "sylvaris",
 		"hp": 110,
 		"atk": 17,
@@ -226,6 +240,7 @@
 	"champion_floralis": {
 		"name": "Lilith Bloomweaver",
 		"faction": "floralis",
+		"rarity": "legendary",
 		"continent": "sylvaris",
 		"hp": 95,
 		"atk": 13,
@@ -242,6 +257,7 @@
 	"champion_terragorn": {
 		"name": "Terragorn the Mountain",
 		"faction": "terragorn",
+		"rarity": "legendary",
 		"continent": "sylvaris",
 		"hp": 140,
 		"atk": 11,
@@ -258,6 +274,7 @@
 	"champion_drakhan": {
 		"name": "Drakhan Wyrmlord",
 		"faction": "drakhan",
+		"rarity": "legendary",
 		"continent": "drakmor",
 		"hp": 125,
 		"atk": 19,
@@ -274,6 +291,7 @@
 	"champion_inferna": {
 		"name": "Inferna Hellbride",
 		"faction": "inferna",
+		"rarity": "legendary",
 		"continent": "drakmor",
 		"hp": 100,
 		"atk": 18,
@@ -290,6 +308,7 @@
 	"champion_bloodfang": {
 		"name": "Bloodfang Reaver",
 		"faction": "bloodfang",
+		"rarity": "legendary",
 		"continent": "drakmor",
 		"hp": 105,
 		"atk": 20,
@@ -306,6 +325,7 @@
 	"champion_warborn": {
 		"name": "Warborn Thane Krogg",
 		"faction": "warborn",
+		"rarity": "legendary",
 		"continent": "drakmor",
 		"hp": 140,
 		"atk": 15,
@@ -322,6 +342,7 @@
 	"champion_abyssal": {
 		"name": "Leviathan Caller Nerith",
 		"faction": "abyssal",
+		"rarity": "legendary",
 		"continent": "thalassia",
 		"hp": 115,
 		"atk": 15,
@@ -338,6 +359,7 @@
 	"champion_pelagia": {
 		"name": "Pelagia Tidemother",
 		"faction": "pelagia",
+		"rarity": "legendary",
 		"continent": "thalassia",
 		"hp": 105,
 		"atk": 13,
@@ -354,6 +376,7 @@
 	"champion_tempestra": {
 		"name": "Tempestra Stormlord",
 		"faction": "tempestra",
+		"rarity": "legendary",
 		"continent": "thalassia",
 		"hp": 95,
 		"atk": 18,
@@ -370,6 +393,7 @@
 	"champion_corsaria": {
 		"name": "Captain Redtide Corsa",
 		"faction": "corsaria",
+		"rarity": "legendary",
 		"continent": "thalassia",
 		"hp": 100,
 		"atk": 17,
@@ -386,6 +410,7 @@
 	"champion_solstice": {
 		"name": "Helion Solstice",
 		"faction": "solstice",
+		"rarity": "legendary",
 		"continent": "eclipsia",
 		"hp": 110,
 		"atk": 16,
@@ -402,6 +427,7 @@
 	"champion_paradox": {
 		"name": "Paradox Wanderer",
 		"faction": "paradox",
+		"rarity": "legendary",
 		"continent": "eclipsia",
 		"hp": 95,
 		"atk": 17,
@@ -418,6 +444,7 @@
 	"champion_eternis": {
 		"name": "Eternis the Unending",
 		"faction": "eternis",
+		"rarity": "legendary",
 		"continent": "eclipsia",
 		"hp": 130,
 		"atk": 13,
@@ -434,6 +461,7 @@
 	"champion_oblivion": {
 		"name": "Oblivion Harbinger",
 		"faction": "oblivion",
+		"rarity": "legendary",
 		"continent": "eclipsia",
 		"hp": 100,
 		"atk": 19,

@@ -17,6 +17,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func go_back() -> void:
+	# An open dialog (UiDialog) takes Back first: it closes like its Cancel button instead of stacking another dialog.
+	for d in get_tree().get_nodes_in_group("ui_dialog"):
+		if d.visible:
+			d.dismiss()
+			return
 	var scene := get_tree().current_scene
 	if scene == null:
 		return

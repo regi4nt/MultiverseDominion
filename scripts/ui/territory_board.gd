@@ -12,7 +12,7 @@ var action_box: HFlowContainer
 var tile_info: Label
 var log_view: RichTextLabel
 var tick: Timer
-var _leave_dialog: ConfirmationDialog
+var _leave_dialog: UiDialog
 var _stats_saved := false
 var _duel_node: Control = null
 var _guide: TutorialGuide = null
@@ -109,7 +109,8 @@ func _build_ui() -> void:
 	menu.custom_minimum_size.x = 96
 	menu.pressed.connect(func(): _leave_dialog.popup_centered(Vector2i(460, 160)))
 	head.add_child(menu)
-	_leave_dialog = ConfirmationDialog.new()
+	_leave_dialog = UiDialog.new()
+	_leave_dialog.title = "Leave match?"
 	_leave_dialog.dialog_text = "Leave to the main menu? The match is saved at the start of each of your turns and can be continued."
 	_leave_dialog.ok_button_text = "Leave"
 	_leave_dialog.cancel_button_text = "Stay"
@@ -375,6 +376,8 @@ func _on_game_over(winner: int) -> void:
 		v.add_child(UiTheme.make_label("%s - net worth %d G%s" % [p.display_name, ctrl.networth(p), "  (OUT)" if not p.alive else ""], 20, p.color))
 	if _new_card != "":
 		v.add_child(UiTheme.make_label("New card unlocked: %s" % CardDatabase.get_support(_new_card)["name"], 20, UiTheme.COL_GOLD))
+	if _stats_saved:
+		v.add_child(UiTheme.make_label("+%d Aether Coins" % SaveManager.last_reward, 20, UiTheme.COL_GOLD))
 	var again := UiTheme.make_button("Play Again", 56)
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	v.add_child(again)

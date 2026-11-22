@@ -20,6 +20,13 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
    Juga: `tutorial_test`, `audio_test`, `rules_test` (Auction, Special Dice, unlock), `save_test`, `perf_test`, `ui_resume_smoke`; dan
    `ui_tutorial_smoke` + `layout_test` (butuh render nyata, lihat BUILD_ANDROID.md bagian 4).
 
+## Shop (Main Menu -> Shop, di atas Profile)
+- Mata uang: **Aether Coins** (disimpan di save, mulai 600). Menang match +150, kalah +50 (`ShopSystem`).
+- Tab **Gacha**: Pull x1 = 100, Pull x10 = 900 (10 kartu, minimal 1 Rare). Rate: Common 60 / Rare 28 / Epic 10 / Legendary 2 (%).
+  Pity: Epic atau lebih dijamin paling lambat pull ke-30. Kartu duplikat diubah jadi koin (Common 15, Rare 40, Epic 100, Legendary 250).
+- Tab **Buy Cards**: beli langsung Support yang masih terkunci (filter per kategori). Harga: Common 200, Rare 500, Epic 1200, Legendary 3000.
+- Tes: `godot --headless --path . res://tests/shop_test.tscn` -> `SHOP TEST RESULT: PASS`; `ui_shop_smoke.tscn` -> `UI SHOP SMOKE: PASS`.
+
 ## Cara bermain (Phase 2)
 - Roll Dice (2xD6). Double / event "Time Surge" = lempar lagi (maks 2 bonus).
 - Reroll Token: ulang lemparan sebelum bergerak (beli di Shop / event / passive Elarion).
@@ -30,14 +37,24 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - Ketuk petak mana pun di papan untuk info detail.
 
 ## Sistem kartu (Phase 3)
-- `data/cards.json`: 15 tipe unit (8 Pawn, 2 Rook, 2 Knight, 2 Bishop, 1 Queen) + 21 Support (3 per kategori x 7 kategori).
+- `data/cards.json`: per dek 15 tipe unit (8 Pawn benua + 7 bidak milik faksi: 2 Rook, 2 Knight, 2 Bishop, 1 Queen) + 105 Support (15 per kategori x 7 kategori).
 - Deck = 15 tipe x 9 salinan (135) + 1 Champion + 15 Support = **151 kartu** (`Deck.validate()`).
 - Upgrade bintang otomatis (`UnitRoster`): 3 salinan = 2 bintang, 9 salinan = 3 bintang (stat dari `balance.json`).
 - Kapasitas catur (`CapacitySystem`): Pawn 1, Rook/Knight/Bishop 2, Queen 4, King 6; level 3 = 9 ... level 10 = 30.
   Asumsi: King/Champion tidak dihitung ke kapasitas deploy (hanya masuk saat Last Stand) — konfirmasi di Phase 4.
 - `BattleDeck`: tumpukan 135 kartu untuk Battle Shop (5 kartu per refresh, sisa kembali ke tumpukan).
 - Main Menu -> Collection & Deck: satu layar dengan dua tab. Tab Collection (filter, detail, stat 1/2/3 bintang) dan tab Deck (pilih Champion + tepat 15 Support, simpan ke save).
-- Koleksi awal: semua unit x9 dan 15 dari 21 Support; 6 Support terkunci (cara membuka: tiap kemenangan membuka satu Support terkunci, lihat "Aturan tambahan").
+- Koleksi awal: semua unit x9 dan 15 dari 105 Support; 90 Support terkunci (cara membuka: tiap kemenangan membuka satu Support terkunci, lihat "Aturan tambahan").
+
+## Deck (Main Menu -> Collection & Deck -> tab Deck)
+- Editor dengan **15 slot Unit** dan **15 slot Support** yang bisa diisi/dikosongkan, plus slot **King**. Ketuk kartu di panel kanan untuk memasang/melepas,
+  atau ketuk slot terisi untuk melepasnya. Tab kanan: Units (filter per faksi), Support (filter per kategori), King.
+- **Kartu Unit mengikuti benua**: pilih benua di bagian atas; yang bisa dipasang = 8 Pawn + 28 bidak dari 4 faksi benua itu. Faksi **boleh dicampur** selama
+  satu benua. Tiap benua punya susunan unit sendiri (disimpan per benua). Tiap tipe unit = 9 salinan (15 x 9 = 135).
+- **King tidak terikat benua** (semua 28 King bisa dipilih) dan Support dipakai bersama semua benua. Total dek tetap 151 kartu.
+- Save hanya aktif jika 15 unit + 15 support terisi. "Reset to default" mengembalikan unit bawaan faksi King.
+- Di match, kartu unit = susunan benua yang dimainkan; King mengikuti faksi yang dipilih di New Match; di Battle Practice King mengikuti pilihan di dek.
+  Lawan AI tetap memakai dek bawaan faksinya.
 
 ## Battle System (Phase 4) — Main Menu -> New Match -> Battle Practice
 - Grid 8x8; kamu di baris 4-7 (area 4x8), lawan di baris 0-3. Tanpa kontrol manual: semua unit bergerak/menyerang sendiri.
@@ -80,6 +97,10 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 
 ## Android (Phase 7) - lihat BUILD_ANDROID.md
 - Tombol Back (`AppNav`): tidak pernah menutup aplikasi; menu utama bertanya dulu, match menampilkan konfirmasi, duel tidak bisa ditinggalkan.
+- Dialog konfirmasi dan **Profile** memakai `UiDialog` (`scripts/ui/ui_dialog.gd`), bukan `ConfirmationDialog`/`AcceptDialog` bawaan Godot:
+  overlay bertema dengan backdrop gelap, ikon nada (`info` ungu / `warn` emas / `danger` merah, tombol konfirmasi ikut merah),
+  tombol selebar dialog (>= 58 px), teks panjang bergulir. Back/Esc menutup dialog yang terbuka lebih dulu (`AppNav.go_back`).
+  Kartu Profile (`scripts/ui/profile_view.gd`): avatar inisial, nama, status tutorial, bar menang/kalah, 6 statistik. Tes: `ui_dialog_smoke`.
 - **Simpan dan lanjutkan match**: autosave di awal tiap giliran manusia dan saat aplikasi di-pause (`user://match.json`, tulis
   lewat file sementara; file korup/versi asing dibuang tanpa crash). Tombol **CONTINUE** di menu. Terbukti deterministik:
   match yang dipulihkan berjalan identik dengan aslinya sampai selesai (3 benua).
@@ -94,7 +115,7 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 
 ## Konten (Phase 6)
 - **7 benua dapat dimainkan**, masing-masing 4 regional bernama, 10 awalan nama wilayah, 4 faction, dan 1 world modifier.
-  Menu: Settings -> "Unlock all" untuk membuka semua benua/faction saat uji; di mode normal, menang di sebuah benua membuka benua berikutnya.
+  Menang di sebuah benua membuka benua berikutnya (tidak ada fitur "Unlock all").
 - **28 Champion berbeda** (`data/champions.json`): 10 passive papan x 11 skill aktif Last Stand, nilai tiap Champion beda dan dibaca dari data
   (`passive_value`, `active_value`). Passive: Royal Treasury, Shadow Ledger, Landlord, Fortune Weave, Toll Keeper, Treasure Hunter,
   Spoils of War, Quartermaster, Mender, Vanguard. Aktif: Sun Judgment, Starfall Decree, Eclipse Veil, Banner of Iron, Inferno Burst,
@@ -102,8 +123,19 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 - **World modifier** (`WorldMods`): Aetherion Royal Tithe (+50 START), Arcanum Arcane Conduits (8 portal aktif), Machina Industrial Age (rent +25%,
   harga shop -20%), Sylvaris Bountiful Harvest (+6 G per wilayah per ronde), Drakmor War Fever (ATK battle +15%, pemenang duel +60 G),
   Thalassia Sea Trade (tax setengah, Reroll Token 40 G), Eclipsia Time Fold (+1 Reroll Token tiap lewat START, bonus roll maks 3).
-- **Kartu**: 15 arketipe unit dipakai semua benua; tiap kartu punya "slot" faksi sehingga di benua lain ia milik faksi benua itu
-  (nama diawali nama faksi, mis. "Ferrum Royal Guard"). Faction Synergy ikut berubah. Nama unik per benua masih TODO; ilustrasi kini prosedural (lihat "Seni dan audio").
+- **Kartu (v19)**: tiap faksi punya **dek 15 tipe unit** (15 x 9 salinan = 135): **8 Pawn benua** (2 per faksi, "slot" 0-3; di benua lain ia milik faksi benua itu, nama diawali
+  nama faksi, mis. "Ferrum Royal Guard"; sama untuk semua faksi di benua itu) + **7 bidak milik faksi sendiri** (2 Rook, 2 Knight, 2 Bishop, 1 Queen; `faction: "<id faksi>"`,
+  `slot: -1`, field `continent`): 28 faksi x 7 = **196 kartu unik** dengan nama, nama skill, angka skill (`skill.params`), buff, serta HP/ATK sendiri. Dek ditentukan
+  oleh Champion (`Deck.faction_id()` -> `CardDatabase.faction_units`), jadi Battle Shop hanya menawarkan Pawn benua + bidak faksi pemain.
+  Setiap slot (Rook Tank, Rook Marksman, Knight Fighter, Knight Assassin, Bishop Mage, Bishop Support, Queen) punya nilai dasar di `CardDatabase.SLOT_BASE`; HP/ATK tiap
+  faksi boleh menyimpang sedikit (maks ~12%) dengan HP x ATK tetap seimbang (`validate_all_continents`). Role, range, move, rarity, dan mekanik skill tetap sama per slot;
+  skill menunjuk mekanik dasar lewat `skill.mechanic` (`CardDatabase.skill_mechanic`). Angka skill yang divariasikan: durasi taunt, interval dan jumlah target Rook Marksman,
+  durasi stun Knight Fighter, bonus serangan pertama Knight Assassin, frekuensi dan persen splash Bishop Mage, interval dan persen heal Bishop Support. Queen selalu
+  aura +15% ATK ditambah buff.
+  **Save lama**: id bidak bersama versi lama diterjemahkan lewat `legacy_ids` di `cards.json` ke bidak faksi pertama benua itu (`CardDatabase.canonical_id`).
+  **Buff benua (`data/card_buffs.json`)**: tiap kartu unit punya satu buff tema (8 Pawn x 7 benua + 196 bidak faksi, nama unik). 8 Pawn yang sama mendapat buff berbeda di
+  tiap benua. Buff = tipe efek + nilai (`CardDatabase.BUFF_TYPES`, 22 tipe, diterapkan di `BattleEngine`): armor, evade, thorns, execute, frenzy, aura_atk, burn, stun_proc, ward, splash,
+  lifesteal, chill, opener, rage, last_rites, death_burst, mend_self, swift, guard, opening_shield, regen, second_life.
 - **Semua 21 efek Support berfungsi.** Efek yang butuh target (Crown of Valor, Aegis Shield, Windboots) memilih target otomatis
   (unit terkuat / tertangguh) - TODO: pilih target manual. Mercenary Pact dan Merchant Contract bekerja otomatis di fase persiapan.
 - Penyetelan konten: win rate tiap faction di 7 benua berada di kisaran 22-27% (ideal 25%) pada 400-700 game AI per benua.
@@ -118,7 +150,7 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 - `tests/` sim_test, ui_smoke
 
 ## Export Android (Phase 7, belum diuji di perangkat)
-Project > Export > Android; renderer sudah GL Compatibility, orientasi landscape. Butuh Android SDK + JDK + keystore.
+Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor landscape (landscape dua arah: layar ikut terbalik saat ponsel diputar 180°, tidak pernah portrait). Butuh Android SDK + JDK + keystore.
 
 - **Build di GitHub dan Gradle/AAB**: `.github/workflows/` (tes otomatis + APK + AAB, Godot 4.7); lihat BUILD_ANDROID.md. Skrip tes: `tools/run_tests.sh`. Proyek kini memakai Godot 4.7 (target API 36 untuk Google Play).
 
@@ -131,7 +163,7 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi landscape
 - **Special Dice** (4 jenis x 6 sisi, `data/special_dice.json`): Swift (bonus gerak), Fortune (gold), Warp (teleport, menggantikan lemparan),
   Order (lempar ekstra / lawan berikutnya lewat giliran / token / gold). Sumber: kartu Event dan Territory Shop (120 G); maks 3 dibawa; dipakai
   sebelum melempar. AI memakainya. Tersimpan di save. (Sumber dari Champion dan Rule Card belum ada.)
-- **Kartu baru**: tiap kemenangan membuka satu dari 6 Support yang terkunci (urutan tetap). Pool unit baru belum ada.
+- **Kartu baru**: tiap kemenangan membuka satu dari 90 Support yang terkunci (urutan tetap: 6 kartu awal, lalu common -> rare -> epic -> legendary). Pool unit baru belum ada.
 - **Seni prosedural** (`Art`, `PortraitView`; tanpa file gambar): siluet 6 bidak catur, 7 lambang benua, 7 ikon kategori Support, potret perisai
   Champion. Dipakai di kartu, token battle, dan pemilihan Champion. Galeri: `docs/screenshots/art_gallery.png`.
 - **Audio** (`Sfx`): 11 efek suara disintesis dari kode (klik, dadu, koin, pukulan, gugur, sihir, portal, menang/kalah, dll), bisa dimatikan di Settings.

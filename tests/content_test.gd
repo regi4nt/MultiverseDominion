@@ -202,7 +202,23 @@ func _test_supports() -> void:
 			failed.append("%s: %s" % [s["id"], err])
 		for i in range(30):  # the battle must keep running after the effect
 			e.step()
-	check(all_ok, "all 21 Support effects can be played (%s)" % str(failed))
+	check(all_ok, "all %d Support cards can be played (%s)" % [CardDatabase.all_supports().size(), str(failed)])
+	var per_cat := {}
+	var sup_names := {}
+	for sc in CardDatabase.all_supports():
+		per_cat[sc["category"]] = int(per_cat.get(sc["category"], 0)) + 1
+		sup_names[sc["name"]] = true
+	check(CardDatabase.all_supports().size() == 105 and per_cat.size() == 7 and per_cat.values().all(func(n): return n == 15), "105 Support cards: 15 in each of the 7 categories (%s)" % str(per_cat))
+	check(sup_names.size() == 105, "every Support card has its own name")
+	var e3 := _make_support_engine(["sup_legion_call", "sup_mass_polymorph", "sup_twin_angels", "sup_vampiric_bargain", "sup_choir_of_angels"])
+	var n_before := e3.units_of(0).size()
+	check(e3.use_support(0, "sup_legion_call") == "" and e3.units_of(0).size() > n_before + 1, "Legion Call creates several Pawns")
+	check(e3.use_support(0, "sup_mass_polymorph") == "", "Mass Polymorph hits several enemies")
+	check(e3.use_support(0, "sup_twin_angels") == "" and int(e3.revive_pending[0]) == 2 and int(e3.revive_hp_pct[0]) == 50, "Twin Angels arms 2 revives")
+	check(e3.use_support(0, "sup_vampiric_bargain") == "" and int(e3.gold_delta[0]) == -30, "Vampiric Bargain costs its own gold")
+	var pr := BattlePrep.new(Deck.create_default(), RandomNumberGenerator.new(), 500, 500, 3)
+	pr.apply_hand(["sup_bargain_hunter"])
+	check(pr.free_reroll and pr.free_rerolls_left == 2, "Bargain Hunter gives 2 free rerolls")
 	var e := _make_support_engine(["sup_fireball", "sup_guardian_angel", "sup_blood_oath", "sup_forge_bastion"])
 	check(e.use_support(0, "sup_guardian_angel") == "" and bool(e.revive_pending[0]), "Guardian Angel arms a revive")
 	var victim: BattleUnit = e.units[0]

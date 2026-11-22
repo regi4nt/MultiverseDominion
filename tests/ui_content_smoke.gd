@@ -3,7 +3,8 @@ extends Node
 
 func _ready() -> void:
 	var fails := 0
-	SaveManager.unlock_all()
+	for c in GameData.continents:  # tests need every continent open (the game has no unlock-all feature)
+		SaveManager.unlock_continent(c["id"])
 	for c in GameData.continents:
 		GameSession.continent_id = c["id"]
 		GameSession.faction_id = c["factions"][1]["id"]

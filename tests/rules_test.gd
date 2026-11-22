@@ -222,17 +222,18 @@ func _test_unlocks() -> void:
 	for s in CardDatabase.all_supports():
 		if SaveManager.owned_count(s["id"]) == 0:
 			locked += 1
-	check(locked == 6, "a new profile has 6 locked Support cards")
+	var expected_locked := CardDatabase.all_supports().size() - CardDatabase.default_support_ids().size()
+	check(locked == expected_locked and locked == 90, "a new profile has 90 locked Support cards of 105 (%d)" % locked)
 	var got: Array[String] = []
-	for i in range(8):
+	for i in range(locked + 2):
 		var id := SaveManager.record_match(true, 10, 100, "")
 		if id != "":
 			got.append(id)
-	check(got.size() == 6 and got.size() == (got as Array).size(), "6 victories unlock the 6 locked cards, then nothing more (%d)" % got.size())
+	check(got.size() == locked, "%d victories unlock the %d locked cards, then nothing more (%d)" % [locked, locked, got.size()])
 	var distinct := {}
 	for id in got:
 		distinct[id] = true
-	check(distinct.size() == 6, "every unlock is a different card")
+	check(distinct.size() == locked, "every unlock is a different card")
 	var before: int = SaveManager.data["stats"]["wins"]
 	check(SaveManager.record_match(false, 10, 100, "") == "" and SaveManager.data["stats"]["wins"] == before, "a defeat unlocks nothing")
 	SaveManager.data = saved

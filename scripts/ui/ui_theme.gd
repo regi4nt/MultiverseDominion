@@ -87,6 +87,21 @@ static func make_primary(text: String, min_h: float = 60.0) -> Button:
 	return b
 
 
+## Destructive confirm button (Leave a battle, ...): red fill, light text.
+static func make_danger(text: String, min_h: float = 60.0) -> Button:
+	var b := make_button(text, min_h)
+	b.add_theme_stylebox_override("normal", make_box(Color("b53a30"), Color("ff9a8f"), 2, 14, 8))
+	b.add_theme_stylebox_override("hover", make_box(Color("cf4a3f"), Color.WHITE, 2, 14, 10))
+	var pr := make_box(Color("8f2a22"), Color("ff9a8f"), 2, 14, 0)
+	pr.content_margin_top = 10
+	b.add_theme_stylebox_override("pressed", pr)
+	b.add_theme_color_override("font_color", Color.WHITE)
+	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.add_theme_color_override("font_pressed_color", Color.WHITE)
+	b.add_theme_font_size_override("font_size", 24)
+	return b
+
+
 ## Player card: tinted with the player's colour, bright border when it is that player's turn.
 static func player_card_box(color: Color, active: bool) -> StyleBoxFlat:
 	var sb := make_box(Color(color.darkened(0.78), 0.9) if active else Color(COL_PANEL, 0.85), color if active else Color("2e3350"), 3 if active else 1, 12, 6 if active else 0)
@@ -99,6 +114,14 @@ static func make_toggle(text: String, group: ButtonGroup, min_h: float = 48.0) -
 	var b := make_button(text, min_h)
 	b.toggle_mode = true
 	b.button_group = group
+	return b
+
+
+## On/off switch. NOT in a ButtonGroup: a lone toggle inside a group behaves like a radio button and can never be
+## switched off again (pressing the pressed button does nothing). Use make_toggle only for real either-or groups.
+static func make_switch(text: String, min_h: float = 52.0) -> Button:
+	var b := make_button(text, min_h)
+	b.toggle_mode = true
 	return b
 
 

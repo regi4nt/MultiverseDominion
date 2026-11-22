@@ -28,6 +28,8 @@ func default_data() -> Dictionary:
 		"collection": {},  # TODO (Phase 3): Card Collection
 		"decks": {},  # TODO (Phase 3): Deck Configuration
 		"stats": {"matches_played": 0, "wins": 0, "losses": 0, "total_rounds": 0, "best_gold": 0},
+		"wallet": {"coins": 600},  # Aether Coins: persistent Shop currency (see ShopSystem)
+		"shop": {"pity": 0, "pulls": 0},
 	}
 
 
@@ -79,10 +81,11 @@ func get_setting(key: String) -> Variant:
 	return data["settings"].get(key)
 
 
-func set_setting(key: String, value: Variant) -> void:
+func set_setting(key: String, value: Variant, persist: bool = true) -> void:
 	data["settings"][key] = value
 	apply_settings()
-	save_game()
+	if persist:
+		save_game()
 
 
 func apply_settings() -> void:
@@ -106,14 +109,36 @@ func unlock_continent(id: String) -> void:
 			data["unlocked_factions"].append(f["id"])
 
 
-## Testing helper (Settings): unlock every continent and faction.
-func unlock_all() -> void:
-	for c in GameData.continents:
-		unlock_continent(c["id"])
-	save_game()
-
-
 ## Winning a match on a continent unlocks the next one in the list (Story Campaign is a TODO).
+## Aether Coins (Shop currency).
+func coins() -> int:
+	return int(data["wallet"].get("coins", 0))
+
+
+func add_coins(n: int) -> void:
+	data["wallet"]["coins"] = maxi(0, coins() + n)
+
+
+## Pays `n` coins; false (and nothing paid) when the player has less.
+func spend_coins(n: int) -> bool:
+	if n < 0 or coins() < n:
+		return false
+	data["wallet"]["coins"] = coins() - n
+	return true
+
+
+## Adds one copy of a card to the collection if it is not owned yet. Returns true when it was new.
+func unlock_card(card_id: String) -> bool:
+	if owned_count(card_id) > 0:
+		return false
+	data["collection"][card_id] = 1
+	return true
+
+
+## Coins earned by the last record_match (shown on the result screen).
+var last_reward: int = 0
+
+
 ## Every victory unlocks the next locked Support card. Returns its id ("" when everything is unlocked).
 func unlock_next_card() -> String:
 	for s in CardDatabase.all_supports():
@@ -137,22 +162,29 @@ func record_match(won: bool, rounds: int, final_gold: int, continent_id: String 
 		for i in range(GameData.continents.size() - 1):
 			if GameData.continents[i]["id"] == continent_id:
 				unlock_continent(GameData.continents[i + 1]["id"])
+	last_reward = ShopSystem.WIN_REWARD if won else ShopSystem.LOSS_REWARD
+	add_coins(last_reward)
 	var card := unlock_next_card() if won else ""
 	save_game()
 	return card
 
 
-## Fills the starter collection (all 15 unit types x 9, 15 default Support cards) and main deck.
+## Fills the starter collection (all unit cards of every continent x 9, 15 default Support cards) and main deck.
 func ensure_collection() -> void:
 	var changed := false
 	var col: Dictionary = data["collection"]
 	if col.is_empty():
-		for u in CardDatabase.all_units():
-			col[u["id"]] = int(GameData.b("unit_copies"))
+		for id in CardDatabase.all_unit_ids_any_continent():
+			col[id] = int(GameData.b("unit_copies"))
 		for s in CardDatabase.all_supports():
 			if s.get("owned_default", false):
 				col[s["id"]] = 1
 		changed = true
+	else:  # older saves: add the unit cards of continents that did not exist yet (per-continent Rook/Knight/Bishop/Queen)
+		for id in CardDatabase.all_unit_ids_any_continent():
+			if not col.has(id):
+				col[id] = int(GameData.b("unit_copies"))
+				changed = true
 	if not (data["decks"] as Dictionary).has("main"):
 		data["decks"]["main"] = Deck.create_default().to_dict()
 		changed = true
@@ -166,12 +198,23 @@ func owned_count(card_id: String) -> int:
 	return int(data["collection"].get(card_id, 0))
 
 
-func get_deck() -> Deck:
-	return Deck.from_dict(data["decks"].get("main", {}))
+## The player's deck for a continent. King and Support cards are shared by every continent; the 15 unit types are saved per
+## continent ("units_by_continent"). No saved list (or an invalid one) = the default units of the King's faction.
+func get_deck(continent_id: String = "") -> Deck:
+	var cid := continent_id if continent_id != "" else CardDatabase.active_continent
+	var main: Dictionary = data["decks"].get("main", {})
+	var ubc: Dictionary = main.get("units_by_continent", {})
+	var deck := Deck.from_dict({"champion": main.get("champion", "champion_solvaris"), "supports": main.get("supports", []),
+		"continent": cid, "units": ubc.get(cid, [])})
+	deck.sanitize_units()
+	return deck
 
 
 func set_deck(deck: Deck) -> void:
-	data["decks"]["main"] = deck.to_dict()
+	var main: Dictionary = data["decks"].get("main", {})
+	var ubc: Dictionary = main.get("units_by_continent", {})
+	ubc[deck.deck_continent()] = deck.unit_ids.duplicate() if deck.unit_ids.size() == Deck.UNIT_SLOTS else []
+	data["decks"]["main"] = {"champion": deck.champion_id, "supports": deck.support_ids.duplicate(), "units_by_continent": ubc}
 	save_game()
 
 

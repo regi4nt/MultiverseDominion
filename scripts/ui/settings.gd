@@ -24,10 +24,13 @@ func _ready() -> void:
 	slider.value = float(SaveManager.get_setting("master_volume"))
 	slider.custom_minimum_size = Vector2(0, 40)
 	slider.scrollable = false  # the mouse wheel must scroll the page, not change the volume
-	slider.value_changed.connect(func(v: float): SaveManager.set_setting("master_volume", v))
+	# Live volume while dragging, but the save file is written once (on release / leaving), not on every 0.05 step.
+	slider.value_changed.connect(func(v: float): SaveManager.set_setting("master_volume", v, false))
+	slider.drag_ended.connect(func(_changed: bool): SaveManager.save_game())
+	slider.tree_exiting.connect(func(): SaveManager.save_game())
 	box.add_child(slider)
 
-	var sfx_btn := UiTheme.make_toggle("Sound effects: ON" if SaveManager.get_setting("sfx") else "Sound effects: OFF", ButtonGroup.new(), 52)
+	var sfx_btn := UiTheme.make_switch("Sound effects: ON" if SaveManager.get_setting("sfx") else "Sound effects: OFF")
 	sfx_btn.button_pressed = bool(SaveManager.get_setting("sfx"))
 	sfx_btn.toggled.connect(func(on: bool):
 		SaveManager.set_setting("sfx", on)
@@ -36,7 +39,7 @@ func _ready() -> void:
 			Sfx.play("coin"))
 	box.add_child(sfx_btn)
 
-	var upd_btn := UiTheme.make_toggle("", ButtonGroup.new(), 52)
+	var upd_btn := UiTheme.make_switch("")
 	var upd_on: bool = SaveManager.get_setting("check_updates") != false
 	upd_btn.button_pressed = upd_on
 	upd_btn.text = "Check for updates at start: ON" if upd_on else "Check for updates at start: OFF"
@@ -76,12 +79,6 @@ func _ready() -> void:
 		b.button_pressed = (SaveManager.get_setting("default_difficulty") == d)
 		b.pressed.connect(func(): SaveManager.set_setting("default_difficulty", d))
 		row.add_child(b)
-
-	var unlock := UiTheme.make_button("Unlock all continents & factions (testing)", 52)
-	unlock.pressed.connect(func():
-		SaveManager.unlock_all()
-		unlock.text = "All content unlocked")
-	box.add_child(unlock)
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL

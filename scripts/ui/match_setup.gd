@@ -163,5 +163,5 @@ func _refresh_champion() -> void:
 		_portrait.setup("")
 		return
 	_portrait.setup(String(fac.get("champion", "")))
-	_champion_text.text = "[color=#d4af37][b]%s[/b][/color]\nHP %d   ATK %d   Capacity %d\n[b]%s:[/b] %s\n[b]%s:[/b] %s" % [
-		ch["name"], ch["hp"], ch["atk"], ch["capacity"], ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"]]
+	_champion_text.text = "[color=#d4af37][b]%s[/b][/color]\n[color=#d4af37]%s King - Last Stand[/color]\nHP %d   ATK %d   Capacity %d\n[b]%s:[/b] %s\n[b]%s:[/b] %s" % [
+		ch["name"], String(ch.get("rarity", "legendary")).capitalize(), ch["hp"], ch["atk"], ch["capacity"], ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"]]

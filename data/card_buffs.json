@@ -1,0 +1,1528 @@
+{
+	"aetherion": {
+		"pawn_royal_guard": {
+			"name": "Oath of the Crown",
+			"type": "armor",
+			"value": 0.1,
+			"desc": "Takes 10% less damage."
+		},
+		"pawn_sun_squire": {
+			"name": "Dawn Knighting",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"pawn_dusk_cutpurse": {
+			"name": "Slippery Fingers",
+			"type": "evade",
+			"value": 4,
+			"desc": "Every 4th hit taken is avoided."
+		},
+		"pawn_shade_archer": {
+			"name": "Royal Marksman",
+			"type": "execute",
+			"value": 0.25,
+			"desc": "Deals +25% damage to enemies below 30% HP."
+		},
+		"pawn_iron_pikeman": {
+			"name": "Pike Wall",
+			"type": "thorns",
+			"value": 0.15,
+			"desc": "Reflects 15% of the damage taken back at the attacker."
+		},
+		"pawn_banner_cadet": {
+			"name": "Standard Bearer",
+			"type": "aura_atk",
+			"value": 0.08,
+			"desc": "Adjacent allies gain +8% ATK."
+		},
+		"pawn_starling_initiate": {
+			"name": "Star Fire",
+			"type": "burn",
+			"value": 0.2,
+			"desc": "Attacks burn the target for 20% of ATK every 4 ticks for 12 ticks."
+		},
+		"pawn_moon_acolyte": {
+			"name": "Silver Lullaby",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"rook_solvaris_sunwall_bastion": {
+			"name": "Aegis of Dawn",
+			"type": "ward",
+			"value": 0.12,
+			"desc": "Starts the battle with a shield worth 12% of max HP."
+		},
+		"rook_solvaris_sunspear_ballista": {
+			"name": "Solar Precision",
+			"type": "execute",
+			"value": 0.25,
+			"desc": "Deals +25% damage to enemies below 30% HP."
+		},
+		"knight_solvaris_dawnbreaker_paladin": {
+			"name": "Blazing Oath",
+			"type": "armor",
+			"value": 0.12,
+			"desc": "Takes 12% less damage."
+		},
+		"knight_solvaris_goldmane_outrider": {
+			"name": "Lion's Pride",
+			"type": "opener",
+			"value": 0.25,
+			"desc": "The first attack deals +25% damage."
+		},
+		"bishop_solvaris_heliomancer": {
+			"name": "Corona Flare",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"bishop_solvaris_sunlit_chaplain": {
+			"name": "Gentle Radiance",
+			"type": "ward",
+			"value": 0.18,
+			"desc": "Starts the battle with a shield worth 18% of max HP."
+		},
+		"queen_solvaris_queen_solenne_the_dawn": {
+			"name": "Crown of Sunlight",
+			"type": "lifesteal",
+			"value": 0.08,
+			"desc": "Heals itself for 8% of the damage dealt."
+		},
+		"rook_nocthyr_duskwall_keep": {
+			"name": "Umbral Plating",
+			"type": "armor",
+			"value": 0.1,
+			"desc": "Takes 10% less damage."
+		},
+		"rook_nocthyr_shadowspike_crossbow": {
+			"name": "Nightbane Bolts",
+			"type": "chill",
+			"value": 4,
+			"desc": "Attacks slow the target for 4 ticks."
+		},
+		"knight_nocthyr_eclipse_cavalier": {
+			"name": "Twilight Resolve",
+			"type": "opener",
+			"value": 0.25,
+			"desc": "The first attack deals +25% damage."
+		},
+		"knight_nocthyr_moonshade_stalker": {
+			"name": "Midnight Frenzy",
+			"type": "rage",
+			"value": 0.25,
+			"desc": "Gains +25% ATK while below 50% HP."
+		},
+		"bishop_nocthyr_gloomcaller": {
+			"name": "Dread Whisper",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_nocthyr_vesper_confessor": {
+			"name": "Ebon Salve",
+			"type": "aura_atk",
+			"value": 0.06,
+			"desc": "Adjacent allies gain +6% ATK."
+		},
+		"queen_nocthyr_queen_noctavia": {
+			"name": "Mantle of Stars",
+			"type": "chill",
+			"value": 3,
+			"desc": "Attacks slow the target for 3 ticks."
+		},
+		"rook_valdoria_ironbanner_fortress": {
+			"name": "Bastion Rivets",
+			"type": "thorns",
+			"value": 0.15,
+			"desc": "Reflects 15% of the damage taken back at the attacker."
+		},
+		"rook_valdoria_ironbolt_ballista": {
+			"name": "Trebuchet Splinters",
+			"type": "lifesteal",
+			"value": 0.08,
+			"desc": "Heals itself for 8% of the damage dealt."
+		},
+		"knight_valdoria_ironguard_lancer": {
+			"name": "Steel Resolve",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"knight_valdoria_scarlet_raider": {
+			"name": "Marauder's Edge",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_valdoria_warmage_of_the_legion": {
+			"name": "Battle Sigil",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"bishop_valdoria_field_chaplain": {
+			"name": "Field Rations",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"queen_valdoria_marshal_valdrea": {
+			"name": "Iron Crown",
+			"type": "second_life",
+			"value": 0.35,
+			"desc": "The first time she falls, she returns with 35% HP."
+		},
+		"rook_elarion_starstone_ward": {
+			"name": "Moonlit Shell",
+			"type": "mend_self",
+			"value": 0.04,
+			"desc": "Heals itself for 4% max HP every 8 ticks."
+		},
+		"rook_elarion_comet_arbalest": {
+			"name": "Comet Trail",
+			"type": "splash",
+			"value": 0.3,
+			"desc": "Attacks also deal 30% damage to enemies adjacent to the target."
+		},
+		"knight_elarion_starlance_knight": {
+			"name": "Starforged Edge",
+			"type": "rage",
+			"value": 0.3,
+			"desc": "Gains +30% ATK while below 50% HP."
+		},
+		"knight_elarion_moonblade_rider": {
+			"name": "Crescent Strike",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3rd hit taken is avoided."
+		},
+		"bishop_elarion_astral_seer": {
+			"name": "Starlight Echo",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"bishop_elarion_moonweaver_priestess": {
+			"name": "Lunar Dew",
+			"type": "last_rites",
+			"value": 0.3,
+			"desc": "When it falls, heals adjacent allies for 30% of their max HP."
+		},
+		"queen_elarion_queen_seraphel": {
+			"name": "Halo of Stars",
+			"type": "aura_atk",
+			"value": 0.06,
+			"desc": "Adjacent allies gain +6% ATK."
+		}
+	},
+	"arcanum": {
+		"pawn_royal_guard": {
+			"name": "Spell Ward",
+			"type": "ward",
+			"value": 0.15,
+			"desc": "Starts the battle with a shield worth 15% of max HP."
+		},
+		"pawn_sun_squire": {
+			"name": "Flare Strike",
+			"type": "burn",
+			"value": 0.15,
+			"desc": "Attacks burn the target for 15% of ATK every 4 ticks for 12 ticks."
+		},
+		"pawn_dusk_cutpurse": {
+			"name": "Blink Step",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3th hit taken is avoided."
+		},
+		"pawn_shade_archer": {
+			"name": "Arcane Arrow",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"pawn_iron_pikeman": {
+			"name": "Rune Spikes",
+			"type": "thorns",
+			"value": 0.12,
+			"desc": "Reflects 12% of the damage taken back at the attacker."
+		},
+		"pawn_banner_cadet": {
+			"name": "Sigil Banner",
+			"type": "aura_atk",
+			"value": 0.1,
+			"desc": "Adjacent allies gain +10% ATK."
+		},
+		"pawn_starling_initiate": {
+			"name": "Mana Siphon",
+			"type": "lifesteal",
+			"value": 0.12,
+			"desc": "Heals itself for 12% of the damage dealt."
+		},
+		"pawn_moon_acolyte": {
+			"name": "Hex Touch",
+			"type": "stun_proc",
+			"value": 4,
+			"desc": "Every 4th attack stuns the target for 1 tick."
+		},
+		"rook_astralis_orrery_sentinel": {
+			"name": "Cosmic Plating",
+			"type": "last_rites",
+			"value": 0.25,
+			"desc": "When it falls, heals adjacent allies for 25% of their max HP."
+		},
+		"rook_astralis_nova_obelisk": {
+			"name": "Stellar Overload",
+			"type": "burn",
+			"value": 0.25,
+			"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
+		},
+		"knight_astralis_comet_cavalier": {
+			"name": "Starfall Lance",
+			"type": "lifesteal",
+			"value": 0.08,
+			"desc": "Heals itself for 8% of the damage dealt."
+		},
+		"knight_astralis_void_skimmer": {
+			"name": "Wandering Fury",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"bishop_astralis_astromancer": {
+			"name": "Mana Constellation",
+			"type": "burn",
+			"value": 0.25,
+			"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
+		},
+		"bishop_astralis_celestial_attendant": {
+			"name": "Zenith Grace",
+			"type": "mend_self",
+			"value": 0.04,
+			"desc": "Heals itself for 4% max HP every 8 ticks."
+		},
+		"queen_astralis_archmage_queen_astrelle": {
+			"name": "Astral Dominion",
+			"type": "guard",
+			"value": 0.1,
+			"desc": "Allies within 2 cells (including herself) take 10% less damage."
+		},
+		"rook_ignivar_magma_bastion": {
+			"name": "Cooled Slag",
+			"type": "ward",
+			"value": 0.18,
+			"desc": "Starts the battle with a shield worth 18% of max HP."
+		},
+		"rook_ignivar_pyre_cannon_spire": {
+			"name": "Searing Barrage",
+			"type": "execute",
+			"value": 0.2,
+			"desc": "Deals +20% damage to enemies below 30% HP."
+		},
+		"knight_ignivar_ember_lancer": {
+			"name": "Cinder Edge",
+			"type": "armor",
+			"value": 0.1,
+			"desc": "Takes 10% less damage."
+		},
+		"knight_ignivar_ashstalker": {
+			"name": "Scorched Instinct",
+			"type": "swift",
+			"value": 1,
+			"desc": "+1 movement."
+		},
+		"bishop_ignivar_pyromancer": {
+			"name": "Living Flame",
+			"type": "splash",
+			"value": 0.25,
+			"desc": "Attacks also deal 25% damage to enemies adjacent to the target."
+		},
+		"bishop_ignivar_flamekeeper": {
+			"name": "Hearth Warmth",
+			"type": "regen",
+			"value": 0.04,
+			"desc": "Every 8 ticks heals all allies for 4% max HP."
+		},
+		"queen_ignivar_queen_ignasia": {
+			"name": "Phoenix Heart",
+			"type": "splash",
+			"value": 0.35,
+			"desc": "Attacks also deal 35% damage to enemies adjacent to the target."
+		},
+		"rook_cryndel_glacier_bulwark": {
+			"name": "Permafrost Shell",
+			"type": "armor",
+			"value": 0.08,
+			"desc": "Takes 8% less damage."
+		},
+		"rook_cryndel_icicle_battery": {
+			"name": "Rime Bolts",
+			"type": "chill",
+			"value": 3,
+			"desc": "Attacks slow the target for 3 ticks."
+		},
+		"knight_cryndel_frostbite_cavalier": {
+			"name": "Winter's Edge",
+			"type": "opener",
+			"value": 0.35,
+			"desc": "The first attack deals +35% damage."
+		},
+		"knight_cryndel_snowshade_courser": {
+			"name": "Whiteout Frenzy",
+			"type": "opener",
+			"value": 0.25,
+			"desc": "The first attack deals +25% damage."
+		},
+		"bishop_cryndel_cryomancer": {
+			"name": "Frozen Mind",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"bishop_cryndel_frostlight_healer": {
+			"name": "Winter Mercy",
+			"type": "ward",
+			"value": 0.18,
+			"desc": "Starts the battle with a shield worth 18% of max HP."
+		},
+		"queen_cryndel_queen_glaciora": {
+			"name": "Frost Crown",
+			"type": "opening_shield",
+			"value": 0.08,
+			"desc": "Allies start the battle with a shield worth 8% of max HP."
+		},
+		"rook_umbrael_crypt_warden": {
+			"name": "Bone Plating",
+			"type": "thorns",
+			"value": 0.12,
+			"desc": "Reflects 12% of the damage taken back at the attacker."
+		},
+		"rook_umbrael_soulpiercer_spire": {
+			"name": "Hollow Shards",
+			"type": "lifesteal",
+			"value": 0.12,
+			"desc": "Heals itself for 12% of the damage dealt."
+		},
+		"knight_umbrael_revenant_knight": {
+			"name": "Deathless Vigor",
+			"type": "frenzy",
+			"value": 0.05,
+			"desc": "Gains +5% ATK for each enemy defeated (max 5 times)."
+		},
+		"knight_umbrael_phantom_reaper": {
+			"name": "Ghoul's Hunger",
+			"type": "rage",
+			"value": 0.25,
+			"desc": "Gains +25% ATK while below 50% HP."
+		},
+		"bishop_umbrael_necromancer": {
+			"name": "Soul Siphon",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_umbrael_gravetender": {
+			"name": "Final Rest",
+			"type": "aura_atk",
+			"value": 0.06,
+			"desc": "Adjacent allies gain +6% ATK."
+		},
+		"queen_umbrael_queen_morwenna": {
+			"name": "Lich Crown",
+			"type": "regen",
+			"value": 0.04,
+			"desc": "Every 8 ticks heals all allies for 4% max HP."
+		}
+	},
+	"machina": {
+		"pawn_royal_guard": {
+			"name": "Riveted Plating",
+			"type": "armor",
+			"value": 0.12,
+			"desc": "Takes 12% less damage."
+		},
+		"pawn_sun_squire": {
+			"name": "Steam Strike",
+			"type": "burn",
+			"value": 0.15,
+			"desc": "Attacks burn the target for 15% of ATK every 4 ticks for 12 ticks."
+		},
+		"pawn_dusk_cutpurse": {
+			"name": "Smoke Bomb",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3th hit taken is avoided."
+		},
+		"pawn_shade_archer": {
+			"name": "Rifled Barrel",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"pawn_iron_pikeman": {
+			"name": "Spiked Gauntlet",
+			"type": "thorns",
+			"value": 0.18,
+			"desc": "Reflects 18% of the damage taken back at the attacker."
+		},
+		"pawn_banner_cadet": {
+			"name": "Field Engineer",
+			"type": "mend_self",
+			"value": 0.06,
+			"desc": "Heals itself for 6% max HP every 8 ticks."
+		},
+		"pawn_starling_initiate": {
+			"name": "Static Discharge",
+			"type": "stun_proc",
+			"value": 6,
+			"desc": "Every 6th attack stuns the target for 1 tick."
+		},
+		"pawn_moon_acolyte": {
+			"name": "Piston Boots",
+			"type": "swift",
+			"value": 1,
+			"desc": "+1 movement."
+		},
+		"rook_ferrum_ironclad_rampart": {
+			"name": "Riveted Hull",
+			"type": "mend_self",
+			"value": 0.06,
+			"desc": "Heals itself for 6% max HP every 8 ticks."
+		},
+		"rook_ferrum_siege_howitzer": {
+			"name": "Slag Shrapnel",
+			"type": "splash",
+			"value": 0.25,
+			"desc": "Attacks also deal 25% damage to enemies adjacent to the target."
+		},
+		"knight_ferrum_ironhorse_charger": {
+			"name": "Forged Resolve",
+			"type": "rage",
+			"value": 0.25,
+			"desc": "Gains +25% ATK while below 50% HP."
+		},
+		"knight_ferrum_rustblade_skirmisher": {
+			"name": "Jagged Gears",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_ferrum_foundry_savant": {
+			"name": "Molten Core",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"bishop_ferrum_rivet_medic": {
+			"name": "Patch Kit",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"queen_ferrum_empress_ferra": {
+			"name": "Iron Throne",
+			"type": "lifesteal",
+			"value": 0.12,
+			"desc": "Heals itself for 12% of the damage dealt."
+		},
+		"rook_voltrix_faraday_bulwark": {
+			"name": "Grounded Plating",
+			"type": "last_rites",
+			"value": 0.2,
+			"desc": "When it falls, heals adjacent allies for 20% of their max HP."
+		},
+		"rook_voltrix_arc_coil_tower": {
+			"name": "Chain Spark",
+			"type": "burn",
+			"value": 0.2,
+			"desc": "Attacks burn the target for 20% of ATK every 4 ticks for 12 ticks."
+		},
+		"knight_voltrix_tesla_lancer": {
+			"name": "Voltaic Edge",
+			"type": "lifesteal",
+			"value": 0.12,
+			"desc": "Heals itself for 12% of the damage dealt."
+		},
+		"knight_voltrix_spark_courser": {
+			"name": "Overclock Fury",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3rd hit taken is avoided."
+		},
+		"bishop_voltrix_storm_engineer": {
+			"name": "Ion Storm",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"bishop_voltrix_capacitor_medic": {
+			"name": "Defibrillation",
+			"type": "last_rites",
+			"value": 0.3,
+			"desc": "When it falls, heals adjacent allies for 30% of their max HP."
+		},
+		"queen_voltrix_empress_voltara": {
+			"name": "Live Wire Crown",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"rook_chronex_clockwork_citadel": {
+			"name": "Gearlock Shell",
+			"type": "ward",
+			"value": 0.15,
+			"desc": "Starts the battle with a shield worth 15% of max HP."
+		},
+		"rook_chronex_escapement_cannon": {
+			"name": "Ratchet Bolts",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"knight_chronex_pendulum_lancer": {
+			"name": "Wound Spring",
+			"type": "armor",
+			"value": 0.08,
+			"desc": "Takes 8% less damage."
+		},
+		"knight_chronex_cogstep_assassin": {
+			"name": "Perfect Timing",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"bishop_chronex_horologist": {
+			"name": "Temporal Resonance",
+			"type": "burn",
+			"value": 0.25,
+			"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
+		},
+		"bishop_chronex_gearwright_healer": {
+			"name": "Second Hand",
+			"type": "mend_self",
+			"value": 0.04,
+			"desc": "Heals itself for 4% max HP every 8 ticks."
+		},
+		"queen_chronex_empress_chronia": {
+			"name": "Hourglass Crown",
+			"type": "second_life",
+			"value": 0.3,
+			"desc": "The first time she falls, she returns with 30% HP."
+		},
+		"rook_nexaris_firewall_sentinel": {
+			"name": "Encrypted Plating",
+			"type": "armor",
+			"value": 0.12,
+			"desc": "Takes 12% less damage."
+		},
+		"rook_nexaris_data_spire_battery": {
+			"name": "Zero-Day Barbs",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"knight_nexaris_node_charger": {
+			"name": "Overwrite Edge",
+			"type": "opener",
+			"value": 0.3,
+			"desc": "The first attack deals +30% damage."
+		},
+		"knight_nexaris_ghost_protocol_rider": {
+			"name": "Backdoor Strike",
+			"type": "swift",
+			"value": 1,
+			"desc": "+1 movement."
+		},
+		"bishop_nexaris_algorithm_mage": {
+			"name": "Runaway Loop",
+			"type": "splash",
+			"value": 0.25,
+			"desc": "Attacks also deal 25% damage to enemies adjacent to the target."
+		},
+		"bishop_nexaris_repair_swarm": {
+			"name": "Self-Repair Routine",
+			"type": "regen",
+			"value": 0.04,
+			"desc": "Every 8 ticks heals all allies for 4% max HP."
+		},
+		"queen_nexaris_empress_nexa": {
+			"name": "Admin Crown",
+			"type": "aura_atk",
+			"value": 0.1,
+			"desc": "Adjacent allies gain +10% ATK."
+		}
+	},
+	"sylvaris": {
+		"pawn_royal_guard": {
+			"name": "Barkskin",
+			"type": "armor",
+			"value": 0.12,
+			"desc": "Takes 12% less damage."
+		},
+		"pawn_sun_squire": {
+			"name": "Wild Growth",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"pawn_dusk_cutpurse": {
+			"name": "Poison Dart",
+			"type": "burn",
+			"value": 0.15,
+			"desc": "Attacks burn the target for 15% of ATK every 4 ticks for 12 ticks."
+		},
+		"pawn_shade_archer": {
+			"name": "Thorn Arrow",
+			"type": "execute",
+			"value": 0.25,
+			"desc": "Deals +25% damage to enemies below 30% HP."
+		},
+		"pawn_iron_pikeman": {
+			"name": "Briar Hide",
+			"type": "thorns",
+			"value": 0.2,
+			"desc": "Reflects 20% of the damage taken back at the attacker."
+		},
+		"pawn_banner_cadet": {
+			"name": "Heartwood Banner",
+			"type": "regen",
+			"value": 0.03,
+			"desc": "Every 8 ticks heals all allies for 3% max HP."
+		},
+		"pawn_starling_initiate": {
+			"name": "Pollen Cloud",
+			"type": "chill",
+			"value": 3,
+			"desc": "Attacks slow the target for 3 ticks."
+		},
+		"pawn_moon_acolyte": {
+			"name": "Vine Snare",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"rook_verdantia_elderwood_bastion": {
+			"name": "Ironbark Skin",
+			"type": "thorns",
+			"value": 0.1,
+			"desc": "Reflects 10% of the damage taken back at the attacker."
+		},
+		"rook_verdantia_thornvine_ballista": {
+			"name": "Splinter Seeds",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"knight_verdantia_oakhart_knight": {
+			"name": "Heartwood Edge",
+			"type": "frenzy",
+			"value": 0.08,
+			"desc": "Gains +8% ATK for each enemy defeated (max 5 times)."
+		},
+		"knight_verdantia_mossfoot_prowler": {
+			"name": "Hidden Snare",
+			"type": "opener",
+			"value": 0.25,
+			"desc": "The first attack deals +25% damage."
+		},
+		"bishop_verdantia_druid_of_the_grove": {
+			"name": "Sapburn",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"bishop_verdantia_seedtender": {
+			"name": "Sprout Surge",
+			"type": "ward",
+			"value": 0.18,
+			"desc": "Starts the battle with a shield worth 18% of max HP."
+		},
+		"queen_verdantia_queen_verdeline": {
+			"name": "Evergreen Crown",
+			"type": "guard",
+			"value": 0.08,
+			"desc": "Allies within 2 cells (including herself) take 8% less damage."
+		},
+		"rook_besthara_boarback_mammoth": {
+			"name": "Thick Hide",
+			"type": "mend_self",
+			"value": 0.05,
+			"desc": "Heals itself for 5% max HP every 8 ticks."
+		},
+		"rook_besthara_tusk_hurler": {
+			"name": "Hunter's Mark",
+			"type": "splash",
+			"value": 0.35,
+			"desc": "Attacks also deal 35% damage to enemies adjacent to the target."
+		},
+		"knight_besthara_rhino_rider": {
+			"name": "Trample Fury",
+			"type": "rage",
+			"value": 0.2,
+			"desc": "Gains +20% ATK while below 50% HP."
+		},
+		"knight_besthara_wolfpack_alpha": {
+			"name": "Blood Scent",
+			"type": "rage",
+			"value": 0.25,
+			"desc": "Gains +25% ATK while below 50% HP."
+		},
+		"bishop_besthara_totem_shaman": {
+			"name": "Spirit Fangs",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_besthara_pack_healer": {
+			"name": "Pack Bond",
+			"type": "aura_atk",
+			"value": 0.06,
+			"desc": "Adjacent allies gain +6% ATK."
+		},
+		"queen_besthara_queen_ursara": {
+			"name": "Alpha's Roar",
+			"type": "splash",
+			"value": 0.3,
+			"desc": "Attacks also deal 30% damage to enemies adjacent to the target."
+		},
+		"rook_floralis_petalwall_guardian": {
+			"name": "Dewshield",
+			"type": "last_rites",
+			"value": 0.3,
+			"desc": "When it falls, heals adjacent allies for 30% of their max HP."
+		},
+		"rook_floralis_bloom_catapult": {
+			"name": "Spore Drift",
+			"type": "burn",
+			"value": 0.15,
+			"desc": "Attacks burn the target for 15% of ATK every 4 ticks for 12 ticks."
+		},
+		"knight_floralis_thornrose_cavalier": {
+			"name": "Rose Lance",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"knight_floralis_nightbloom_dancer": {
+			"name": "Poison Petals",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_floralis_faerie_sorceress": {
+			"name": "Glimmer Dust",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"bishop_floralis_lily_mender": {
+			"name": "Honeyed Balm",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"queen_floralis_queen_floriana": {
+			"name": "Eternal Spring",
+			"type": "opening_shield",
+			"value": 0.12,
+			"desc": "Allies start the battle with a shield worth 12% of max HP."
+		},
+		"rook_terragorn_granite_colossus": {
+			"name": "Stone Skin",
+			"type": "ward",
+			"value": 0.12,
+			"desc": "Starts the battle with a shield worth 12% of max HP."
+		},
+		"rook_terragorn_boulder_slinger": {
+			"name": "Shattered Slate",
+			"type": "execute",
+			"value": 0.25,
+			"desc": "Deals +25% damage to enemies below 30% HP."
+		},
+		"knight_terragorn_cragborn_charger": {
+			"name": "Bedrock Resolve",
+			"type": "armor",
+			"value": 0.12,
+			"desc": "Takes 12% less damage."
+		},
+		"knight_terragorn_dustwalker": {
+			"name": "Sudden Tremor",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3rd hit taken is avoided."
+		},
+		"bishop_terragorn_geomancer": {
+			"name": "Lava Veins",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"bishop_terragorn_clay_mender": {
+			"name": "Mountain Patience",
+			"type": "last_rites",
+			"value": 0.3,
+			"desc": "When it falls, heals adjacent allies for 30% of their max HP."
+		},
+		"queen_terragorn_queen_terra_magna": {
+			"name": "Mountain Crown",
+			"type": "regen",
+			"value": 0.03,
+			"desc": "Every 8 ticks heals all allies for 3% max HP."
+		}
+	},
+	"drakmor": {
+		"pawn_royal_guard": {
+			"name": "Scale Hide",
+			"type": "armor",
+			"value": 0.12,
+			"desc": "Takes 12% less damage."
+		},
+		"pawn_sun_squire": {
+			"name": "Bloodlust",
+			"type": "frenzy",
+			"value": 0.07,
+			"desc": "Gains +7% ATK for each enemy defeated (max 5 times)."
+		},
+		"pawn_dusk_cutpurse": {
+			"name": "Cruel Blade",
+			"type": "execute",
+			"value": 0.35,
+			"desc": "Deals +35% damage to enemies below 30% HP."
+		},
+		"pawn_shade_archer": {
+			"name": "Hellfire Arrow",
+			"type": "burn",
+			"value": 0.2,
+			"desc": "Attacks burn the target for 20% of ATK every 4 ticks for 12 ticks."
+		},
+		"pawn_iron_pikeman": {
+			"name": "Iron Spikes",
+			"type": "thorns",
+			"value": 0.15,
+			"desc": "Reflects 15% of the damage taken back at the attacker."
+		},
+		"pawn_banner_cadet": {
+			"name": "War Drum",
+			"type": "aura_atk",
+			"value": 0.1,
+			"desc": "Adjacent allies gain +10% ATK."
+		},
+		"pawn_starling_initiate": {
+			"name": "Cinder Burst",
+			"type": "death_burst",
+			"value": 0.6,
+			"desc": "When it falls, deals 60% of its ATK to adjacent enemies."
+		},
+		"pawn_moon_acolyte": {
+			"name": "Curse Whisper",
+			"type": "stun_proc",
+			"value": 4,
+			"desc": "Every 4th attack stuns the target for 1 tick."
+		},
+		"rook_drakhan_dragonscale_bulwark": {
+			"name": "Scale Mail",
+			"type": "armor",
+			"value": 0.1,
+			"desc": "Takes 10% less damage."
+		},
+		"rook_drakhan_drake_ballista": {
+			"name": "Dragonfire Bolts",
+			"type": "chill",
+			"value": 4,
+			"desc": "Attacks slow the target for 4 ticks."
+		},
+		"knight_drakhan_wyrmrider": {
+			"name": "Dragon's Wrath",
+			"type": "opener",
+			"value": 0.25,
+			"desc": "The first attack deals +25% damage."
+		},
+		"knight_drakhan_wyvern_scout": {
+			"name": "Rending Talons",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"bishop_drakhan_flame_oracle": {
+			"name": "Draconic Blaze",
+			"type": "burn",
+			"value": 0.25,
+			"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
+		},
+		"bishop_drakhan_eggkeeper": {
+			"name": "Brood Care",
+			"type": "mend_self",
+			"value": 0.04,
+			"desc": "Heals itself for 4% max HP every 8 ticks."
+		},
+		"queen_drakhan_dragonqueen_drakara": {
+			"name": "Dragon Heart",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"rook_inferna_hellgate_keeper": {
+			"name": "Infernal Plate",
+			"type": "thorns",
+			"value": 0.15,
+			"desc": "Reflects 15% of the damage taken back at the attacker."
+		},
+		"rook_inferna_brimstone_mortar": {
+			"name": "Soulflame",
+			"type": "lifesteal",
+			"value": 0.08,
+			"desc": "Heals itself for 8% of the damage dealt."
+		},
+		"knight_inferna_pit_fiend_charger": {
+			"name": "Fiendish Edge",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"knight_inferna_imp_assassin": {
+			"name": "Wicked Instinct",
+			"type": "swift",
+			"value": 1,
+			"desc": "+1 movement."
+		},
+		"bishop_inferna_hexweaver": {
+			"name": "Hex Burn",
+			"type": "splash",
+			"value": 0.25,
+			"desc": "Attacks also deal 25% damage to enemies adjacent to the target."
+		},
+		"bishop_inferna_soul_priestess": {
+			"name": "Pact of Ashes",
+			"type": "regen",
+			"value": 0.04,
+			"desc": "Every 8 ticks heals all allies for 4% max HP."
+		},
+		"queen_inferna_queen_infernia": {
+			"name": "Demon Crown",
+			"type": "chill",
+			"value": 4,
+			"desc": "Attacks slow the target for 4 ticks."
+		},
+		"rook_bloodfang_bonewall_juggernaut": {
+			"name": "Crimson Plating",
+			"type": "mend_self",
+			"value": 0.04,
+			"desc": "Heals itself for 4% max HP every 8 ticks."
+		},
+		"rook_bloodfang_blood_harpoon": {
+			"name": "Open Wounds",
+			"type": "splash",
+			"value": 0.3,
+			"desc": "Attacks also deal 30% damage to enemies adjacent to the target."
+		},
+		"knight_bloodfang_bloodrider": {
+			"name": "Red Mist",
+			"type": "rage",
+			"value": 0.3,
+			"desc": "Gains +30% ATK while below 50% HP."
+		},
+		"knight_bloodfang_night_fang": {
+			"name": "Bloodthirst",
+			"type": "opener",
+			"value": 0.25,
+			"desc": "The first attack deals +25% damage."
+		},
+		"bishop_bloodfang_hemomancer": {
+			"name": "Blood Tithe",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"bishop_bloodfang_plague_surgeon": {
+			"name": "Scarlet Rite",
+			"type": "ward",
+			"value": 0.18,
+			"desc": "Starts the battle with a shield worth 18% of max HP."
+		},
+		"queen_bloodfang_queen_sanguina": {
+			"name": "Bloodmoon Crown",
+			"type": "second_life",
+			"value": 0.25,
+			"desc": "The first time she falls, she returns with 25% HP."
+		},
+		"rook_warborn_warhulk_brute": {
+			"name": "Battle Scars",
+			"type": "last_rites",
+			"value": 0.25,
+			"desc": "When it falls, heals adjacent allies for 25% of their max HP."
+		},
+		"rook_warborn_skullshot_ballista": {
+			"name": "Jagged Spikes",
+			"type": "burn",
+			"value": 0.25,
+			"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
+		},
+		"knight_warborn_boar_rider": {
+			"name": "Horde Fury",
+			"type": "lifesteal",
+			"value": 0.08,
+			"desc": "Heals itself for 8% of the damage dealt."
+		},
+		"knight_warborn_knifeear_raider": {
+			"name": "Cheap Shot",
+			"type": "rage",
+			"value": 0.25,
+			"desc": "Gains +25% ATK while below 50% HP."
+		},
+		"bishop_warborn_warchanter": {
+			"name": "War Drums",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_warborn_bone_healer": {
+			"name": "Tribal Spirit",
+			"type": "aura_atk",
+			"value": 0.06,
+			"desc": "Adjacent allies gain +6% ATK."
+		},
+		"queen_warborn_queen_grukka": {
+			"name": "Warchief's Pride",
+			"type": "aura_atk",
+			"value": 0.08,
+			"desc": "Adjacent allies gain +8% ATK."
+		}
+	},
+	"thalassia": {
+		"pawn_royal_guard": {
+			"name": "Barnacle Shell",
+			"type": "armor",
+			"value": 0.1,
+			"desc": "Takes 10% less damage."
+		},
+		"pawn_sun_squire": {
+			"name": "Riptide Rush",
+			"type": "swift",
+			"value": 1,
+			"desc": "+1 movement."
+		},
+		"pawn_dusk_cutpurse": {
+			"name": "Slippery Eel",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3th hit taken is avoided."
+		},
+		"pawn_shade_archer": {
+			"name": "Harpoon Shot",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"pawn_iron_pikeman": {
+			"name": "Urchin Spines",
+			"type": "thorns",
+			"value": 0.18,
+			"desc": "Reflects 18% of the damage taken back at the attacker."
+		},
+		"pawn_banner_cadet": {
+			"name": "Tide Banner",
+			"type": "aura_atk",
+			"value": 0.08,
+			"desc": "Adjacent allies gain +8% ATK."
+		},
+		"pawn_starling_initiate": {
+			"name": "Storm Spark",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"pawn_moon_acolyte": {
+			"name": "Brine Curse",
+			"type": "burn",
+			"value": 0.15,
+			"desc": "Attacks burn the target for 15% of ATK every 4 ticks for 12 ticks."
+		},
+		"rook_abyssal_deepsea_leviathan": {
+			"name": "Pressure Hull",
+			"type": "ward",
+			"value": 0.18,
+			"desc": "Starts the battle with a shield worth 18% of max HP."
+		},
+		"rook_abyssal_trench_harpooner": {
+			"name": "Barbed Tentacles",
+			"type": "execute",
+			"value": 0.2,
+			"desc": "Deals +20% damage to enemies below 30% HP."
+		},
+		"knight_abyssal_kraken_knight": {
+			"name": "Crushing Depth",
+			"type": "armor",
+			"value": 0.1,
+			"desc": "Takes 10% less damage."
+		},
+		"knight_abyssal_dread_eel_stalker": {
+			"name": "Lurking Hunger",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_abyssal_deep_oracle": {
+			"name": "Tidal Pull",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"bishop_abyssal_black_pearl_cleric": {
+			"name": "Black Pearl",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"queen_abyssal_queen_nerithia": {
+			"name": "Trench Crown",
+			"type": "guard",
+			"value": 0.12,
+			"desc": "Allies within 2 cells (including herself) take 12% less damage."
+		},
+		"rook_pelagia_coral_bastion": {
+			"name": "Coral Armor",
+			"type": "armor",
+			"value": 0.08,
+			"desc": "Takes 8% less damage."
+		},
+		"rook_pelagia_conch_cannon": {
+			"name": "Stinging Anemone",
+			"type": "chill",
+			"value": 3,
+			"desc": "Attacks slow the target for 3 ticks."
+		},
+		"knight_pelagia_seahorse_lancer": {
+			"name": "Foam Edge",
+			"type": "opener",
+			"value": 0.35,
+			"desc": "The first attack deals +35% damage."
+		},
+		"knight_pelagia_reefshade_darter": {
+			"name": "Riptide Instinct",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3rd hit taken is avoided."
+		},
+		"bishop_pelagia_tidecaller": {
+			"name": "Moon Tide",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"bishop_pelagia_tidemother_s_handmaid": {
+			"name": "Mother's Blessing",
+			"type": "last_rites",
+			"value": 0.3,
+			"desc": "When it falls, heals adjacent allies for 30% of their max HP."
+		},
+		"queen_pelagia_queen_pelagra": {
+			"name": "Pearl Crown",
+			"type": "splash",
+			"value": 0.25,
+			"desc": "Attacks also deal 25% damage to enemies adjacent to the target."
+		},
+		"rook_tempestra_stormwall_rampart": {
+			"name": "Thunderhide",
+			"type": "thorns",
+			"value": 0.12,
+			"desc": "Reflects 12% of the damage taken back at the attacker."
+		},
+		"rook_tempestra_lightning_rod_cannon": {
+			"name": "Forked Lightning",
+			"type": "lifesteal",
+			"value": 0.12,
+			"desc": "Heals itself for 12% of the damage dealt."
+		},
+		"knight_tempestra_squall_cavalier": {
+			"name": "Thunder Lance",
+			"type": "frenzy",
+			"value": 0.05,
+			"desc": "Gains +5% ATK for each enemy defeated (max 5 times)."
+		},
+		"knight_tempestra_gale_dancer": {
+			"name": "Storm Surge",
+			"type": "frenzy",
+			"value": 0.06,
+			"desc": "Gains +6% ATK for each enemy defeated (max 5 times)."
+		},
+		"bishop_tempestra_stormcaller": {
+			"name": "Eye of the Storm",
+			"type": "burn",
+			"value": 0.25,
+			"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
+		},
+		"bishop_tempestra_rainbringer": {
+			"name": "Cleansing Rain",
+			"type": "mend_self",
+			"value": 0.04,
+			"desc": "Heals itself for 4% max HP every 8 ticks."
+		},
+		"queen_tempestra_queen_tempesta": {
+			"name": "Stormcrown",
+			"type": "opening_shield",
+			"value": 0.1,
+			"desc": "Allies start the battle with a shield worth 10% of max HP."
+		},
+		"rook_corsaria_ironclad_hulk": {
+			"name": "Barnacle Plating",
+			"type": "mend_self",
+			"value": 0.06,
+			"desc": "Heals itself for 6% max HP every 8 ticks."
+		},
+		"rook_corsaria_gunnery_brig": {
+			"name": "Grapeshot",
+			"type": "splash",
+			"value": 0.25,
+			"desc": "Attacks also deal 25% damage to enemies adjacent to the target."
+		},
+		"knight_corsaria_cutlass_cavalier": {
+			"name": "Cutlass Flourish",
+			"type": "rage",
+			"value": 0.25,
+			"desc": "Gains +25% ATK while below 50% HP."
+		},
+		"knight_corsaria_cutthroat_corsair": {
+			"name": "Dirty Fighting",
+			"type": "swift",
+			"value": 1,
+			"desc": "+1 movement."
+		},
+		"bishop_corsaria_powder_mage": {
+			"name": "Rum-Fueled Spark",
+			"type": "splash",
+			"value": 0.25,
+			"desc": "Attacks also deal 25% damage to enemies adjacent to the target."
+		},
+		"bishop_corsaria_ship_s_surgeon": {
+			"name": "Salt and Rum",
+			"type": "regen",
+			"value": 0.04,
+			"desc": "Every 8 ticks heals all allies for 4% max HP."
+		},
+		"queen_corsaria_queen_redwave": {
+			"name": "Black Flag",
+			"type": "regen",
+			"value": 0.05,
+			"desc": "Every 8 ticks heals all allies for 5% max HP."
+		}
+	},
+	"eclipsia": {
+		"pawn_royal_guard": {
+			"name": "Chrono Plating",
+			"type": "armor",
+			"value": 0.1,
+			"desc": "Takes 10% less damage."
+		},
+		"pawn_sun_squire": {
+			"name": "Echo Strike",
+			"type": "opener",
+			"value": 0.3,
+			"desc": "The first attack deals +30% damage."
+		},
+		"pawn_dusk_cutpurse": {
+			"name": "Blink Dagger",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3th hit taken is avoided."
+		},
+		"pawn_shade_archer": {
+			"name": "Paradox Arrow",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"pawn_iron_pikeman": {
+			"name": "Reflected Time",
+			"type": "thorns",
+			"value": 0.15,
+			"desc": "Reflects 15% of the damage taken back at the attacker."
+		},
+		"pawn_banner_cadet": {
+			"name": "Hourglass Banner",
+			"type": "mend_self",
+			"value": 0.06,
+			"desc": "Heals itself for 6% max HP every 8 ticks."
+		},
+		"pawn_starling_initiate": {
+			"name": "Temporal Burn",
+			"type": "burn",
+			"value": 0.2,
+			"desc": "Attacks burn the target for 20% of ATK every 4 ticks for 12 ticks."
+		},
+		"pawn_moon_acolyte": {
+			"name": "Stasis Touch",
+			"type": "stun_proc",
+			"value": 4,
+			"desc": "Every 4th attack stuns the target for 1 tick."
+		},
+		"rook_solstice_equinox_sentinel": {
+			"name": "Daylight Shell",
+			"type": "last_rites",
+			"value": 0.2,
+			"desc": "When it falls, heals adjacent allies for 20% of their max HP."
+		},
+		"rook_solstice_solar_array": {
+			"name": "Flare Burst",
+			"type": "burn",
+			"value": 0.2,
+			"desc": "Attacks burn the target for 20% of ATK every 4 ticks for 12 ticks."
+		},
+		"knight_solstice_dayturn_lancer": {
+			"name": "Golden Hour",
+			"type": "lifesteal",
+			"value": 0.12,
+			"desc": "Heals itself for 12% of the damage dealt."
+		},
+		"knight_solstice_twilight_courser": {
+			"name": "Long Shadow",
+			"type": "opener",
+			"value": 0.25,
+			"desc": "The first attack deals +25% damage."
+		},
+		"bishop_solstice_sunwheel_mage": {
+			"name": "Totality",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"bishop_solstice_aurora_priest": {
+			"name": "Warm Dawn",
+			"type": "ward",
+			"value": 0.18,
+			"desc": "Starts the battle with a shield worth 18% of max HP."
+		},
+		"queen_solstice_empress_solara": {
+			"name": "Sunwheel Crown",
+			"type": "lifesteal",
+			"value": 0.08,
+			"desc": "Heals itself for 8% of the damage dealt."
+		},
+		"rook_paradox_loop_bastion": {
+			"name": "Paradox Plating",
+			"type": "ward",
+			"value": 0.15,
+			"desc": "Starts the battle with a shield worth 15% of max HP."
+		},
+		"rook_paradox_anomaly_cannon": {
+			"name": "Unstable Rounds",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"knight_paradox_mirage_lancer": {
+			"name": "Double Vision",
+			"type": "armor",
+			"value": 0.08,
+			"desc": "Takes 8% less damage."
+		},
+		"knight_paradox_doppel_stalker": {
+			"name": "Time Skip",
+			"type": "rage",
+			"value": 0.25,
+			"desc": "Gains +25% ATK while below 50% HP."
+		},
+		"bishop_paradox_entropy_mage": {
+			"name": "Butterfly Effect",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_paradox_fractured_healer": {
+			"name": "Stray Timeline",
+			"type": "aura_atk",
+			"value": 0.06,
+			"desc": "Adjacent allies gain +6% ATK."
+		},
+		"queen_paradox_empress_paradoxia": {
+			"name": "Impossible Crown",
+			"type": "chill",
+			"value": 3,
+			"desc": "Attacks slow the target for 3 ticks."
+		},
+		"rook_eternis_timeless_monolith": {
+			"name": "Ageless Shell",
+			"type": "armor",
+			"value": 0.12,
+			"desc": "Takes 12% less damage."
+		},
+		"rook_eternis_eon_beam_tower": {
+			"name": "Slow Erosion",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"knight_eternis_ageless_knight": {
+			"name": "Endless Vigor",
+			"type": "opener",
+			"value": 0.3,
+			"desc": "The first attack deals +30% damage."
+		},
+		"knight_eternis_dustweaver": {
+			"name": "Withering Touch",
+			"type": "execute",
+			"value": 0.3,
+			"desc": "Deals +30% damage to enemies below 30% HP."
+		},
+		"bishop_eternis_chronicler": {
+			"name": "Memory Surge",
+			"type": "chill",
+			"value": 2,
+			"desc": "Attacks slow the target for 2 ticks."
+		},
+		"bishop_eternis_elder_mender": {
+			"name": "Long Life",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"queen_eternis_empress_eternia": {
+			"name": "Unending Crown",
+			"type": "second_life",
+			"value": 0.35,
+			"desc": "The first time she falls, she returns with 35% HP."
+		},
+		"rook_oblivion_void_gate_keeper": {
+			"name": "Hollow Plating",
+			"type": "thorns",
+			"value": 0.1,
+			"desc": "Reflects 10% of the damage taken back at the attacker."
+		},
+		"rook_oblivion_entropy_driver": {
+			"name": "Erasing Bolts",
+			"type": "lifesteal",
+			"value": 0.1,
+			"desc": "Heals itself for 10% of the damage dealt."
+		},
+		"knight_oblivion_voidrider": {
+			"name": "Hungering Dark",
+			"type": "frenzy",
+			"value": 0.08,
+			"desc": "Gains +8% ATK for each enemy defeated (max 5 times)."
+		},
+		"knight_oblivion_starless_reaver": {
+			"name": "Fading Strike",
+			"type": "evade",
+			"value": 3,
+			"desc": "Every 3rd hit taken is avoided."
+		},
+		"bishop_oblivion_nullcaster": {
+			"name": "Event Horizon",
+			"type": "stun_proc",
+			"value": 5,
+			"desc": "Every 5th attack stuns the target for 1 tick."
+		},
+		"bishop_oblivion_black_hole_medic": {
+			"name": "Last Light",
+			"type": "last_rites",
+			"value": 0.3,
+			"desc": "When it falls, heals adjacent allies for 30% of their max HP."
+		},
+		"queen_oblivion_empress_nihila": {
+			"name": "Crown of Silence",
+			"type": "aura_atk",
+			"value": 0.06,
+			"desc": "Adjacent allies gain +6% ATK."
+		}
+	}
+}

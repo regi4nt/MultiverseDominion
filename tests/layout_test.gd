@@ -9,7 +9,7 @@ const SIZES := {
 	"21:9 2520x1080": Vector2i(1680, 720), "4:3 tablet 2048x1536": Vector2i(1280, 960), "16:10 1920x1200": Vector2i(1280, 800),
 	"5:3 800x480 low-end": Vector2i(1280, 768)}
 const SCENES := ["main_menu/main_menu", "match_setup/match_setup", "settings/settings", "territory_board/territory_board",
-	"battle_board/battle_board", "card_collection/card_collection"]
+	"battle_board/battle_board", "card_collection/card_collection", "shop/shop"]
 const MIN_TOUCH := 48.0  # logical px; ~5.5 mm on a typical 6.5" phone
 
 var overflow: Array[String] = []
@@ -18,7 +18,8 @@ var small: Dictionary = {}  # "scene: text" -> height
 
 func _ready() -> void:
 	OS.low_processor_usage_mode = false  # the project enables it for battery life; screenshots need real frames
-	SaveManager.unlock_all()
+	for c in GameData.continents:  # tests need every continent open (the game has no unlock-all feature)
+		SaveManager.unlock_continent(c["id"])
 	for label in SIZES:
 		var sz: Vector2i = SIZES[label]
 		for sc in SCENES:

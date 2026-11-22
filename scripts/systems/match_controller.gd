@@ -133,22 +133,28 @@ func _init_army(p: PlayerState) -> void:
 	if p.is_ai or not human_present:
 		p.deck = Deck.create_default()
 	else:
-		p.deck = SaveManager.get_deck()
+		p.deck = SaveManager.get_deck(String(continent["id"]))  # the player's own unit loadout of this continent
 	p.deck.champion_id = p.champion_id
 	p.battle_deck = BattleDeck.new(p.deck, rng)
 	p.roster = UnitRoster.new()
-	var pawns: Array[String] = []
-	for u in CardDatabase.units_of_chess("pawn"):
-		pawns.append(u["id"])
+	var pawns: Array[String] = []  # starter units: Pawns of the deck (any unit type if the deck has no Pawn)
+	var deck_ids := p.deck.effective_unit_ids()
+	for id in deck_ids:
+		if String(CardDatabase.get_unit(id).get("chess", "")) == "pawn":
+			pawns.append(id)
+	if pawns.is_empty():
+		pawns = deck_ids
 	for i in range(int(GameData.b("starter_units"))):
 		var id := pawns[rng.randi() % pawns.size()]
 		if p.battle_deck.take_card(id):
 			p.roster.add_copy(id)
 	if p.has_passive("vanguard"):  # extra rare units
 		var rares: Array[String] = []
-		for u in CardDatabase.all_units():
-			if u["rarity"] == "rare":
-				rares.append(u["id"])
+		for id in deck_ids:
+			if String(CardDatabase.get_unit(id).get("rarity", "")) == "rare":
+				rares.append(id)
+		if rares.is_empty():
+			rares = deck_ids
 		for i in range(int(p.passive_value)):
 			var rid := rares[rng.randi() % rares.size()]
 			if p.battle_deck.take_card(rid):

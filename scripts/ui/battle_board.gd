@@ -45,8 +45,8 @@ var _result_shown := false
 var _duel_msg: String = ""
 var _tip_panel: PanelContainer = null
 var _tip_label: Label = null
-var _leave_dialog: ConfirmationDialog
-var _start_dialog: ConfirmationDialog
+var _leave_dialog: UiDialog
+var _start_dialog: UiDialog
 
 
 func _ready() -> void:
@@ -55,7 +55,7 @@ func _ready() -> void:
 	if duel_context.is_empty():
 		CardDatabase.set_continent(GameSession.continent_id)
 		WorldMods.apply(GameData.get_continent(CardDatabase.active_continent))
-		deck = SaveManager.get_deck()
+		deck = SaveManager.get_deck(GameSession.continent_id)
 		champion_id = deck.champion_id
 		hand = BattleAI.pick_hand(deck, rng, 3)
 		prep = BattlePrep.new(deck, rng, int(GameData.b("practice_gold")), int(GameData.b("practice_gold")), int(GameData.b("start_level")))
@@ -67,8 +67,10 @@ func _ready() -> void:
 		var budget := int(float(me.gold) * float(GameData.b("battle_budget_ratio")))
 		prep = BattlePrep.new(deck, rng, me.gold, budget, me.level, me.roster, me.battle_deck)
 		prep.price_mult = me.battle_price_mult()  # Quartermaster passive (prices are computed on display)
+	var own_faction := String(GameData.get_champion(champion_id).get("faction", ""))
 	prep.apply_hand(hand)  # Mercenary Pact / Merchant Contract act during preparation
 	_build_ui()
+	grid.own_faction = own_faction
 	grid.show_prep(prep)
 	grid.cell_pressed.connect(_on_cell)
 	timer = Timer.new()
@@ -242,13 +244,17 @@ func _build_ui() -> void:
 	log_view.add_theme_font_size_override("normal_font_size", 14)
 	lp.add_child(log_view)
 
-	_leave_dialog = ConfirmationDialog.new()
+	_leave_dialog = UiDialog.new()
+	_leave_dialog.title = "Leave battle?"
+	_leave_dialog.tone = "danger"
 	_leave_dialog.dialog_text = "Leave Battle Practice? This battle will be lost."
 	_leave_dialog.ok_button_text = "Leave"
 	_leave_dialog.cancel_button_text = "Stay"
 	_leave_dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
 	add_child(_leave_dialog)
-	_start_dialog = ConfirmationDialog.new()
+	_start_dialog = UiDialog.new()
+	_start_dialog.title = "No units deployed"
+	_start_dialog.tone = "warn"
 	_start_dialog.dialog_text = "No units are deployed, so your Champion will fight alone. Start the battle anyway?"
 	_start_dialog.ok_button_text = "Fight"
 	_start_dialog.cancel_button_text = "Back"
@@ -327,7 +333,7 @@ func _refresh_prep() -> void:
 	else:
 		var card := CardDatabase.get_unit(selected.card_id)
 		var st := selected.stats()
-		sel_label.text = "%s %s | HP %d ATK %d | Rng %d Mov %d | cost %d | %s: %s" % [card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], card["range"], card["move"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]]
+		sel_label.text = "%s %s | HP %d ATK %d | Rng %d Mov %d | cost %d | %s: %s" % [card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], card["range"], card["move"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]] + _buff_line(selected.card_id)
 	sell_btn.disabled = selected == null
 	bench_btn.disabled = selected == null or selected.cell.x < 0
 	var names: Array[String] = []
@@ -568,3 +574,9 @@ func _finish_duel() -> void:
 		bonus = int(engine.bonus_gold[1])
 	battle_finished.emit({"winner": winner_pid, "bonus_gold": bonus,
 		"gold_delta": {me.id: int(engine.gold_delta[0]), opp.id: int(engine.gold_delta[1])}})
+
+
+## " | Buff: name - desc" of a unit card (continent buff), "" if it has none.
+func _buff_line(card_id: String) -> String:
+	var bf := CardDatabase.get_buff(card_id)
+	return "" if bf.is_empty() else " | Buff %s: %s" % [bf["name"], bf["desc"]]
