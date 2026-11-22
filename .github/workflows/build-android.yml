@@ -74,10 +74,10 @@ jobs:
       - name: Import the project and run the tests first (a broken game is not exported)
         run: |
           godot --headless --path . --import || true
-          GODOT=godot tools/run_tests.sh logic
+          GODOT=godot bash tools/run_tests.sh logic
 
       - name: Install the Android Gradle build template
-        run: tools/install_android_template.sh "${GODOT_FULL}"
+        run: bash tools/install_android_template.sh "${GODOT_FULL}"
 
       - name: Cache Gradle
         uses: actions/cache@v4
