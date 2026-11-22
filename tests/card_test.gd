@@ -289,7 +289,10 @@ func _ready() -> void:
 	for bu in e.units:
 		(f0 if bu.side == 0 else f1).append(bu.faction)
 	check(f0 == ["valdoria", "valdoria"] and f1 == ["elarion", "elarion"], "faction pieces fight for their own faction (%s / %s)" % [str(f0), str(f1)])
-	check(e.units[0].max_hp == int(round(float(CardDatabase.unit_stats(vp[0]["id"], 1)["hp"]) * 1.05)), "two own pieces give the side's Faction Synergy (+5%)")
+	# Valdoria's King passive (Iron Discipline, team_hp) multiplies on top of the +5% Faction Synergy
+	var kp_v: Dictionary = GameData.king_passives.get("champion_valdoria", {})
+	var kp_hp := float(kp_v.get("value", 0.0)) if kp_v.get("type", "") == "team_hp" else 0.0
+	check(e.units[0].max_hp == int(round(float(CardDatabase.unit_stats(vp[0]["id"], 1)["hp"]) * 1.05 * (1.0 + kp_hp))), "two own pieces give the side's Faction Synergy (+5%%, King passive HP +%d%%)" % int(round(kp_hp * 100.0)))
 
 	# Old saves only own the Aetherion set: ensure_collection adds the new continents' cards (9 copies each)
 	var saved: Dictionary = SaveManager.data.duplicate(true)

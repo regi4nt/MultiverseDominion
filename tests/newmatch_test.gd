@@ -219,7 +219,7 @@ func _test_ui() -> void:
 	check(SaveManager.is_continent_unlocked("arcanum"), "confirming opens the chosen continent")
 	check(_find_button(n, "3.  MACHINA").disabled and _find_button(n, "3.  MACHINA").text.find("Locked") >= 0, "the unlock is spent: the others are locked again")
 	check(GameSession.continent_id == "arcanum", "the Journey now points at the new continent")
-	check(n._journey_hint.text.find("does not count") >= 0, "a faction of another continent is explained as not counting")
+	check(n._journey_hint.text.find("not a faction of") >= 0, "a faction of another continent is explained as not counting")
 	n.on_back_requested()
 	check(n._view == "hub", "Back from setup returns to the hub")
 
