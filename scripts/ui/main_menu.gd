@@ -48,21 +48,9 @@ func _ready() -> void:
 	var play := UiTheme.make_button("NEW MATCH", 68)
 	play.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/match_setup/match_setup.tscn"))
 	right.add_child(play)
-	var tut := UiTheme.make_button("TUTORIAL  (done)" if SaveManager.data["profile"].get("tutorial_done", false) else "TUTORIAL", 60)
-	tut.pressed.connect(func():
-		SaveManager.clear_match()
-		GameSession.start_tutorial()
-		get_tree().change_scene_to_file("res://scenes/territory_board/territory_board.tscn"))
-	right.add_child(tut)
-	var practice := UiTheme.make_button("Battle Practice")
-	practice.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/battle_board/battle_board.tscn"))
-	right.add_child(practice)
-	var coll := UiTheme.make_button("Card Collection")
+	var coll := UiTheme.make_button("Collection & Deck")
 	coll.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/card_collection/card_collection.tscn"))
 	right.add_child(coll)
-	var deckb := UiTheme.make_button("Deck Builder")
-	deckb.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/deck_builder/deck_builder.tscn"))
-	right.add_child(deckb)
 	var profile := UiTheme.make_button("Profile")
 	profile.pressed.connect(_show_profile)
 	right.add_child(profile)
@@ -74,6 +62,8 @@ func _ready() -> void:
 	right.add_child(quit)
 	_quit_dialog = ConfirmationDialog.new()
 	_quit_dialog.dialog_text = "Quit Multiverse Dominion?"
+	_quit_dialog.ok_button_text = "Quit"
+	_quit_dialog.cancel_button_text = "Stay"
 	_quit_dialog.confirmed.connect(func(): get_tree().quit())
 	add_child(_quit_dialog)
 	left.add_child(UiTheme.make_label("v" + UpdateCheck.current_version(), 18, UiTheme.COL_MUTED))

@@ -36,10 +36,10 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - Kapasitas catur (`CapacitySystem`): Pawn 1, Rook/Knight/Bishop 2, Queen 4, King 6; level 3 = 9 ... level 10 = 30.
   Asumsi: King/Champion tidak dihitung ke kapasitas deploy (hanya masuk saat Last Stand) — konfirmasi di Phase 4.
 - `BattleDeck`: tumpukan 135 kartu untuk Battle Shop (5 kartu per refresh, sisa kembali ke tumpukan).
-- Main Menu -> Card Collection (filter, detail, stat 1/2/3 bintang) dan Deck Builder (pilih Champion + tepat 15 Support, simpan ke save).
+- Main Menu -> Collection & Deck: satu layar dengan dua tab. Tab Collection (filter, detail, stat 1/2/3 bintang) dan tab Deck (pilih Champion + tepat 15 Support, simpan ke save).
 - Koleksi awal: semua unit x9 dan 15 dari 21 Support; 6 Support terkunci (cara membuka: tiap kemenangan membuka satu Support terkunci, lihat "Aturan tambahan").
 
-## Battle System (Phase 4) — Main Menu -> Battle Practice
+## Battle System (Phase 4) — Main Menu -> New Match -> Battle Practice
 - Grid 8x8; kamu di baris 4-7 (area 4x8), lawan di baris 0-3. Tanpa kontrol manual: semua unit bergerak/menyerang sendiri.
 - Persiapan (`BattlePrep`): Battle Shop 5 unit, Reroll, Buy/Sell, Level Up (kapasitas 9 -> 30), Preparation Area 10 slot,
   Deploy/Return (ketuk unit lalu ketuk petak), Auto Deploy. Satu mata uang (Dominion Gold); "budget" hanya batas belanja.
@@ -123,7 +123,7 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi landscape
 - **Build di GitHub dan Gradle/AAB**: `.github/workflows/` (tes otomatis + APK + AAB, Godot 4.7); lihat BUILD_ANDROID.md. Skrip tes: `tools/run_tests.sh`. Proyek kini memakai Godot 4.7 (target API 36 untuk Google Play).
 
 ## Tutorial, Auction, Special Dice, seni, audio, kartu baru
-- **Tutorial** (menu utama): match 1v1 melawan AI Easy di Aetherion, 10 ronde, seed tetap. AI sudah memiliki wilayah di depan pemain dan
+- **Tutorial** (menu utama -> New Match): match 1v1 melawan AI Easy di Aetherion, 10 ronde, seed tetap. AI sudah memiliki wilayah di depan pemain dan
   tawaran duel pertama selalu muncul. `TutorialGuide` menjelaskan tiap aturan saat pertama kali muncul (panel petunjuk di papan; tips
   di atas separuh papan musuh saat persiapan duel). Hasilnya tidak dihitung ke statistik; `profile.tutorial_done` disimpan.
 - **Auction sungguhan**: lot acak dilelang ke semua pemain hidup, mulai dari yang mendarat; buka 40% harga, naik 10% per tawaran;
@@ -146,3 +146,7 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi landscape
 - Pemilihan target manual untuk kartu Artifact (Crown of Valor, Aegis Shield, Windboots).
 - Uji di perangkat Android nyata (lihat BUILD_ANDROID.md).
 - Keseimbangan: eliminasi total jarang (3-4%); game biasanya diputuskan net worth di ronde 30. Diukur per benua dengan `tools/balance_report`.
+
+## Peta Territory: zoom dan kamera
+Layar Territory dan Battle tiga kolom ala Monopoly (Battle: shop + bench di kiri, papan 8x8 di tengah, tombol + kartu Support di kanan, log di kiri saat bertarung). Territory: papan di tengah (Roll Dice dan aksi di tengah papan), pemain di kiri, log di kanan. Papan tampil utuh (zoom 1x) dan kamera mengikuti pion saat di-zoom. Geser dengan drag, cubit atau roda mouse untuk zoom,
+tombol + / - / Fit (kanan bawah) untuk zoom manual atau melihat seluruh papan. Ketuk petak untuk info. Kode: `scripts/ui/board_view.gd`.

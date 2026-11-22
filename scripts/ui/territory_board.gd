@@ -1,5 +1,5 @@
 extends Control
-## Territory Board screen: board on the left, HUD on the right.
+## Territory Board screen: board in the middle (dice + actions in its centre), players left, log right.
 ## All game rules live in MatchController; this script only displays and forwards input.
 
 var ctrl: MatchController
@@ -19,6 +19,7 @@ var _guide: TutorialGuide = null
 var _new_card: String = ""
 var _hint_panel: PanelContainer
 var _hint_label: Label
+var _pan_key: String = ""  # "round:player" of the last turn the camera was moved for
 
 
 func _ready() -> void:
@@ -40,6 +41,7 @@ func _ready() -> void:
 	ctrl.player_moved.connect(_on_moved)
 	ctrl.game_over.connect(_on_game_over)
 	board_view.bind(ctrl)
+	board_view.speed_changed.connect(_on_speed_changed)
 	board_view.tile_pressed.connect(func(i: int): tile_info.text = ctrl.describe_tile(i))
 	for line in ctrl.recent_log:  # lines logged before the UI was connected (match start / resumed match)
 		log_view.add_text(line + "\n")
@@ -53,7 +55,7 @@ func _ready() -> void:
 		_guide.hint.connect(_on_hint)
 		ctrl.state_changed.emit()  # let the coach see the first state
 	tick = Timer.new()
-	tick.wait_time = 0.8
+	tick.wait_time = 0.8 / BoardView.speed_mult
 	tick.timeout.connect(_on_tick)
 	add_child(tick)
 	tick.start()
@@ -67,81 +69,105 @@ func _build_ui() -> void:
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
 
+	# Three columns, Monopoly style: players and info | the board in the middle with the dice and actions | log.
+	var left := VBoxContainer.new()
+	left.custom_minimum_size = Vector2(230, 0)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.size_flags_stretch_ratio = 1.0
+	left.add_theme_constant_override("separation", 8)
+	root.add_child(left)
+
 	var arc := AspectRatioContainer.new()
 	arc.ratio = 1.0
 	arc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	arc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	arc.size_flags_stretch_ratio = 1.27  # 16:9 -> the board gets its full 696 px height; extra width goes to the HUD
+	arc.size_flags_stretch_ratio = 2.6  # 16:9 -> the board gets its full height; extra width goes to the side columns
 	root.add_child(arc)
+	var holder := Control.new()  # square holder: the board fills it, the action panel floats in the board's centre
+	arc.add_child(holder)
 	board_view = BoardView.new()
-	arc.add_child(board_view)
+	board_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	holder.add_child(board_view)
 
 	var right := VBoxContainer.new()
-	right.custom_minimum_size = Vector2(500, 0)
+	right.custom_minimum_size = Vector2(230, 0)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.size_flags_stretch_ratio = 1.0
 	right.add_theme_constant_override("separation", 8)
 	root.add_child(right)
 
+	# --- left column
 	var head := HBoxContainer.new()
-	right.add_child(head)
-	round_label = UiTheme.make_label("Round 1", 24, UiTheme.COL_GOLD)
+	left.add_child(head)
+	round_label = UiTheme.make_label("Round 1", 22, UiTheme.COL_GOLD)
 	round_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(round_label)
 	var menu := UiTheme.make_button("Menu", 44)
-	menu.custom_minimum_size.x = 110
+	menu.custom_minimum_size.x = 96
 	menu.pressed.connect(func(): _leave_dialog.popup_centered(Vector2i(460, 160)))
 	head.add_child(menu)
 	_leave_dialog = ConfirmationDialog.new()
 	_leave_dialog.dialog_text = "Leave to the main menu? The match is saved at the start of each of your turns and can be continued."
+	_leave_dialog.ok_button_text = "Leave"
+	_leave_dialog.cancel_button_text = "Stay"
 	_leave_dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
 	add_child(_leave_dialog)
 
 	var players_panel := PanelContainer.new()
-	right.add_child(players_panel)
+	players_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	left.add_child(players_panel)
 	player_box = VBoxContainer.new()
-	player_box.add_theme_constant_override("separation", 4)
+	player_box.add_theme_constant_override("separation", 8)
 	players_panel.add_child(player_box)
 
-	var turn_panel := PanelContainer.new()
-	right.add_child(turn_panel)
-	var tv := VBoxContainer.new()
-	turn_panel.add_child(tv)
-	turn_label = UiTheme.make_label("", 22)
-	dice_label = UiTheme.make_label("Dice: -", 20, UiTheme.COL_MUTED)
-	tv.add_child(turn_label)
-	tv.add_child(dice_label)
-
-	var action_panel := PanelContainer.new()
-	action_panel.custom_minimum_size = Vector2(0, 76)
-	right.add_child(action_panel)
-	action_box = HFlowContainer.new()
-	action_box.add_theme_constant_override("h_separation", 8)
-	action_box.add_theme_constant_override("v_separation", 8)
-	action_panel.add_child(action_box)
-
-	var info_panel := PanelContainer.new()
-	info_panel.custom_minimum_size = Vector2(0, 84)
-	right.add_child(info_panel)
-	tile_info = UiTheme.make_label("Tap a tile on the board to inspect it.", 16, UiTheme.COL_MUTED)
-	tile_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info_panel.add_child(tile_info)
+	dice_label = UiTheme.make_label("Dice: -", 18, UiTheme.COL_MUTED)
+	dice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var dice_panel := PanelContainer.new()
+	dice_panel.add_child(dice_label)
+	left.add_child(dice_panel)
 
 	_hint_panel = PanelContainer.new()  # Tutorial coach (hidden in normal matches)
 	_hint_panel.visible = false
 	_hint_panel.add_theme_stylebox_override("panel", UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 2, 10))
-	right.add_child(_hint_panel)
-	var hv := HBoxContainer.new()
+	left.add_child(_hint_panel)
+	var hv := VBoxContainer.new()
 	hv.add_theme_constant_override("separation", 8)
 	_hint_panel.add_child(hv)
 	_hint_label = UiTheme.make_label("", 15, UiTheme.COL_TEXT)
 	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hv.add_child(_hint_label)
 	var hide_btn := UiTheme.make_button("OK", 52)
-	hide_btn.custom_minimum_size.x = 70
-	hide_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	hide_btn.pressed.connect(func(): _hint_panel.visible = false)
 	hv.add_child(hide_btn)
+
+	# --- centre of the board: whose turn it is + the action buttons (Roll Dice, Buy, Tax / Duel, ...)
+	var centre := PanelContainer.new()
+	centre.anchor_left = 0.15
+	centre.anchor_right = 0.85
+	centre.anchor_top = 0.64
+	centre.anchor_bottom = 0.90
+	centre.grow_vertical = Control.GROW_DIRECTION_END
+	centre.add_theme_stylebox_override("panel", UiTheme.make_box(Color(UiTheme.COL_PANEL, 0.96), UiTheme.COL_GOLD_DIM, 2, 10))
+	holder.add_child(centre)
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override("separation", 6)
+	centre.add_child(cv)
+	turn_label = UiTheme.make_label("", 22)
+	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cv.add_child(turn_label)
+	action_box = HFlowContainer.new()
+	action_box.alignment = FlowContainer.ALIGNMENT_CENTER
+	action_box.add_theme_constant_override("h_separation", 8)
+	action_box.add_theme_constant_override("v_separation", 8)
+	cv.add_child(action_box)
+
+	# --- right column
+	var info_panel := PanelContainer.new()
+	info_panel.custom_minimum_size = Vector2(0, 84)
+	right.add_child(info_panel)
+	tile_info = UiTheme.make_label("Tap a tile to inspect it.  RR = reroll tokens, SD = special dice.", 16, UiTheme.COL_MUTED)
+	tile_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_panel.add_child(tile_info)
 
 	var log_panel := PanelContainer.new()
 	log_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -190,6 +216,10 @@ func _on_moved(pid: int, _from: int, to_i: int, _warped: bool) -> void:
 		tile_info.text = ctrl.describe_tile(to_i)
 
 
+func _on_speed_changed(mult: float) -> void:
+	tick.wait_time = 0.8 / mult
+
+
 func _on_state_changed() -> void:
 	round_label.text = "Round %d / %d" % [mini(ctrl.round_number, ctrl.round_limit), ctrl.round_limit]
 	var p := ctrl.current_player()
@@ -199,6 +229,11 @@ func _on_state_changed() -> void:
 	_rebuild_actions()
 	board_view.queue_redraw()
 	_maybe_open_duel()
+	if ctrl.state == MatchController.State.AWAIT_ROLL:
+		var key := "%d:%d" % [ctrl.round_number, ctrl.current]
+		if key != _pan_key:  # a new turn: bring that player's pawn into view (once, so manual panning is not undone)
+			_pan_key = key
+			board_view.pan_to_tile(p.position)
 	if ctrl.state == MatchController.State.AWAIT_ROLL and not ctrl.current_player().is_ai:
 		_autosave()  # start of the human turn: a stable moment
 
@@ -208,19 +243,45 @@ func _refresh_players() -> void:
 		player_box.remove_child(c)
 		c.queue_free()
 	for p in ctrl.players:
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", UiTheme.player_card_box(p.color, p.id == ctrl.current and p.alive))
 		var row := HBoxContainer.new()
-		var sw := ColorRect.new()
-		sw.color = p.color
-		sw.custom_minimum_size = Vector2(14, 14)
-		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(sw)
-		var txt := "%s%s  %d G | Life %d | Lands %d | RR %d%s" % [">" if p.id == ctrl.current else " ", p.display_name, p.gold, p.life, ctrl.count_owned(p.id), p.reroll_tokens, (" | SD %d" % p.special_dice.size()) if not p.special_dice.is_empty() else ""]
-		if not p.alive:
-			txt = "  %s  OUT" % p.display_name
-		var l := UiTheme.make_label(txt, 16, UiTheme.COL_TEXT if p.alive else UiTheme.COL_MUTED)
-		row.add_child(l)
-		row.add_theme_constant_override("separation", 8)
-		player_box.add_child(row)
+		row.add_theme_constant_override("separation", 10)
+		card.add_child(row)
+		# round avatar with the player's initial
+		var av := Label.new()
+		av.text = String(p.display_name).substr(0, 1).to_upper()
+		av.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		av.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		av.custom_minimum_size = Vector2(44, 44)
+		av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		av.add_theme_font_size_override("font_size", 22)
+		av.add_theme_color_override("font_color", Color("10141f"))
+		var avs := UiTheme.make_box(p.color if p.alive else Color("4a4f66"), p.color.lightened(0.5), 2, 22, 4)
+		avs.content_margin_left = 0
+		avs.content_margin_right = 0
+		av.add_theme_stylebox_override("normal", avs)
+		row.add_child(av)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 0)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(col)
+		var nm := String(p.display_name)
+		var name_l := UiTheme.make_label(nm, 17, UiTheme.COL_TEXT if p.alive else UiTheme.COL_MUTED)
+		name_l.clip_text = true
+		col.add_child(name_l)
+		if p.alive:
+			col.add_child(UiTheme.make_label("%d G" % p.gold, 22, UiTheme.COL_GOLD))
+			var st := "Life %d  |  Land %d  |  RR %d" % [p.life, ctrl.count_owned(p.id), p.reroll_tokens]
+			if not p.special_dice.is_empty():
+				st += "  |  SD %d" % p.special_dice.size()
+			var sl := UiTheme.make_label(st, 13, UiTheme.COL_MUTED)
+			sl.tooltip_text = "Life | Land owned | RR = reroll tokens | SD = special dice"
+			sl.clip_text = true
+			col.add_child(sl)
+		else:
+			col.add_child(UiTheme.make_label("OUT", 18, UiTheme.COL_DANGER))
+		player_box.add_child(card)
 
 
 func _rebuild_actions() -> void:
@@ -252,19 +313,19 @@ func _rebuild_actions() -> void:
 		return
 	match ctrl.state:
 		MatchController.State.AWAIT_ROLL:
-			_add_action("Roll Dice", func(): ctrl.roll_dice())
+			_add_action("Roll Dice", func(): ctrl.roll_dice(), false, true)
 			for i in range(p.special_dice.size()):
 				var def := GameData.get_special_die(p.special_dice[i])
 				_add_action("Use %s" % def["name"], ctrl.use_special_die.bind(i))
 		MatchController.State.ROLLED:
 			_add_action("Reroll Token (%d)" % p.reroll_tokens, func(): ctrl.reroll(), p.reroll_tokens <= 0)
-			_add_action("Move", func(): ctrl.confirm_move())
+			_add_action("Move", func(): ctrl.confirm_move(), false, true)
 		MatchController.State.TURN_DONE:
-			_add_action("End Turn", func(): ctrl.end_turn())
+			_add_action("End Turn", func(): ctrl.end_turn(), false, true)
 
 
-func _add_action(text: String, cb: Callable, disabled: bool = false) -> void:
-	var b := UiTheme.make_button(text, 56)
+func _add_action(text: String, cb: Callable, disabled: bool = false, primary: bool = false) -> void:
+	var b := UiTheme.make_primary(text, 56) if primary else UiTheme.make_button(text, 56)
 	b.custom_minimum_size.x = 230
 	b.disabled = disabled
 	b.pressed.connect(cb)

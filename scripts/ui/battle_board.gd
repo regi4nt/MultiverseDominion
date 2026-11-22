@@ -30,7 +30,9 @@ var bench_btn: Button
 var reroll_btn: Button
 var level_btn: Button
 var hand_label: Label
-var prep_panel: VBoxContainer
+var prep_panel: VBoxContainer  # right column, preparation part (buttons)
+var prep_left: VBoxContainer  # left column, preparation part (shop + bench)
+var battle_left: VBoxContainer  # left column, battle part (log)
 var battle_panel: VBoxContainer
 var battle_status: Label
 var support_box: VBoxContainer
@@ -43,6 +45,8 @@ var _result_shown := false
 var _duel_msg: String = ""
 var _tip_panel: PanelContainer = null
 var _tip_label: Label = null
+var _leave_dialog: ConfirmationDialog
+var _start_dialog: ConfirmationDialog
 
 
 func _ready() -> void:
@@ -109,41 +113,51 @@ func _build_ui() -> void:
 	var root := HBoxContainer.new()
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
+	# Three columns, like the Territory Board: shop and army | the board in the middle | actions / support cards.
+	var left := VBoxContainer.new()
+	left.custom_minimum_size = Vector2(230, 0)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_theme_constant_override("separation", 6)
+	root.add_child(left)
 	var arc := AspectRatioContainer.new()
 	arc.ratio = 1.0
 	arc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	arc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	arc.size_flags_stretch_ratio = 1.27  # 16:9 -> the board gets its full 696 px height; extra width goes to the HUD
+	arc.size_flags_stretch_ratio = 2.6  # 16:9 -> the board gets its full height; extra width goes to the side columns
 	root.add_child(arc)
 	grid = BattleGridView.new()
 	arc.add_child(grid)
 
 	var right := VBoxContainer.new()
-	right.custom_minimum_size = Vector2(520, 0)
+	right.custom_minimum_size = Vector2(230, 0)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 6)
 	root.add_child(right)
 	var head := HBoxContainer.new()
-	right.add_child(head)
+	left.add_child(head)
 	status_label = UiTheme.make_label("", 17, UiTheme.COL_GOLD)
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.add_child(status_label)
 	var menu := UiTheme.make_button("Menu", 44)
-	menu.custom_minimum_size.x = 100
+	menu.custom_minimum_size.x = 90
 	menu.visible = duel_context.is_empty()  # a duel cannot be abandoned
-	menu.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
+	menu.pressed.connect(_request_leave)
 	head.add_child(menu)
 
 	# ---- preparation panel
+	prep_left = VBoxContainer.new()
+	prep_left.add_theme_constant_override("separation", 4)
+	prep_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left.add_child(prep_left)
 	prep_panel = VBoxContainer.new()
 	prep_panel.add_theme_constant_override("separation", 4)
 	prep_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(prep_panel)
 	shop_box = VBoxContainer.new()
 	shop_box.add_theme_constant_override("separation", 3)
-	prep_panel.add_child(shop_box)
-	var row := HBoxContainer.new()
+	prep_left.add_child(shop_box)
+	var row := VBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	prep_panel.add_child(row)
 	reroll_btn = UiTheme.make_button("Reroll", 46)
@@ -159,14 +173,15 @@ func _build_ui() -> void:
 	auto.pressed.connect(_on_auto)
 	row.add_child(auto)
 	bench_grid = GridContainer.new()
-	bench_grid.columns = 5
+	bench_grid.columns = 3
 	bench_grid.add_theme_constant_override("h_separation", 4)
 	bench_grid.add_theme_constant_override("v_separation", 3)
-	prep_panel.add_child(bench_grid)
+	prep_left.add_child(bench_grid)
 	sel_label = UiTheme.make_label("Select a unit (bench or board), then tap a cell in your area.", 14, UiTheme.COL_MUTED)
 	sel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	sel_label.max_lines_visible = 2
+	sel_label.max_lines_visible = 5
 	sel_label.custom_minimum_size.y = 40
+	sel_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	prep_panel.add_child(sel_label)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 6)
@@ -180,14 +195,14 @@ func _build_ui() -> void:
 	sell_btn.pressed.connect(_on_sell)
 	row2.add_child(sell_btn)
 	hand_label = UiTheme.make_label("", 14, UiTheme.COL_MUTED)
-	hand_label.clip_text = true
+	hand_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	prep_panel.add_child(hand_label)
 	message_label = UiTheme.make_label("", 14, UiTheme.COL_DANGER)
-	message_label.clip_text = true
+	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	message_label.custom_minimum_size.y = 22
 	prep_panel.add_child(message_label)
-	var start := UiTheme.make_button("LOCK FORMATION & FIGHT", 56)
-	start.pressed.connect(_on_start_battle)
+	var start := UiTheme.make_primary("LOCK FORMATION\n& FIGHT", 72)
+	start.pressed.connect(_on_start_pressed)
 	prep_panel.add_child(start)
 
 	# ---- battle panel
@@ -212,13 +227,51 @@ func _build_ui() -> void:
 	support_box = VBoxContainer.new()
 	support_box.add_theme_constant_override("separation", 4)
 	battle_panel.add_child(support_box)
+	battle_left = VBoxContainer.new()
+	battle_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	battle_left.visible = false
+	left.add_child(battle_left)
 	var lp := PanelContainer.new()
 	lp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	battle_panel.add_child(lp)
+	battle_left.add_child(lp)
 	log_view = RichTextLabel.new()
 	log_view.scroll_following = true
 	log_view.add_theme_font_size_override("normal_font_size", 14)
 	lp.add_child(log_view)
+
+	_leave_dialog = ConfirmationDialog.new()
+	_leave_dialog.dialog_text = "Leave Battle Practice? This battle will be lost."
+	_leave_dialog.ok_button_text = "Leave"
+	_leave_dialog.cancel_button_text = "Stay"
+	_leave_dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
+	add_child(_leave_dialog)
+	_start_dialog = ConfirmationDialog.new()
+	_start_dialog.dialog_text = "No units are deployed, so your Champion will fight alone. Start the battle anyway?"
+	_start_dialog.ok_button_text = "Fight"
+	_start_dialog.cancel_button_text = "Back"
+	_start_dialog.confirmed.connect(_on_start_battle)
+	add_child(_start_dialog)
+
+
+## Menu button / Android Back in Battle Practice: ask first, unless the battle is already over.
+func _request_leave() -> void:
+	if _result_shown:
+		get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
+	else:
+		_leave_dialog.popup_centered(Vector2i(460, 170))
+
+
+func on_back_requested() -> void:
+	if duel_context.is_empty():
+		_request_leave()
+
+
+## "Lock formation & fight": an empty formation needs a confirmation (it used to start silently).
+func _on_start_pressed() -> void:
+	if prep.deployed_units().is_empty():
+		_start_dialog.popup_centered(Vector2i(480, 190))
+	else:
+		_on_start_battle()
 
 
 # ------------------------------------------------------------------ preparation
@@ -232,6 +285,8 @@ func _refresh_prep() -> void:
 		var id := prep.offers[i]
 		var b := UiTheme.make_button("", 48)
 		b.custom_minimum_size.y = 48  # compact: the preparation panel must fit a 720 px high screen
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # the side column is narrow: long names wrap
+		b.add_theme_font_size_override("font_size", 15)
 		if id == "":
 			b.text = "- sold -"
 			b.disabled = true
@@ -249,7 +304,7 @@ func _refresh_prep() -> void:
 	var bench := prep.bench_units()
 	for i in range(int(GameData.b("prep_slots"))):
 		var b := UiTheme.make_button("", 48)
-		b.custom_minimum_size = Vector2(96, 48)
+		b.custom_minimum_size = Vector2(72, 48)
 		b.clip_text = true
 		b.add_theme_font_size_override("font_size", 13)
 		if i < bench.size():
@@ -344,8 +399,6 @@ func _on_cell(cell: Vector2i) -> void:
 # ------------------------------------------------------------------ battle
 
 func _on_start_battle() -> void:
-	if prep.deployed_units().is_empty():
-		_msg("Deploy at least one unit (or the Champion will fight alone!).")
 	var enemy_cfg: Dictionary
 	if duel_context.is_empty():
 		var diff := String(GameSession.difficulty)
@@ -366,7 +419,9 @@ func _on_start_battle() -> void:
 	phase = "battle"
 	_set_tip(TutorialGuide.BATTLE["fight"])
 	prep_panel.visible = false
+	prep_left.visible = false
 	battle_panel.visible = true
+	battle_left.visible = true
 	grid.show_engine(engine)
 	_log_index = 0
 	_rebuild_supports()
@@ -430,8 +485,8 @@ func _rebuild_supports() -> void:
 		c.queue_free()
 	for id in hand:
 		var s := CardDatabase.get_support(id)
-		var b := UiTheme.make_button("%s - %s" % [s["name"], s["description"]], 44)
-		b.clip_text = true
+		var b := UiTheme.make_button("%s - %s" % [s["name"], s["description"]], 64)
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.add_theme_font_size_override("font_size", 14)
 		var used := (engine.used_supports[0] as Array).has(id)
 		var ok := engine.is_support_implemented(id)

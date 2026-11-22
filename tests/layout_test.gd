@@ -9,7 +9,7 @@ const SIZES := {
 	"21:9 2520x1080": Vector2i(1680, 720), "4:3 tablet 2048x1536": Vector2i(1280, 960), "16:10 1920x1200": Vector2i(1280, 800),
 	"5:3 800x480 low-end": Vector2i(1280, 768)}
 const SCENES := ["main_menu/main_menu", "match_setup/match_setup", "settings/settings", "territory_board/territory_board",
-	"battle_board/battle_board", "card_collection/card_collection", "deck_builder/deck_builder"]
+	"battle_board/battle_board", "card_collection/card_collection"]
 const MIN_TOUCH := 48.0  # logical px; ~5.5 mm on a typical 6.5" phone
 
 var overflow: Array[String] = []
@@ -50,6 +50,11 @@ func _ready() -> void:
 					await RenderingServer.frame_post_draw
 					await RenderingServer.frame_post_draw
 					vp.get_texture().get_image().save_png("/tmp/shots/battle_fight_16x9.png")
+			if sc.get_file() == "card_collection":  # second pass: the Deck tab
+				node._show_tab("deck")
+				for i in range(3):
+					await get_tree().process_frame
+				_audit(node, Rect2(Vector2.ZERO, Vector2(sz)), "card_collection(deck) @ %s" % label, "card_collection(deck)")
 			vp.queue_free()
 			await get_tree().process_frame
 	print("overflowing controls: ", overflow.size())

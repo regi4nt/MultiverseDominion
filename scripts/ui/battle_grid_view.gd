@@ -126,23 +126,47 @@ func _faction_color(faction: String) -> Color:
 	return Color(f.get("color", "#777788"))
 
 
+var _sb := StyleBoxFlat.new()
+
+
+func _rr(r: Rect2, fill: Color, radius: float, border: Color = Color(0, 0, 0, 0), bw: float = 0.0, shadow: float = 0.0) -> void:
+	_sb.bg_color = fill
+	_sb.set_corner_radius_all(int(radius))
+	_sb.set_border_width_all(int(bw))
+	_sb.border_color = border
+	_sb.anti_aliasing = true
+	_sb.shadow_size = int(shadow)
+	_sb.shadow_color = Color(0, 0, 0, 0.5)
+	_sb.shadow_offset = Vector2(0, shadow * 0.4)
+	draw_style_box(_sb, r)
+
+
 func _draw() -> void:
 	_layout()
 	var font := ThemeDB.fallback_font
+	_rr(Rect2(_origin, Vector2(_cell * 8, _cell * 8)).grow(_cell * 0.06), Color("090d1c"), _cell * 0.22, Color("4a4126"), 2.0, _cell * 0.3)
+	var gap := maxf(1.5, _cell * 0.03)
 	for y in range(8):
 		for x in range(8):
-			var r := Rect2(_origin + Vector2(x, y) * _cell, Vector2(_cell, _cell))
-			var base := Color("151c38") if (x + y) % 2 == 0 else Color("1a2342")
-			var tint := Color(0.25, 0.65, 0.85, 0.10) if y >= 4 else Color(0.9, 0.3, 0.25, 0.10)
-			draw_rect(r, base)
-			draw_rect(r, tint)
-			draw_rect(r, Color("2a3358"), false, 1.0)
-	draw_line(_origin + Vector2(0, _cell * 4), _origin + Vector2(_cell * 8, _cell * 4), UiTheme.COL_GOLD_DIM, 3.0)
+			var r := Rect2(_origin + Vector2(x, y) * _cell, Vector2(_cell, _cell)).grow(-gap)
+			var light := (x + y) % 2 == 0
+			var base: Color
+			if y >= 4:
+				base = Color("1b2c52") if light else Color("182647")  # your half: blue
+			else:
+				base = Color("3a2040") if light else Color("311a38")  # enemy half: red-violet
+			_rr(r, base, _cell * 0.12, base.lightened(0.12), 1.0)
+	# deploy line: dashed gold
+	var ly := _origin.y + _cell * 4.0
+	var dash := _cell * 0.3
+	var dx := 0.0
+	while dx < _cell * 8:
+		draw_line(Vector2(_origin.x + dx, ly), Vector2(_origin.x + minf(dx + dash, _cell * 8), ly), Color("c9a73a"), 3.0)
+		dx += dash * 1.8
 	if engine != null:
 		for wc in engine.walls:
-			var wr := Rect2(_origin + Vector2(wc.x, wc.y) * _cell, Vector2(_cell, _cell)).grow(-3.0)
-			draw_rect(wr, Color("6b6f86"))
-			draw_rect(wr, Color("b8bcd0"), false, 2.0)
+			var wr := Rect2(_origin + Vector2(wc.x, wc.y) * _cell, Vector2(_cell, _cell)).grow(-gap - _cell * 0.06)
+			_rr(wr, Color("5d6178"), _cell * 0.14, Color("a9aec6"), 2.0, _cell * 0.1)
 		for u in engine.units:
 			if u.alive:
 				_draw_token(font, _visual_cell(u), u.side, u.chess, u.faction, u.stars, u.hp, u.max_hp, u.shield, u.is_king, false)
@@ -174,16 +198,25 @@ func _draw() -> void:
 func _draw_token(font: Font, c: Vector2, side: int, chess: String, faction: String, stars: int, hp: int, max_hp: int, shield: int, king: bool, selected_flag: bool) -> void:
 	var ctr := _center(c)
 	var radius := _cell * 0.36
+	draw_circle(ctr + Vector2(0, _cell * 0.07), radius, Color(0, 0, 0, 0.4))  # shadow
 	draw_circle(ctr, radius, _faction_color(faction).darkened(0.35))
-	draw_arc(ctr, radius, 0.0, TAU, 24, SIDE_COLORS[side], 4.0 if not king else 6.0)
+	draw_circle(ctr - Vector2(radius * 0.3, radius * 0.35), radius * 0.45, Color(1, 1, 1, 0.08))  # soft highlight
+	draw_arc(ctr, radius, 0.0, TAU, 28, SIDE_COLORS[side], 4.0 if not king else 6.0)
+	if king:
+		draw_arc(ctr, radius + 4, 0.0, TAU, 28, Color(UiTheme.COL_GOLD, 0.7), 2.0)
 	if selected_flag:
-		draw_arc(ctr, radius + 5, 0.0, TAU, 24, UiTheme.COL_GOLD, 3.0)
+		draw_circle(ctr, radius + 8, Color(UiTheme.COL_GOLD, 0.18))
+		draw_arc(ctr, radius + 6, 0.0, TAU, 28, UiTheme.COL_GOLD, 3.0)
 	Art.draw_piece(self, chess, Rect2(ctr - Vector2(radius, radius) * 0.92, Vector2(radius, radius) * 1.84), Color("f0e6c8"), _faction_color(faction).darkened(0.5))
 	if stars > 1:
-		draw_string(font, Vector2(ctr.x - radius, ctr.y - radius - 2), "*".repeat(stars), HORIZONTAL_ALIGNMENT_CENTER, radius * 2.0, int(_cell * 0.3), UiTheme.COL_GOLD)
-	var bar := Rect2(ctr.x - radius, ctr.y + radius + 3, radius * 2.0, 5)
-	draw_rect(bar, Color(0, 0, 0, 0.7))
+		draw_string_outline(font, Vector2(ctr.x - radius, ctr.y - radius - 2), "*".repeat(stars), HORIZONTAL_ALIGNMENT_CENTER, radius * 2.0, int(_cell * 0.32), 4, Color(0, 0, 0, 0.8))
+		draw_string(font, Vector2(ctr.x - radius, ctr.y - radius - 2), "*".repeat(stars), HORIZONTAL_ALIGNMENT_CENTER, radius * 2.0, int(_cell * 0.32), UiTheme.COL_GOLD)
+	# rounded HP bar
+	var bar := Rect2(ctr.x - radius, ctr.y + radius + 4, radius * 2.0, maxf(6.0, _cell * 0.09))
+	_rr(bar.grow(1.0), Color(0, 0, 0, 0.75), bar.size.y)
 	var frac := clampf(float(hp) / float(maxi(max_hp, 1)), 0.0, 1.0)
-	draw_rect(Rect2(bar.position, Vector2(bar.size.x * frac, bar.size.y)), Color("59cd90") if frac > 0.5 else (Color("e8c547") if frac > 0.25 else Color("e5533d")))
+	if frac > 0.0:
+		var hc := Color("59cd90") if frac > 0.5 else (Color("e8c547") if frac > 0.25 else Color("e5533d"))
+		_rr(Rect2(bar.position, Vector2(maxf(bar.size.y, bar.size.x * frac), bar.size.y)), hc, bar.size.y)
 	if shield > 0:
-		draw_rect(Rect2(bar.position + Vector2(0, -3), Vector2(bar.size.x, 2)), Color("8fd0ff"))
+		_rr(Rect2(bar.position + Vector2(0, -4), Vector2(bar.size.x, 3)), Color("8fd0ff"), 2.0)

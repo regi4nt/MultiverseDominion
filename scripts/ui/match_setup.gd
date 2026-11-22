@@ -1,5 +1,5 @@
 extends Control
-## Mode -> Continent -> Faction -> Champion -> Difficulty -> Start.
+## Mode -> Continent -> Faction -> Champion -> Difficulty -> Start. The bottom bar also holds Tutorial and Battle Practice.
 
 var _faction_box: VBoxContainer
 var _champion_text: RichTextLabel
@@ -37,6 +37,7 @@ func _ready() -> void:
 		b.pressed.connect(func():
 			GameSession.mode = m[1]
 			GameSession.ai_count = m[2])
+		UiTheme.scroll_passthrough(b)
 		c1.add_child(b)
 	c1.add_child(UiTheme.make_label("AI Difficulty", 22, UiTheme.COL_GOLD))
 	var diff_group := ButtonGroup.new()
@@ -44,6 +45,7 @@ func _ready() -> void:
 		var b := UiTheme.make_toggle(d.capitalize(), diff_group)
 		b.button_pressed = (GameSession.difficulty == d)
 		b.pressed.connect(func(): GameSession.difficulty = d)
+		UiTheme.scroll_passthrough(b)
 		c1.add_child(b)
 
 	# Column 2: continent + faction
@@ -57,6 +59,7 @@ func _ready() -> void:
 		b.pressed.connect(func():
 			GameSession.continent_id = c["id"]
 			_refresh_factions())
+		UiTheme.scroll_passthrough(b)
 		c2.add_child(b)
 
 	# Column 3: faction + champion + start
@@ -88,6 +91,17 @@ func _ready() -> void:
 	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
 	bottom.add_child(back)
+	var tut := UiTheme.make_button("TUTORIAL  (done)" if SaveManager.data["profile"].get("tutorial_done", false) else "TUTORIAL", 60)
+	tut.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tut.pressed.connect(func():
+		SaveManager.clear_match()  # the tutorial replaces the saved match, like START MATCH
+		GameSession.start_tutorial()
+		get_tree().change_scene_to_file("res://scenes/territory_board/territory_board.tscn"))
+	bottom.add_child(tut)
+	var practice := UiTheme.make_button("BATTLE PRACTICE", 60)
+	practice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	practice.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/battle_board/battle_board.tscn"))
+	bottom.add_child(practice)
 	var start := UiTheme.make_button("START MATCH", 60)
 	start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	start.pressed.connect(func():
@@ -103,9 +117,12 @@ func _column(parent: Control, title: String) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(panel)
+	var scroll := UiTheme.make_scroll()
+	panel.add_child(scroll)
 	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 6)
-	panel.add_child(v)
+	scroll.add_child(v)
 	v.add_child(UiTheme.make_label(title, 24, UiTheme.COL_GOLD))
 	return v
 
@@ -133,6 +150,7 @@ func _refresh_factions() -> void:
 		b.pressed.connect(func():
 			GameSession.faction_id = f["id"]
 			_refresh_champion())
+		UiTheme.scroll_passthrough(b)
 		_faction_box.add_child(b)
 	_refresh_champion()
 

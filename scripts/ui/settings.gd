@@ -6,9 +6,13 @@ func _ready() -> void:
 	add_child(UiTheme.make_background())
 	var margin := UiTheme.make_margin(40)
 	add_child(margin)
+	var scroll := UiTheme.make_scroll()
+	margin.add_child(scroll)
 	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL  # Back stays at the bottom when everything fits
 	box.add_theme_constant_override("separation", 16)
-	margin.add_child(box)
+	scroll.add_child(box)
 	box.add_child(UiTheme.make_label("SETTINGS", 44, UiTheme.COL_GOLD))
 	box.add_child(UiTheme.make_divider())
 
@@ -19,6 +23,7 @@ func _ready() -> void:
 	slider.step = 0.05
 	slider.value = float(SaveManager.get_setting("master_volume"))
 	slider.custom_minimum_size = Vector2(0, 40)
+	slider.scrollable = false  # the mouse wheel must scroll the page, not change the volume
 	slider.value_changed.connect(func(v: float): SaveManager.set_setting("master_volume", v))
 	box.add_child(slider)
 

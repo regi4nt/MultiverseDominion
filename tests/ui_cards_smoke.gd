@@ -1,5 +1,5 @@
 extends Node
-## Instantiates Card Collection + Deck Builder, clicks through them, checks results.
+## Instantiates the merged Collection & Deck screen, clicks through both tabs, checks results.
 
 func _ready() -> void:
 	var fails := 0
@@ -14,11 +14,13 @@ func _ready() -> void:
 	print("collection cards shown (all): ", coll._grid.get_child_count(), " detail: ", coll._detail.text.substr(0, 40).replace("\n", " "))
 	if coll._grid.get_child_count() != 36:
 		fails += 1
-	coll.queue_free()
-
-	var db: Control = load("res://scenes/deck_builder/deck_builder.tscn").instantiate()
-	add_child(db)
+	if not coll._collection_view.visible or coll._deck_view.visible:
+		fails += 1
+	coll._show_tab("deck")
 	await get_tree().process_frame
+	if coll._collection_view.visible or not coll._deck_view.visible:
+		fails += 1
+	var db: Control = coll  # the deck editor is the second tab of the same screen
 	if db._save_btn.disabled:
 		fails += 1
 	db._support_buttons["sup_summon_recruits"].button_pressed = false

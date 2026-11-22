@@ -13,8 +13,13 @@ var owned: int = 0
 var selected: bool = false
 
 
+var _press_pos: Vector2 = Vector2.ZERO
+var _tracking: bool = false
+
+
 func _init() -> void:
 	custom_minimum_size = Vector2(150, 206)
+	mouse_filter = Control.MOUSE_FILTER_PASS  # a drag that starts on a card must still scroll the list behind it
 
 
 func setup(c: Dictionary, support: bool, owned_count: int) -> void:
@@ -30,8 +35,16 @@ func set_selected(v: bool) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		pressed.emit(String(card.get("id", "")))
+	# Select on RELEASE and only if the finger did not travel: scrolling the grid no longer selects (and redraws)
+	# every card it starts on. Global coordinates, because the card itself moves under the finger while scrolling.
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_tracking = true
+			_press_pos = event.global_position
+		else:
+			if _tracking and event.global_position.distance_to(_press_pos) <= 12.0:
+				pressed.emit(String(card.get("id", "")))
+			_tracking = false
 
 
 func _faction_color() -> Color:
