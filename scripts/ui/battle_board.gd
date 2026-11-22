@@ -235,6 +235,7 @@ func _build_ui() -> void:
 	battle_panel.visible = false
 	right.add_child(battle_panel)
 	battle_status = UiTheme.make_label("", 17)
+	battle_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long HP totals must not clip at the panel edge
 	battle_panel.add_child(battle_status)
 	var speeds := HBoxContainer.new()
 	speeds.add_theme_constant_override("separation", 6)
@@ -308,7 +309,7 @@ func _on_start_pressed() -> void:
 # ------------------------------------------------------------------ preparation
 
 func _refresh_prep() -> void:
-	status_label.text = "Gold %d | Budget %d | Level %d | Capacity %d/%d" % [prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
+	status_label.text = "Gold %d  |  Budget %d\nLevel %d  |  Capacity %d/%d" % [prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
 	for c in shop_box.get_children():
 		shop_box.remove_child(c)
 		c.queue_free()
@@ -324,11 +325,11 @@ func _refresh_prep() -> void:
 		else:
 			if BattlePrep.is_support_id(id):
 				var sc := CardDatabase.get_support(id)
-				b.text = "%s  [Support %s, Lv %d]  %d G\n%s" % [sc["name"], String(sc["category"]), prep.support_level_req(id), prep.support_price(id), sc["description"]]
+				b.text = "%s  [Support %s, Lv %d]  %d\u00A0G\n%s" % [sc["name"], String(sc["category"]), prep.support_level_req(id), prep.support_price(id), sc["description"]]
 				b.add_theme_font_size_override("font_size", 13)
 			else:
 				var card := CardDatabase.get_unit(id)
-				b.text = "%s  [%s %s]  %d G" % [card["name"], String(card["chess"]).capitalize(), card["role"], prep.unit_price(id)]
+				b.text = "%s  [%s %s]  %d\u00A0G" % [card["name"], String(card["chess"]).capitalize(), card["role"], prep.unit_price(id)]
 			b.disabled = prep.can_buy(i) != ""
 		b.pressed.connect(_on_buy.bind(i))
 		shop_box.add_child(b)
@@ -588,7 +589,7 @@ func _update_battle_ui() -> void:
 		log_view.add_text(engine.log_lines[_log_index] + "\n")
 		_log_index += 1
 	status_label.text = "Tick %d / %d" % [engine.tick, BattleEngine.MAX_TICKS]
-	battle_status.text = "You: %d units, HP %d   |   Enemy: %d units, HP %d" % [engine.regulars_alive(0), engine.total_hp(0), engine.regulars_alive(1), engine.total_hp(1)]
+	battle_status.text = "You: %d units, HP %d\nEnemy: %d units, HP %d" % [engine.regulars_alive(0), engine.total_hp(0), engine.regulars_alive(1), engine.total_hp(1)]
 	_refresh_king_btn()
 	grid.queue_redraw()
 
