@@ -179,6 +179,9 @@ func _build_ui() -> void:
 	reroll_btn = UiTheme.make_button("Reroll", 46)
 	reroll_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reroll_btn.pressed.connect(_on_reroll)
+	var auto_btn := UiTheme.make_button("Auto Deploy", 46)
+	auto_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	auto_btn.pressed.connect(_on_auto)
 	hand_label = UiTheme.make_label("", 14, UiTheme.COL_MUTED)
 	hand_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	prep_panel.add_child(hand_label)
@@ -194,10 +197,7 @@ func _build_ui() -> void:
 	var push := Control.new()  # pushes Auto Deploy + Level Up to the bottom
 	push.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	prep_panel.add_child(push)
-	var auto := UiTheme.make_button("Auto Deploy", 46)
-	auto.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	auto.pressed.connect(_on_auto)
-	prep_panel.add_child(auto)  # above Level Up
+	prep_panel.add_child(reroll_btn)  # above Level Up
 	level_btn = UiTheme.make_button("Level Up", 46)
 	level_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_btn.pressed.connect(_on_level_up)
@@ -211,7 +211,7 @@ func _build_ui() -> void:
 	shop_box = VBoxContainer.new()
 	shop_box.add_theme_constant_override("separation", 3)
 	prep_left.add_child(shop_box)
-	prep_left.add_child(reroll_btn)  # directly below the unit offers
+	prep_left.add_child(auto_btn)  # directly below the unit offers
 	prep_actions = VBoxContainer.new()
 	prep_actions.add_theme_constant_override("separation", 6)
 	left.add_child(prep_actions)
