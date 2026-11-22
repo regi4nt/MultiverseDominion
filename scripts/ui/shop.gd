@@ -1,8 +1,9 @@
 extends Control
-## Shop (one screen, two tabs). Gacha: pull Support cards with Aether Coins (duplicates turn into coins, pity timer).
-## Cards: buy any locked Support card directly. Coins are earned by playing matches (see SaveManager.record_match).
+## Shop (one screen, two tabs). Gacha: pull Support cards with Aether Coins (duplicates turn into Card Fragments, pity timer).
+## Cards: buy any locked Support card with coins, or exchange Card Fragments for it (rarer = more fragments). Coins are earned by playing matches (see SaveManager.record_match).
 
 var _coin_label: Label
+var _frag_label: Label
 var _gacha_view: Control
 var _buy_view: Control
 var _tab_buttons: Dictionary = {}
@@ -18,6 +19,7 @@ var _buy_filter: String = "all"
 var _buy_grid: HFlowContainer
 var _buy_detail: RichTextLabel
 var _buy_btn: Button
+var _frag_btn: Button
 var _buy_msg: Label
 var _selected_id: String = ""
 var _views: Dictionary = {}
@@ -41,6 +43,8 @@ func _ready() -> void:
 	head.add_child(title)
 	_coin_label = UiTheme.make_label("", 26, UiTheme.COL_GOLD)
 	head.add_child(_coin_label)
+	_frag_label = UiTheme.make_label("", 26, Color("a98be0"))
+	head.add_child(_frag_label)
 	var back := UiTheme.make_button("Back", 48)
 	back.custom_minimum_size.x = 140
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
@@ -93,9 +97,9 @@ func _build_gacha() -> Control:
 	info.bbcode_enabled = true
 	info.fit_content = true
 	info.add_theme_font_size_override("normal_font_size", 17)
-	info.text = "Pull Support cards you do not own yet.\n[color=#8d93ad]Common %d%%   Rare %d%%\nEpic %d%%   Legendary %d%%[/color]\nA duplicate turns into coins (Common %d, Rare %d, Epic %d, Legendary %d).\nThe 10-pull always holds at least one Rare." % [
+	info.text = "Pull Support cards you do not own yet.\n[color=#8d93ad]Common %d%%   Rare %d%%\nEpic %d%%   Legendary %d%%[/color]\nA duplicate turns into Card Fragments (Common %d, Rare %d, Epic %d, Legendary %d).\nExchange fragments for a locked card in Buy Cards: the rarer the card, the more it costs.\nThe 10-pull always holds at least one Rare." % [
 		ShopSystem.RATES["common"], ShopSystem.RATES["rare"], ShopSystem.RATES["epic"], ShopSystem.RATES["legendary"],
-		ShopSystem.DUPLICATE_REFUND["common"], ShopSystem.DUPLICATE_REFUND["rare"], ShopSystem.DUPLICATE_REFUND["epic"], ShopSystem.DUPLICATE_REFUND["legendary"]]
+		ShopSystem.DUPLICATE_FRAGMENTS["common"], ShopSystem.DUPLICATE_FRAGMENTS["rare"], ShopSystem.DUPLICATE_FRAGMENTS["epic"], ShopSystem.DUPLICATE_FRAGMENTS["legendary"]]
 	lbox.add_child(info)
 	_pity_label = UiTheme.make_label("", 17, UiTheme.COL_MUTED)
 	_pity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -138,7 +142,7 @@ func _on_pull(count: int) -> void:
 		_result_flow.remove_child(c)
 		c.queue_free()
 	var new_n := 0
-	var refund := 0
+	var frags := 0
 	var lines := ""
 	for r in results:
 		var card := CardDatabase.get_support(String(r["id"]))
@@ -149,9 +153,9 @@ func _on_pull(count: int) -> void:
 			new_n += 1
 			lines += "[color=#59cd90]NEW[/color]  %s [color=#8d93ad](%s)[/color]\n" % [card["name"], String(r["rarity"]).capitalize()]
 		else:
-			refund += int(r["refund"])
-			lines += "[color=#8d93ad]Duplicate  %s  +%d coins[/color]\n" % [card["name"], int(r["refund"])]
-	_result_text.text = "[color=#d4af37][b]%d new card%s[/b][/color]   [color=#8d93ad]duplicates +%d coins[/color]\n%s" % [new_n, "" if new_n == 1 else "s", refund, lines]
+			frags += int(r["fragments"])
+			lines += "[color=#a98be0]Duplicate[/color]  %s  [color=#a98be0]+%d fragments[/color]\n" % [card["name"], int(r["fragments"])]
+	_result_text.text = "[color=#d4af37][b]%d new card%s[/b][/color]   [color=#a98be0]duplicates +%d fragments[/color]\n%s" % [new_n, "" if new_n == 1 else "s", frags, lines]
 	_refresh()
 
 
@@ -206,6 +210,10 @@ func _build_buy() -> Control:
 	_buy_btn = UiTheme.make_primary("Buy", 60)
 	_buy_btn.pressed.connect(_on_buy)
 	pbox.add_child(_buy_btn)
+	_frag_btn = UiTheme.make_button("Exchange fragments", 60)
+	_frag_btn.add_theme_color_override("font_color", Color("cdb8ff"))
+	_frag_btn.pressed.connect(_on_exchange)
+	pbox.add_child(_frag_btn)
 	return col
 
 
@@ -244,19 +252,31 @@ func _refresh_buy_detail() -> void:
 			_views.size(), "" if _views.size() == 1 else "s"] if not _views.is_empty() else "[color=#59cd90]Every Support card of this category is unlocked.[/color]"
 		_buy_btn.disabled = true
 		_buy_btn.text = "Buy"
+		_frag_btn.disabled = true
+		_frag_btn.text = "Exchange fragments"
 		return
 	var s := CardDatabase.get_support(_selected_id)
 	var price := ShopSystem.buy_price(s)
-	_buy_detail.text = "[color=#d4af37][b]%s[/b][/color]\n%s - %s\nUses per battle: %d\n\n%s\n\nPrice: %d coins" % [
-		s["name"], s["category"], String(s["rarity"]).capitalize(), int(s["uses"]), s["description"], price]
-	_buy_btn.text = "Buy  (%d)" % price
+	_buy_detail.text = "[color=#d4af37][b]%s[/b][/color]\n%s - %s\nUses per battle: %d\n\n%s\n\nPrice: %d coins\nor %d fragments" % [
+		s["name"], s["category"], String(s["rarity"]).capitalize(), int(s["uses"]), s["description"], price, ShopSystem.fragment_price(s)]
+	_buy_btn.text = "Buy  (%d coins)" % price
 	_buy_btn.disabled = SaveManager.coins() < price
+	_frag_btn.text = "Exchange  (%d fragments)" % ShopSystem.fragment_price(s)
+	_frag_btn.disabled = SaveManager.fragments() < ShopSystem.fragment_price(s)
 
 
 func _on_buy() -> void:
-	if _selected_id == "":
+	_unlock_selected(ShopSystem.buy(_selected_id) if _selected_id != "" else "-")
+
+
+func _on_exchange() -> void:
+	_unlock_selected(ShopSystem.exchange(_selected_id) if _selected_id != "" else "-")
+
+
+## Shared end of a purchase / exchange: `err` is "" on success, "-" when nothing is selected.
+func _unlock_selected(err: String) -> void:
+	if err == "-":
 		return
-	var err := ShopSystem.buy(_selected_id)
 	if err != "":
 		_buy_msg.text = err
 		return
@@ -271,9 +291,12 @@ func _on_buy() -> void:
 func _refresh() -> void:
 	var coins := SaveManager.coins()
 	_coin_label.text = "%d coins" % coins
+	_frag_label.text = "%d fragments" % SaveManager.fragments()
 	_pull1.disabled = coins < ShopSystem.PULL_PRICE
 	_pull10.disabled = coins < ShopSystem.PULL10_PRICE
 	_pity_label.text = "Epic or better is guaranteed within %d pull%s.\nWin a match +%d coins, lose +%d." % [
 		ShopSystem.pulls_to_pity(), "" if ShopSystem.pulls_to_pity() == 1 else "s", ShopSystem.WIN_REWARD, ShopSystem.LOSS_REWARD]
 	if _buy_btn != null and _selected_id != "":
-		_buy_btn.disabled = coins < ShopSystem.buy_price(CardDatabase.get_support(_selected_id))
+		var sel := CardDatabase.get_support(_selected_id)
+		_buy_btn.disabled = coins < ShopSystem.buy_price(sel)
+		_frag_btn.disabled = SaveManager.fragments() < ShopSystem.fragment_price(sel)

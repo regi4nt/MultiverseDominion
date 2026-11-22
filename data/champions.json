@@ -14,7 +14,7 @@
 		"skill_id": "sun_judgment",
 		"active_value": 1.5,
 		"active_name": "Sun Judgment",
-		"active_desc": "On Last Stand entry: deals 150% ATK to all enemies."
+		"active_desc": "Manual, once: deals 150% ATK to all enemies."
 	},
 	"champion_nocthyr": {
 		"name": "Vesper Nightcrown",
@@ -31,7 +31,7 @@
 		"skill_id": "eclipse_veil",
 		"active_value": 0.2,
 		"active_name": "Eclipse Veil",
-		"active_desc": "On entry: takes 50% less damage for 12 ticks and heals 20% HP."
+		"active_desc": "Manual, once: takes 50% less damage for 12 ticks and heals 20% HP."
 	},
 	"champion_valdoria": {
 		"name": "Lord Valdric Ironbanner",
@@ -48,7 +48,7 @@
 		"skill_id": "banner_of_iron",
 		"active_value": 0.4,
 		"active_name": "Banner of Iron",
-		"active_desc": "On entry: gains a shield worth 40% of max HP."
+		"active_desc": "Manual, once: gains a shield worth 40% of max HP."
 	},
 	"champion_elarion": {
 		"name": "Queen Elarael Starweaver",
@@ -65,7 +65,7 @@
 		"skill_id": "starfall_decree",
 		"active_value": 3.0,
 		"active_name": "Starfall Decree",
-		"active_desc": "On entry: hits 3 random enemies for 300% ATK."
+		"active_desc": "Manual, once: hits 3 random enemies for 300% ATK."
 	},
 	"champion_astralis": {
 		"name": "Seraphine Starcaller",
@@ -82,7 +82,7 @@
 		"skill_id": "starfall_decree",
 		"active_value": 3.0,
 		"active_name": "Starfall Decree",
-		"active_desc": "On entry: hits 3 random enemies for 300% ATK."
+		"active_desc": "Manual, once: hits 3 random enemies for 300% ATK."
 	},
 	"champion_ignivar": {
 		"name": "Pyrrhus Emberlord",
@@ -99,7 +99,7 @@
 		"skill_id": "inferno_burst",
 		"active_value": 2.0,
 		"active_name": "Inferno Burst",
-		"active_desc": "On entry: enemies within 3 cells take 200% ATK."
+		"active_desc": "Manual, once: enemies within 3 cells take 200% ATK."
 	},
 	"champion_cryndel": {
 		"name": "Glacia Frostweaver",
@@ -116,7 +116,7 @@
 		"skill_id": "frost_veil",
 		"active_value": 10,
 		"active_name": "Frost Veil",
-		"active_desc": "On entry: slows all enemies for 10 ticks."
+		"active_desc": "Manual, once: slows all enemies for 10 ticks."
 	},
 	"champion_umbrael": {
 		"name": "Morrowen the Hollow",
@@ -133,7 +133,7 @@
 		"skill_id": "soul_drain",
 		"active_value": 2.5,
 		"active_name": "Soul Drain",
-		"active_desc": "On entry: hits the toughest enemy for 250% ATK and heals the same amount."
+		"active_desc": "Manual, once: hits the toughest enemy for 250% ATK and heals the same amount."
 	},
 	"champion_ferrum": {
 		"name": "Ironclad Goliath-7",
@@ -150,7 +150,7 @@
 		"skill_id": "banner_of_iron",
 		"active_value": 0.5,
 		"active_name": "Banner of Iron",
-		"active_desc": "On entry: gains a shield worth 50% of max HP."
+		"active_desc": "Manual, once: gains a shield worth 50% of max HP."
 	},
 	"champion_voltrix": {
 		"name": "Tesla Voltarine",
@@ -167,7 +167,7 @@
 		"skill_id": "overcharge",
 		"active_value": 0.6,
 		"active_name": "Overcharge",
-		"active_desc": "On entry: +60% ATK for 12 ticks."
+		"active_desc": "Manual, once: +60% ATK for 12 ticks."
 	},
 	"champion_chronex": {
 		"name": "Horologe Chronarch",
@@ -184,7 +184,7 @@
 		"skill_id": "chrono_stasis",
 		"active_value": 3,
 		"active_name": "Chrono Stasis",
-		"active_desc": "On entry: stuns all enemies for 3 ticks."
+		"active_desc": "Manual, once: stuns all enemies for 3 ticks."
 	},
 	"champion_nexaris": {
 		"name": "Nexus Prime Arbiter",
@@ -201,7 +201,7 @@
 		"skill_id": "sun_judgment",
 		"active_value": 1.3,
 		"active_name": "Sun Judgment",
-		"active_desc": "On Last Stand entry: deals 130% ATK to all enemies."
+		"active_desc": "Manual, once: deals 130% ATK to all enemies."
 	},
 	"champion_verdantia": {
 		"name": "Elder Thornwarden",
@@ -218,7 +218,7 @@
 		"skill_id": "life_surge",
 		"active_value": 0.35,
 		"active_name": "Life Surge",
-		"active_desc": "On entry: heals 35% max HP and gains +25% ATK for 16 ticks."
+		"active_desc": "Manual, once: heals 35% max HP and gains +25% ATK for 16 ticks."
 	},
 	"champion_besthara": {
 		"name": "Fangmother Besthara",
@@ -235,7 +235,7 @@
 		"skill_id": "overcharge",
 		"active_value": 0.5,
 		"active_name": "Overcharge",
-		"active_desc": "On entry: +50% ATK for 12 ticks."
+		"active_desc": "Manual, once: +50% ATK for 12 ticks."
 	},
 	"champion_floralis": {
 		"name": "Lilith Bloomweaver",
@@ -252,7 +252,7 @@
 		"skill_id": "eclipse_veil",
 		"active_value": 0.3,
 		"active_name": "Eclipse Veil",
-		"active_desc": "On entry: takes 50% less damage for 12 ticks and heals 30% HP."
+		"active_desc": "Manual, once: takes 50% less damage for 12 ticks and heals 30% HP."
 	},
 	"champion_terragorn": {
 		"name": "Terragorn the Mountain",
@@ -269,7 +269,7 @@
 		"skill_id": "banner_of_iron",
 		"active_value": 0.45,
 		"active_name": "Banner of Iron",
-		"active_desc": "On entry: gains a shield worth 45% of max HP."
+		"active_desc": "Manual, once: gains a shield worth 45% of max HP."
 	},
 	"champion_drakhan": {
 		"name": "Drakhan Wyrmlord",
@@ -286,7 +286,7 @@
 		"skill_id": "inferno_burst",
 		"active_value": 2.2,
 		"active_name": "Inferno Burst",
-		"active_desc": "On entry: enemies within 3 cells take 220% ATK."
+		"active_desc": "Manual, once: enemies within 3 cells take 220% ATK."
 	},
 	"champion_inferna": {
 		"name": "Inferna Hellbride",
@@ -303,7 +303,7 @@
 		"skill_id": "sun_judgment",
 		"active_value": 1.6,
 		"active_name": "Sun Judgment",
-		"active_desc": "On Last Stand entry: deals 160% ATK to all enemies."
+		"active_desc": "Manual, once: deals 160% ATK to all enemies."
 	},
 	"champion_bloodfang": {
 		"name": "Bloodfang Reaver",
@@ -320,7 +320,7 @@
 		"skill_id": "soul_drain",
 		"active_value": 3.0,
 		"active_name": "Soul Drain",
-		"active_desc": "On entry: hits the toughest enemy for 300% ATK and heals the same amount."
+		"active_desc": "Manual, once: hits the toughest enemy for 300% ATK and heals the same amount."
 	},
 	"champion_warborn": {
 		"name": "Warborn Thane Krogg",
@@ -337,7 +337,7 @@
 		"skill_id": "overcharge",
 		"active_value": 0.7,
 		"active_name": "Overcharge",
-		"active_desc": "On entry: +70% ATK for 12 ticks."
+		"active_desc": "Manual, once: +70% ATK for 12 ticks."
 	},
 	"champion_abyssal": {
 		"name": "Leviathan Caller Nerith",
@@ -354,7 +354,7 @@
 		"skill_id": "frost_veil",
 		"active_value": 10,
 		"active_name": "Frost Veil",
-		"active_desc": "On entry: slows all enemies for 10 ticks."
+		"active_desc": "Manual, once: slows all enemies for 10 ticks."
 	},
 	"champion_pelagia": {
 		"name": "Pelagia Tidemother",
@@ -371,7 +371,7 @@
 		"skill_id": "life_surge",
 		"active_value": 0.4,
 		"active_name": "Life Surge",
-		"active_desc": "On entry: heals 40% max HP and gains +25% ATK for 16 ticks."
+		"active_desc": "Manual, once: heals 40% max HP and gains +25% ATK for 16 ticks."
 	},
 	"champion_tempestra": {
 		"name": "Tempestra Stormlord",
@@ -388,7 +388,7 @@
 		"skill_id": "chrono_stasis",
 		"active_value": 2,
 		"active_name": "Chrono Stasis",
-		"active_desc": "On entry: stuns all enemies for 2 ticks."
+		"active_desc": "Manual, once: stuns all enemies for 2 ticks."
 	},
 	"champion_corsaria": {
 		"name": "Captain Redtide Corsa",
@@ -405,7 +405,7 @@
 		"skill_id": "rift_strike",
 		"active_value": 3.0,
 		"active_name": "Rift Strike",
-		"active_desc": "On entry: teleports next to the weakest enemy and hits for 300% ATK."
+		"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 300% ATK."
 	},
 	"champion_solstice": {
 		"name": "Helion Solstice",
@@ -422,7 +422,7 @@
 		"skill_id": "sun_judgment",
 		"active_value": 1.5,
 		"active_name": "Sun Judgment",
-		"active_desc": "On Last Stand entry: deals 150% ATK to all enemies."
+		"active_desc": "Manual, once: deals 150% ATK to all enemies."
 	},
 	"champion_paradox": {
 		"name": "Paradox Wanderer",
@@ -439,7 +439,7 @@
 		"skill_id": "rift_strike",
 		"active_value": 3.5,
 		"active_name": "Rift Strike",
-		"active_desc": "On entry: teleports next to the weakest enemy and hits for 350% ATK."
+		"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 350% ATK."
 	},
 	"champion_eternis": {
 		"name": "Eternis the Unending",
@@ -456,7 +456,7 @@
 		"skill_id": "life_surge",
 		"active_value": 0.5,
 		"active_name": "Life Surge",
-		"active_desc": "On entry: heals 50% max HP and gains +25% ATK for 16 ticks."
+		"active_desc": "Manual, once: heals 50% max HP and gains +25% ATK for 16 ticks."
 	},
 	"champion_oblivion": {
 		"name": "Oblivion Harbinger",
@@ -473,6 +473,6 @@
 		"skill_id": "soul_drain",
 		"active_value": 3.0,
 		"active_name": "Soul Drain",
-		"active_desc": "On entry: hits the toughest enemy for 300% ATK and heals the same amount."
+		"active_desc": "Manual, once: hits the toughest enemy for 300% ATK and heals the same amount."
 	}
 }

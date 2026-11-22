@@ -29,10 +29,15 @@ func make_cfg(seed_v: int, diff: String, level: int) -> Dictionary:
 
 
 func _ready() -> void:
+	BattleDeck.supports_in_shop = false  # unit-only shop for the unit / balance tests below
 	_test_prep()
 	_test_support()
 	_test_last_stand_empty()
+	_test_manual_king()
+	_test_king_passive()
 	_test_battles()
+	BattleDeck.supports_in_shop = true
+	_test_shop_supports()
 	print("BATTLE TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(failures)
 
@@ -135,6 +140,69 @@ func _test_last_stand_empty() -> void:
 		steps += 1
 	check(e.finished, "lone Champion vs 1 pawn battle finishes")
 	check(e.king_entry_tick[1] == -1 or e.regulars_alive_at_entry[1] == 0, "enemy Champion only entered after its pawn fell")
+
+
+func _test_manual_king() -> void:
+	var cfg := {"seed": 5, "ai_supports": [false, false], "manual_king": [true, false], "sides": [
+		{"units": [], "champion": "champion_solvaris", "supports": []},
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 3)}], "champion": "champion_nocthyr", "supports": []}]}
+	var e := BattleEngine.new()
+	e.setup(cfg)
+	check(e.king_entered[0] and not e.king_skill_used[0] and e.can_use_king_skill(0), "manual King enters but waits for the skill")
+	var hp_before := e.total_hp(1)
+	e.step()
+	check(not e.king_skill_used[0], "manual King skill is not cast by itself")
+	check(e.use_king_skill(0) == "" and e.king_skill_used[0], "manual King skill can be cast once")
+	check(e.use_king_skill(0) != "", "manual King skill cannot be cast twice")
+	check(e.total_hp(1) < hp_before, "Sun Judgment damages the enemy when cast")
+	check(e.use_king_skill(1) != "", "a King that has not entered cannot cast")
+	var e2 := BattleEngine.new()
+	e2.setup({"seed": 5, "ai_supports": [false, false], "sides": cfg["sides"]})
+	check(e2.king_skill_used[0], "without manual_king the skill is cast on entry (AI / old behaviour)")
+
+
+func _test_king_passive() -> void:
+	var units := [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 6)}]
+	var base := BattleEngine.new()
+	base.setup({"seed": 5, "ai_supports": [false, false], "sides": [{"units": units, "champion": "", "supports": []}, {"units": [], "champion": "champion_nocthyr", "supports": []}]})
+	var hp := BattleEngine.new()
+	hp.setup({"seed": 5, "ai_supports": [false, false], "sides": [{"units": units, "champion": "champion_valdoria", "supports": []}, {"units": [], "champion": "champion_nocthyr", "supports": []}]})
+	check(hp.units_of(0)[0].max_hp > base.units_of(0)[0].max_hp, "Valdoria's Iron Discipline raises unit HP")
+	var ok28 := true
+	for cid in GameData.champions:
+		var p: Dictionary = GameData.king_passives.get(cid, {})
+		ok28 = ok28 and ["team_hp", "team_atk", "team_armor", "team_shield", "king_hp", "king_atk"].has(String(p.get("type", "")))
+	check(ok28, "every King has a valid battle passive")
+
+
+func _test_shop_supports() -> void:
+	BattleDeck.supports_in_shop = true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var deck := Deck.create_default()
+	var bd := BattleDeck.new(deck, rng)
+	var saw := false
+	for i in range(40):
+		var shop := bd.draw_shop()
+		for id in shop:
+			if BattlePrep.is_support_id(id):
+				saw = true
+		bd.return_cards(shop)
+	check(saw, "Support cards appear in Battle Shop rolls")
+	check(bd.remaining() == 135 and bd.support_pool.size() == deck.support_ids.size(), "returning offers keeps units and supports in their own piles")
+	var prep := BattlePrep.new(deck, rng, 2000, 2000, 3)
+	var sid := String(deck.support_ids[0])
+	for sup in deck.support_ids:  # find a rarity that the level gate blocks
+		if prep.support_level_req(String(sup)) > prep.level:
+			sid = String(sup)
+			break
+	prep.offers = [sid, "", "", "", ""]
+	check(prep.can_buy(0).begins_with("Needs level"), "a Support above the player's level cannot be bought")
+	prep.level = 10
+	var gold_before := prep.gold
+	check(prep.buy(0) == "" and prep.hand.has(sid) and prep.gold == gold_before - prep.support_price(sid), "a Support is bought into the hand")
+	prep.consume_used([sid])
+	check(not prep.hand.has(sid) and bd.support_pool.has(sid), "a played Support is spent and returns to the pile")
 
 
 func _test_battles() -> void:

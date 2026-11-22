@@ -103,6 +103,7 @@ func _ready() -> void:
 	# Battle deck: 135 cards, shop of 5, copies never exceed 9
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
+	BattleDeck.supports_in_shop = false  # this block counts unit cards only
 	var bd := BattleDeck.new(d, rng)
 	check(bd.remaining() == 135, "battle deck pool = 135")
 	var shop := bd.draw_shop()
@@ -112,6 +113,7 @@ func _ready() -> void:
 	var all: Array[String] = []
 	while bd.remaining() > 0:
 		all.append_array(bd.draw_shop())
+	BattleDeck.supports_in_shop = true
 	var per := {}
 	for c in all:
 		per[c] = int(per.get(c, 0)) + 1

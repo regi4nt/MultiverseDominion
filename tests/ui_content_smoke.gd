@@ -13,10 +13,14 @@ func _ready() -> void:
 		var setup: Control = load("res://scenes/match_setup/match_setup.tscn").instantiate()
 		add_child(setup)
 		await get_tree().process_frame
-		var champ_text: String = setup._champion_text.text
-		if champ_text.find(c["factions"][1]["name"]) < 0 and champ_text.find(GameData.get_champion(c["factions"][1]["champion"])["name"]) < 0:
+		setup._show_setup("arena")  # New Match opens on the mode hub; Arena shows continent / faction / champion
+		await get_tree().process_frame
+		var champ_text: String = setup._champion_text.text  # New Match only shows the faction of the Deck's King
+		var deck_fac := GameData.find_faction(SaveManager.player_faction_id())
+		if champ_text.find(String(deck_fac["name"])) < 0 or champ_text.find(GameData.get_champion(String(deck_fac["champion"]))["name"]) < 0:
 			fails += 1
-			push_error("setup shows no champion for " + c["id"])
+			push_error("setup shows no faction / champion of the deck for " + c["id"])
+		GameSession.faction_id = c["factions"][1]["id"]  # the board below is started with a faction of this continent
 		setup.queue_free()
 		var coll: Control = load("res://scenes/card_collection/card_collection.tscn").instantiate()
 		add_child(coll)

@@ -56,6 +56,16 @@ func _ready() -> void:
 				for i in range(3):
 					await get_tree().process_frame
 				_audit(node, Rect2(Vector2.ZERO, Vector2(sz)), "card_collection(deck) @ %s" % label, "card_collection(deck)")
+			if sc.get_file() == "match_setup":  # extra passes: Online tab, Arena setup, Journey setup
+				node._set_tab("online")
+				for i in range(3):
+					await get_tree().process_frame
+				_audit(node, Rect2(Vector2.ZERO, Vector2(sz)), "match_setup(online) @ %s" % label, "match_setup(online)")
+				for kind in ["arena", "journey"]:
+					node._show_setup(kind)
+					for i in range(3):
+						await get_tree().process_frame
+					_audit(node, Rect2(Vector2.ZERO, Vector2(sz)), "match_setup(%s) @ %s" % [kind, label], "match_setup(%s)" % kind)
 			vp.queue_free()
 			await get_tree().process_frame
 	print("overflowing controls: ", overflow.size())

@@ -20,15 +20,18 @@ var free_rerolls_left: int = 0
 var merge_log: Array[String] = []
 var price_mult: float = 1.0  # Quartermaster passive
 var capacity_bonus: int = 0  # Mercenary Pact (Support card applied during preparation)
+var hand: Array = []  # owned Support cards (shared with PlayerState.hand in a match)
 
 
 func _init(d: Deck, r: RandomNumberGenerator, start_gold: int, budget: int, start_level: int,
-		existing_roster: UnitRoster = null, existing_pile: BattleDeck = null) -> void:
+		existing_roster: UnitRoster = null, existing_pile: BattleDeck = null, existing_hand: Variant = null) -> void:
 	deck = d
 	rng = r
 	gold = start_gold
 	budget_left = mini(budget, start_gold)
 	level = start_level
+	if existing_hand != null:
+		hand = existing_hand
 	if existing_roster != null:
 		roster = existing_roster  # persistent army: units survive between duels
 	battle_deck = existing_pile if existing_pile != null else BattleDeck.new(d, r)
@@ -43,6 +46,26 @@ func finish() -> void:
 			back.append(o)
 	battle_deck.return_cards(back)
 	offers = []
+
+
+static func is_support_id(id: String) -> bool:
+	return id != "" and not CardDatabase.is_unit(id) and CardDatabase.is_support(id)
+
+
+func support_price(id: String) -> int:
+	var prices: Dictionary = GameData.b("support_price")
+	var base := float(prices.get(CardDatabase.get_support(id).get("rarity", "common"), 40))
+	return maxi(1, int(round(base * price_mult)))
+
+
+## Level the side needs to buy (and so to play) a Support card of this rarity.
+func support_level_req(id: String) -> int:
+	var req: Dictionary = GameData.b("support_level_req")
+	return int(req.get(CardDatabase.get_support(id).get("rarity", "common"), 3))
+
+
+func offer_price(id: String) -> int:
+	return support_price(id) if is_support_id(id) else unit_price(id)
 
 
 func unit_price(card_id: String) -> int:
@@ -108,6 +131,12 @@ func _would_merge(card_id: String) -> bool:
 func can_buy(index: int) -> String:
 	if index < 0 or index >= offers.size() or offers[index] == "":
 		return "Empty slot."
+	if is_support_id(offers[index]):
+		if level < support_level_req(offers[index]):
+			return "Needs level %d." % support_level_req(offers[index])
+		if hand.size() >= int(GameData.b("hand_max")):
+			return "Support hand is full."
+		return _spend_ok(support_price(offers[index]))
 	var err := _spend_ok(unit_price(offers[index]))
 	if err != "":
 		return err
@@ -121,6 +150,15 @@ func buy(index: int) -> String:
 	if err != "":
 		return err
 	var id := offers[index]
+	if is_support_id(id):
+		var sprice := support_price(id)
+		gold -= sprice
+		budget_left -= sprice
+		offers[index] = ""
+		hand.append(id)
+		merge_log = []
+		apply_hand([id])  # Mercenary Pact / Merchant Contract take effect right away
+		return ""
 	var price := unit_price(id)
 	gold -= price
 	budget_left -= price
@@ -146,6 +184,30 @@ func refresh_offers(paid: bool) -> bool:
 	battle_deck.return_cards(back)
 	offers = battle_deck.draw_shop()
 	return true
+
+
+## Preparation Supports (capacity / free rerolls) are spent the moment they are bought and cannot be sold.
+func can_sell_support(id: String) -> bool:
+	var eff := String(CardDatabase.get_support(id).get("effect", ""))
+	return hand.has(id) and eff != "temp_capacity" and eff != "free_reroll"
+
+
+func sell_support(id: String) -> void:
+	if not can_sell_support(id):
+		return
+	var refund := int(support_price(id) * float(GameData.b("sell_ratio")))
+	gold += refund
+	budget_left += refund
+	hand.erase(id)
+	battle_deck.return_cards([id])
+
+
+## After a battle: the Support cards that were played are consumed and return to the shop pile.
+func consume_used(used: Array) -> void:
+	for id in used:
+		if hand.has(id):
+			hand.erase(id)
+			battle_deck.return_cards([String(id)])
 
 
 func sell(u: UnitInstance) -> void:

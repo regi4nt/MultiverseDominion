@@ -137,6 +137,15 @@ static func get_buff(id: String) -> Dictionary:
 	return GameData.card_buffs.get(cont, {}).get(id, {})
 
 
+## The King's own buff ({} if none). `home_only`: {} unless the King's faction belongs to the ACTIVE continent.
+static func king_buff(champion_id: String, home_only: bool = true) -> Dictionary:
+	var bf: Dictionary = GameData.king_buffs.get(champion_id, {})
+	if bf.is_empty() or not home_only:
+		return bf
+	var fac := String(GameData.get_champion(champion_id).get("faction", ""))
+	return bf if GameData.is_home_faction(fac, active_continent) else {}
+
+
 ## True if the card id is part of the ACTIVE continent's 15 unit cards (get_unit also answers for other continents).
 static func in_active_set(id: String) -> bool:
 	return _resolved(active_continent)["map"].has(canonical_id(id))

@@ -72,5 +72,19 @@
 	"special_die_price": 120,
 	"max_special_dice": 3,
 	"auction_start_ratio": 0.4,
-	"auction_step_ratio": 0.1
+	"auction_step_ratio": 0.1,
+	"shop_support_chance": 0.2,
+	"support_price": {
+		"common": 40,
+		"rare": 100,
+		"epic": 220,
+		"legendary": 450
+	},
+	"support_level_req": {
+		"common": 3,
+		"rare": 5,
+		"epic": 7,
+		"legendary": 9
+	},
+	"hand_max": 5
 }

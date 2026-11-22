@@ -1,5 +1,6 @@
 extends Control
 
+var _chk_btn: Button
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
@@ -11,7 +12,7 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.size_flags_vertical = Control.SIZE_EXPAND_FILL  # Back stays at the bottom when everything fits
-	box.add_theme_constant_override("separation", 16)
+	box.add_theme_constant_override("separation", 10)
 	scroll.add_child(box)
 	box.add_child(UiTheme.make_label("SETTINGS", 44, UiTheme.COL_GOLD))
 	box.add_child(UiTheme.make_divider())
@@ -39,6 +40,14 @@ func _ready() -> void:
 			Sfx.play("coin"))
 	box.add_child(sfx_btn)
 
+	var fs_on: bool = SaveManager.get_setting("fullscreen") == true  # default OFF
+	var fs_btn := UiTheme.make_switch("Fullscreen: ON" if fs_on else "Fullscreen: OFF")
+	fs_btn.button_pressed = fs_on
+	fs_btn.toggled.connect(func(on: bool):
+		SaveManager.set_setting("fullscreen", on)
+		fs_btn.text = "Fullscreen: ON" if on else "Fullscreen: OFF")
+	box.add_child(fs_btn)
+
 	var upd_btn := UiTheme.make_switch("")
 	var upd_on: bool = SaveManager.get_setting("check_updates") != false
 	upd_btn.button_pressed = upd_on
@@ -49,24 +58,9 @@ func _ready() -> void:
 	box.add_child(upd_btn)
 
 	# Manual check: ignores "skip this version" and always tells the player what happened.
-	var chk_btn := UiTheme.make_button("Check for updates now  (v%s)" % UpdateCheck.current_version(), 52)
-	chk_btn.pressed.connect(func():
-		chk_btn.disabled = true
-		chk_btn.text = "Checking..."
-		var uc := UpdateCheck.new()
-		add_child(uc)
-		uc.check_finished.connect(func(status: String, info: Dictionary):
-			chk_btn.disabled = false
-			match status:
-				"available":
-					chk_btn.text = "Update available: v%s" % info["version"]
-					UpdateCheck.show_dialog(self, info, false)
-				"current":
-					chk_btn.text = "You are up to date (v%s)" % UpdateCheck.current_version()
-				_:
-					chk_btn.text = "Could not check (offline?). Tap to retry")
-		uc.check())
-	box.add_child(chk_btn)
+	_chk_btn = UiTheme.make_button("Check for updates now  (v%s)" % UpdateCheck.current_version(), 52)
+	_chk_btn.pressed.connect(_on_check_pressed)
+	box.add_child(_chk_btn)
 
 	box.add_child(UiTheme.make_label("Default AI difficulty"))
 	var row := HBoxContainer.new()
@@ -86,3 +80,23 @@ func _ready() -> void:
 	var back := UiTheme.make_button("Back", 60)
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
 	box.add_child(back)
+
+
+func _on_check_pressed() -> void:
+	_chk_btn.disabled = true
+	_chk_btn.text = "Checking..."
+	var uc := UpdateCheck.new()
+	add_child(uc)
+	uc.check_finished.connect(_on_check_finished)
+	uc.check()
+
+
+func _on_check_finished(status: String, info: Dictionary) -> void:
+	_chk_btn.disabled = false
+	if status == "available":
+		_chk_btn.text = "Update available: v%s" % info["version"]
+		UpdateCheck.show_dialog(self, info, false)
+	elif status == "current":
+		_chk_btn.text = "You are up to date (v%s)" % UpdateCheck.current_version()
+	else:
+		_chk_btn.text = "Could not check (offline?). Tap to retry"

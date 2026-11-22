@@ -30,12 +30,18 @@ var bench_btn: Button
 var reroll_btn: Button
 var level_btn: Button
 var hand_label: Label
+var hand_box: VBoxContainer
+var synergy_box: VBoxContainer  # top-left: faction + role synergy of the deployed units
+var prep_actions: VBoxContainer  # bottom of the right column (To Bench / Sell / Lock Formation), preparation only
+var _own_faction: String = ""
 var prep_panel: VBoxContainer  # right column, preparation part (buttons)
 var prep_left: VBoxContainer  # left column, preparation part (shop + bench)
 var battle_left: VBoxContainer  # left column, battle part (log)
 var battle_panel: VBoxContainer
 var battle_status: Label
 var support_box: VBoxContainer
+var king_box: VBoxContainer  # King passive (buff) + manual active skill
+var king_btn: Button
 var log_view: RichTextLabel
 var timer: Timer
 var _log_index: int = 0
@@ -57,18 +63,18 @@ func _ready() -> void:
 		WorldMods.apply(GameData.get_continent(CardDatabase.active_continent))
 		deck = SaveManager.get_deck(GameSession.continent_id)
 		champion_id = deck.champion_id
-		hand = BattleAI.pick_hand(deck, rng, 3)
 		prep = BattlePrep.new(deck, rng, int(GameData.b("practice_gold")), int(GameData.b("practice_gold")), int(GameData.b("start_level")))
+		hand = prep.hand
 	else:
 		var me: PlayerState = duel_context["human"]
 		deck = me.deck
 		champion_id = me.champion_id
-		hand = BattleAI.pick_hand(deck, rng, 3)
 		var budget := int(float(me.gold) * float(GameData.b("battle_budget_ratio")))
-		prep = BattlePrep.new(deck, rng, me.gold, budget, me.level, me.roster, me.battle_deck)
+		prep = BattlePrep.new(deck, rng, me.gold, budget, me.level, me.roster, me.battle_deck, me.hand)
+		hand = prep.hand
 		prep.price_mult = me.battle_price_mult()  # Quartermaster passive (prices are computed on display)
 	var own_faction := String(GameData.get_champion(champion_id).get("faction", ""))
-	prep.apply_hand(hand)  # Mercenary Pact / Merchant Contract act during preparation
+	_own_faction = own_faction
 	_build_ui()
 	grid.own_faction = own_faction
 	grid.show_prep(prep)
@@ -150,47 +156,66 @@ func _build_ui() -> void:
 	menu.pressed.connect(_request_leave)
 	head.add_child(menu)
 
-	# ---- preparation panel
+	# ---- left column (top -> bottom): synergy combos | selected unit + Reroll | ... | Auto Deploy + Level Up (bottom-left corner)
+	var syn_panel := PanelContainer.new()
+	right.add_child(syn_panel)
+	synergy_box = VBoxContainer.new()
+	synergy_box.add_theme_constant_override("separation", 0)
+	syn_panel.add_child(synergy_box)
+	prep_panel = VBoxContainer.new()
+	prep_panel.add_theme_constant_override("separation", 6)
+	prep_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right.add_child(prep_panel)
+	sel_label = UiTheme.make_label("Select a unit (bench or board), then tap a cell in your area.", 14, UiTheme.COL_MUTED)
+	sel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sel_label.max_lines_visible = 5
+	sel_label.custom_minimum_size.y = 90
+	prep_panel.add_child(sel_label)
+	reroll_btn = UiTheme.make_button("Reroll", 46)
+	reroll_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reroll_btn.pressed.connect(_on_reroll)
+	prep_panel.add_child(reroll_btn)  # directly below the selected-unit text
+	hand_label = UiTheme.make_label("", 14, UiTheme.COL_MUTED)
+	hand_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	prep_panel.add_child(hand_label)
+	hand_box = VBoxContainer.new()
+	hand_box.add_theme_constant_override("separation", 2)
+	prep_panel.add_child(hand_box)
+	bench_grid = GridContainer.new()
+	bench_grid.columns = 4
+	bench_grid.add_theme_constant_override("h_separation", 4)
+	bench_grid.add_theme_constant_override("v_separation", 3)
+	prep_panel.add_child(bench_grid)
+	var push := Control.new()  # pushes Auto Deploy + Level Up to the bottom
+	push.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	prep_panel.add_child(push)
+	var auto := UiTheme.make_button("Auto Deploy", 46)
+	auto.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	auto.pressed.connect(_on_auto)
+	prep_panel.add_child(auto)  # above Level Up
+	level_btn = UiTheme.make_button("Level Up", 46)
+	level_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_btn.pressed.connect(_on_level_up)
+	prep_panel.add_child(level_btn)
+
+	# ---- right column: shop + bench on top, To Bench / Sell / Lock Formation in the bottom-right corner
 	prep_left = VBoxContainer.new()
 	prep_left.add_theme_constant_override("separation", 4)
 	prep_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(prep_left)
-	prep_panel = VBoxContainer.new()
-	prep_panel.add_theme_constant_override("separation", 4)
-	prep_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right.add_child(prep_panel)
 	shop_box = VBoxContainer.new()
 	shop_box.add_theme_constant_override("separation", 3)
 	prep_left.add_child(shop_box)
-	var row := VBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	prep_panel.add_child(row)
-	reroll_btn = UiTheme.make_button("Reroll", 46)
-	reroll_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reroll_btn.pressed.connect(_on_reroll)
-	row.add_child(reroll_btn)
-	level_btn = UiTheme.make_button("Level Up", 46)
-	level_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	level_btn.pressed.connect(_on_level_up)
-	row.add_child(level_btn)
-	var auto := UiTheme.make_button("Auto Deploy", 46)
-	auto.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	auto.pressed.connect(_on_auto)
-	row.add_child(auto)
-	bench_grid = GridContainer.new()
-	bench_grid.columns = 3
-	bench_grid.add_theme_constant_override("h_separation", 4)
-	bench_grid.add_theme_constant_override("v_separation", 3)
-	prep_left.add_child(bench_grid)
-	sel_label = UiTheme.make_label("Select a unit (bench or board), then tap a cell in your area.", 14, UiTheme.COL_MUTED)
-	sel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	sel_label.max_lines_visible = 5
-	sel_label.custom_minimum_size.y = 40
-	sel_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	prep_panel.add_child(sel_label)
+	prep_actions = VBoxContainer.new()
+	prep_actions.add_theme_constant_override("separation", 6)
+	left.add_child(prep_actions)
+	message_label = UiTheme.make_label("", 14, UiTheme.COL_DANGER)
+	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	message_label.custom_minimum_size.y = 22
+	prep_actions.add_child(message_label)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 6)
-	prep_panel.add_child(row2)
+	prep_actions.add_child(row2)
 	bench_btn = UiTheme.make_button("To Bench", 44)
 	bench_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bench_btn.pressed.connect(_on_to_bench)
@@ -199,16 +224,9 @@ func _build_ui() -> void:
 	sell_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sell_btn.pressed.connect(_on_sell)
 	row2.add_child(sell_btn)
-	hand_label = UiTheme.make_label("", 14, UiTheme.COL_MUTED)
-	hand_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	prep_panel.add_child(hand_label)
-	message_label = UiTheme.make_label("", 14, UiTheme.COL_DANGER)
-	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	message_label.custom_minimum_size.y = 22
-	prep_panel.add_child(message_label)
 	var start := UiTheme.make_primary("LOCK FORMATION\n& FIGHT", 72)
 	start.pressed.connect(_on_start_pressed)
-	prep_panel.add_child(start)
+	prep_actions.add_child(start)
 
 	# ---- battle panel
 	battle_panel = VBoxContainer.new()
@@ -228,6 +246,10 @@ func _build_ui() -> void:
 		b.button_pressed = (s[1] == 1.0)
 		b.pressed.connect(func(): _set_speed(s[1]))
 		speeds.add_child(b)
+	battle_panel.add_child(UiTheme.make_label("King", 16, UiTheme.COL_GOLD))
+	king_box = VBoxContainer.new()
+	king_box.add_theme_constant_override("separation", 4)
+	battle_panel.add_child(king_box)
 	battle_panel.add_child(UiTheme.make_label("Support hand (tap to play)", 16, UiTheme.COL_GOLD))
 	support_box = VBoxContainer.new()
 	support_box.add_theme_constant_override("separation", 4)
@@ -300,8 +322,13 @@ func _refresh_prep() -> void:
 			b.text = "- sold -"
 			b.disabled = true
 		else:
-			var card := CardDatabase.get_unit(id)
-			b.text = "%s  [%s %s]  %d G" % [card["name"], String(card["chess"]).capitalize(), card["role"], prep.unit_price(id)]
+			if BattlePrep.is_support_id(id):
+				var sc := CardDatabase.get_support(id)
+				b.text = "%s  [Support %s, Lv %d]  %d G\n%s" % [sc["name"], String(sc["category"]), prep.support_level_req(id), prep.support_price(id), sc["description"]]
+				b.add_theme_font_size_override("font_size", 13)
+			else:
+				var card := CardDatabase.get_unit(id)
+				b.text = "%s  [%s %s]  %d G" % [card["name"], String(card["chess"]).capitalize(), card["role"], prep.unit_price(id)]
 			b.disabled = prep.can_buy(i) != ""
 		b.pressed.connect(_on_buy.bind(i))
 		shop_box.add_child(b)
@@ -313,12 +340,12 @@ func _refresh_prep() -> void:
 	var bench := prep.bench_units()
 	for i in range(int(GameData.b("prep_slots"))):
 		var b := UiTheme.make_button("", 48)
-		b.custom_minimum_size = Vector2(72, 48)
+		b.custom_minimum_size = Vector2(62, 48)
 		b.clip_text = true
 		b.add_theme_font_size_override("font_size", 13)
 		if i < bench.size():
 			var u := bench[i]
-			b.text = "%s %s" % [String(CardDatabase.get_unit(u.card_id)["name"]).substr(0, 9), "*".repeat(u.stars)]
+			b.text = "%s %s" % [String(CardDatabase.get_unit(u.card_id)["name"]).substr(0, 7), "*".repeat(u.stars)]
 			b.toggle_mode = true
 			b.button_pressed = (u == selected)
 			b.pressed.connect(_on_select.bind(u))
@@ -336,12 +363,82 @@ func _refresh_prep() -> void:
 		sel_label.text = "%s %s | HP %d ATK %d | Rng %d Mov %d | cost %d | %s: %s" % [card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], card["range"], card["move"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]] + _buff_line(selected.card_id)
 	sell_btn.disabled = selected == null
 	bench_btn.disabled = selected == null or selected.cell.x < 0
-	var names: Array[String] = []
-	for id in hand:
-		names.append(String(CardDatabase.get_support(id)["name"]))
-	hand_label.text = "Hand: %s" % ", ".join(names)
+	hand_label.text = "Support hand (%d/%d) - tap to sell:" % [prep.hand.size(), int(GameData.b("hand_max"))]
+	for c in hand_box.get_children():
+		hand_box.remove_child(c)
+		c.queue_free()
+	for id in prep.hand:
+		var hs := CardDatabase.get_support(id)
+		var sellable := prep.can_sell_support(id)
+		var hb := UiTheme.make_button("%s%s" % [hs["name"], ("  (sell %d G)" % int(prep.support_price(id) * float(GameData.b("sell_ratio")))) if sellable else "  (used now)"], 34)
+		hb.custom_minimum_size.y = 34
+		hb.add_theme_font_size_override("font_size", 13)
+		hb.tooltip_text = String(hs["description"])
+		hb.disabled = not sellable
+		hb.pressed.connect(_on_sell_support.bind(id))
+		hand_box.add_child(hb)
+	_refresh_synergy()
 	grid.selected = selected
 	grid.queue_redraw()
+
+
+## Top-left panel: faction synergy (same tiers as BattleEngine._synergy: 2 = +5%, 4 = +15%, 6 = +30% HP and ATK)
+## and role synergy (BattleEngine.role_bonus: 2 = +8%, 4 = +20%, 6 = +35% of the role's stat) of the deployed units.
+func _refresh_synergy() -> void:
+	for c in synergy_box.get_children():
+		synergy_box.remove_child(c)
+		c.queue_free()
+	synergy_box.add_child(UiTheme.make_label("SYNERGY", 14, UiTheme.COL_GOLD))
+	var deployed := prep.deployed_units()
+	if deployed.is_empty():
+		synergy_box.add_child(UiTheme.make_label("Deploy units to see combos.", 12, UiTheme.COL_MUTED))
+		return
+	var fac_counts := {}
+	var role_counts := {}
+	for u in deployed:
+		var card := CardDatabase.get_unit(u.card_id)
+		var fac := CardDatabase.effective_faction(card, _own_faction)
+		if fac != "" and GameData.is_home_faction(fac, CardDatabase.active_continent):
+			fac_counts[fac] = int(fac_counts.get(fac, 0)) + 1
+		var role := String(card.get("role", ""))
+		if role != "":
+			role_counts[role] = int(role_counts.get(role, 0)) + 1
+	var inactive: Array[String] = []  # groups without a bonus yet share one muted line (keeps the panel short)
+	var facs: Array = fac_counts.keys()
+	facs.sort_custom(func(x, y): return int(fac_counts[x]) > int(fac_counts[y]))
+	for fac in facs:
+		var n: int = fac_counts[fac]
+		var fname := String(GameData.get_faction(CardDatabase.active_continent, fac).get("name", String(fac).capitalize()))
+		var bonus := 30 if n >= 6 else (15 if n >= 4 else (5 if n >= 2 else 0))
+		if bonus == 0:
+			inactive.append("%s x%d" % [fname, n])
+			continue
+		var nxt := "" if n >= 6 else "  (next at %d)" % (6 if n >= 4 else 4)
+		_synergy_row("%s x%d  +%d%% HP/ATK%s" % [fname, n, bonus, nxt])
+	var roles: Array = role_counts.keys()
+	roles.sort_custom(func(x, y): return int(role_counts[x]) > int(role_counts[y]))
+	for r in roles:
+		var n: int = role_counts[r]
+		var rb := BattleEngine.role_bonus(String(r), n)
+		var pct := int(round(maxf(float(rb["hp"]), float(rb["atk"])) * 100.0))
+		if pct == 0:
+			inactive.append("%s x%d" % [r, n])
+			continue
+		var focus := String(BattleEngine.ROLE_FOCUS.get(r, "both"))
+		var stat := "HP" if focus == "hp" else ("ATK" if focus == "atk" else "HP/ATK")
+		var nt := BattleEngine.role_next_tier(n)
+		_synergy_row("%s x%d  +%d%% %s%s" % [r, n, pct, stat, ("  (next at %d)" % nt) if nt > 0 else ""])
+	if not inactive.is_empty():
+		var il := _synergy_row("No bonus yet: " + ", ".join(inactive), false)
+		il.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		il.clip_text = false
+
+
+func _synergy_row(text: String, active: bool = true) -> Label:
+	var l := UiTheme.make_label(text, 12, UiTheme.COL_GOLD if active else UiTheme.COL_MUTED)
+	l.clip_text = true
+	synergy_box.add_child(l)
+	return l
 
 
 ## Errors in red; with no error the line shows the duel information (if any).
@@ -353,6 +450,11 @@ func _msg(text: String) -> void:
 func _on_buy(i: int) -> void:
 	var err := prep.buy(i)
 	_msg(err if err != "" else (" ".join(prep.merge_log)))
+	_refresh_prep()
+
+
+func _on_sell_support(id: String) -> void:
+	prep.sell_support(id)
 	_refresh_prep()
 
 
@@ -423,17 +525,19 @@ func _on_start_battle() -> void:
 		me.capacity = prep.capacity()
 		enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1)
 	engine = BattleEngine.new()
-	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "sides": [
+	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "manual_king": [true, false], "sides": [
 		prep.to_side_cfg(champion_id, hand), enemy_cfg]})
 	phase = "battle"
 	_set_tip(TutorialGuide.BATTLE["fight"])
 	prep_panel.visible = false
 	prep_left.visible = false
+	prep_actions.visible = false
 	battle_panel.visible = true
 	battle_left.visible = true
 	grid.show_engine(engine)
 	_log_index = 0
 	_rebuild_supports()
+	_rebuild_king()
 	_set_speed(1.0)
 
 
@@ -485,7 +589,60 @@ func _update_battle_ui() -> void:
 		_log_index += 1
 	status_label.text = "Tick %d / %d" % [engine.tick, BattleEngine.MAX_TICKS]
 	battle_status.text = "You: %d units, HP %d   |   Enemy: %d units, HP %d" % [engine.regulars_alive(0), engine.total_hp(0), engine.regulars_alive(1), engine.total_hp(1)]
+	_refresh_king_btn()
 	grid.queue_redraw()
+
+
+## King panel: Passive (every continent), Buff (home continent only) and the active skill, cast by hand once the King is in the arena.
+func _rebuild_king() -> void:
+	for c in king_box.get_children():
+		king_box.remove_child(c)
+		c.queue_free()
+	king_btn = null
+	var ch := GameData.get_champion(champion_id)
+	if ch.is_empty():
+		return
+	var kp: Dictionary = GameData.king_passives.get(champion_id, {})
+	if not kp.is_empty():
+		var ppl := UiTheme.make_label("Passive - %s: %s" % [kp["name"], kp["desc"]], 13, UiTheme.COL_GOLD)
+		ppl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		king_box.add_child(ppl)
+	var kb := CardDatabase.king_buff(champion_id, false)
+	if not kb.is_empty():
+		var home := not CardDatabase.king_buff(champion_id).is_empty()
+		var pl := UiTheme.make_label("Buff - %s: %s%s" % [kb["name"], kb["desc"], "" if home else " (inactive: foreign faction)"], 13, UiTheme.COL_GOLD if home else UiTheme.COL_MUTED)
+		pl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		king_box.add_child(pl)
+	king_btn = UiTheme.make_button("", 64)
+	king_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	king_btn.add_theme_font_size_override("font_size", 14)
+	king_btn.pressed.connect(_on_king_skill)
+	king_box.add_child(king_btn)
+	_refresh_king_btn()
+
+
+func _refresh_king_btn() -> void:
+	if king_btn == null:
+		return
+	var ch := GameData.get_champion(champion_id)
+	var base := "%s - %s" % [ch.get("active_name", "King skill"), ch.get("active_desc", "")]
+	if bool(engine.king_skill_used[0]):
+		king_btn.text = "%s (used)" % ch.get("active_name", "King skill")
+	elif not bool(engine.king_entered[0]):
+		king_btn.text = "%s\n(available once the King enters in Last Stand)" % base
+	else:
+		king_btn.text = "USE: %s" % base
+	king_btn.disabled = not engine.can_use_king_skill(0)
+
+
+func _on_king_skill() -> void:
+	var err := engine.use_king_skill(0)
+	if err != "":
+		log_view.add_text(err + "\n")
+		Sfx.play("error")
+	grid.notify_tick()
+	_battle_sounds()
+	_update_battle_ui()
 
 
 func _rebuild_supports() -> void:
@@ -521,6 +678,7 @@ func _show_result() -> void:
 	if _result_shown:
 		return
 	_result_shown = true
+	prep.consume_used(engine.used_supports[0])  # played Support cards are spent (they return to the shop pile)
 	_rebuild_supports()
 	var won := engine.winner == 0
 	var dim := ColorRect.new()
@@ -529,8 +687,10 @@ func _show_result() -> void:
 	add_child(dim)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(520, 0)
-	dim.add_child(panel)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	var cc := CenterContainer.new()  # keeps the panel exactly in the middle of the screen whatever its size
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(cc)
+	cc.add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	panel.add_child(v)
@@ -579,4 +739,7 @@ func _finish_duel() -> void:
 ## " | Buff: name - desc" of a unit card (continent buff), "" if it has none.
 func _buff_line(card_id: String) -> String:
 	var bf := CardDatabase.get_buff(card_id)
-	return "" if bf.is_empty() else " | Buff %s: %s" % [bf["name"], bf["desc"]]
+	if bf.is_empty():
+		return ""
+	var off := "" if _own_faction == "" or GameData.is_home_faction(_own_faction, CardDatabase.active_continent) else " (inactive: foreign faction)"
+	return " | Buff %s: %s%s" % [bf["name"], bf["desc"], off]

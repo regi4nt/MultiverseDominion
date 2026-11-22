@@ -5,7 +5,7 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 
 ## Menjalankan
 1. Buka Godot 4.2+ -> Import -> pilih `project.godot` (biarkan import pertama selesai).
-2. Tekan F5. Alur: Main Menu -> PLAY -> pilih mode / continent / faction / difficulty -> START MATCH.
+2. Tekan F5. Alur: Main Menu -> NEW MATCH -> pilih OFFLINE (Journey / Arena / Battle Chess / Tutorial) -> untuk Journey dan Arena: pemain / difficulty / continent -> START MATCH (faksi diambil dari Deck) (lihat bagian "New Match").
 3. Tes otomatis (tanpa UI):
    `godot --headless --path . res://tests/sim_test.tscn` -> harus mencetak `TEST RESULT: PASS`.
    `godot --headless --path . res://tests/ui_smoke.tscn` -> memainkan papan lewat scene asli.
@@ -17,14 +17,15 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
    `godot --headless --path . res://tests/ui_duel_smoke.tscn` -> `UI DUEL SMOKE: PASS`.
    `godot --headless --path . res://tests/content_test.tscn` -> `CONTENT TEST RESULT: PASS` (Phase 6).
    `godot --headless --path . res://tests/ui_content_smoke.tscn` -> `UI CONTENT SMOKE: PASS` (7 benua di UI).
-   Juga: `tutorial_test`, `audio_test`, `rules_test` (Auction, Special Dice, unlock), `save_test`, `perf_test`, `ui_resume_smoke`; dan
+   Juga: `tutorial_test`, `audio_test`, `rules_test` (Auction, Special Dice, unlock), `team_test` (mode 2vs2), `save_test`, `perf_test`, `ui_resume_smoke`; dan
    `ui_tutorial_smoke` + `layout_test` (butuh render nyata, lihat BUILD_ANDROID.md bagian 4).
 
 ## Shop (Main Menu -> Shop, di atas Profile)
 - Mata uang: **Aether Coins** (disimpan di save, mulai 600). Menang match +150, kalah +50 (`ShopSystem`).
 - Tab **Gacha**: Pull x1 = 100, Pull x10 = 900 (10 kartu, minimal 1 Rare). Rate: Common 60 / Rare 28 / Epic 10 / Legendary 2 (%).
-  Pity: Epic atau lebih dijamin paling lambat pull ke-30. Kartu duplikat diubah jadi koin (Common 15, Rare 40, Epic 100, Legendary 250).
+  Pity: Epic atau lebih dijamin paling lambat pull ke-30. Kartu duplikat diubah jadi **Card Fragment** (Common 10, Rare 25, Epic 60, Legendary 150), disimpan di save (`wallet.fragments`) dan ditampilkan di header Shop.
 - Tab **Buy Cards**: beli langsung Support yang masih terkunci (filter per kategori). Harga: Common 200, Rare 500, Epic 1200, Legendary 3000.
+  Atau **tukar dengan fragment** lewat tombol *Exchange* di panel yang sama: makin langka kartunya makin banyak fragment (Common 50, Rare 150, Epic 400, Legendary 1000; `ShopSystem.exchange`).
 - Tes: `godot --headless --path . res://tests/shop_test.tscn` -> `SHOP TEST RESULT: PASS`; `ui_shop_smoke.tscn` -> `UI SHOP SMOKE: PASS`.
 
 ## Cara bermain (Phase 2)
@@ -35,6 +36,45 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - Bangkrut = jual wilayah otomatis; jika tetap kurang -> -1 Life + bailout. Life 0 = tereliminasi.
 - Menang: lawan habis, atau ronde 40 -> net worth tertinggi.
 - Ketuk petak mana pun di papan untuk info detail.
+
+## New Match (menu utama -> NEW MATCH)
+Satu scene (`scripts/ui/match_setup.gd`) dengan dua tampilan. Tombol Back / Esc / tombol Back Android: dari setup kembali ke hub, dari hub ke menu utama.
+- **Hub**: dua tab. **OFFLINE** berisi 4 kartu: **Journey**, **Arena**, **Battle Chess**, **Tutorial**. **ONLINE - COMING SOON** berisi **Classic**, **Ranked**, **Battle Chess**
+  (kartu redup dan nonaktif, belum ada multiplayer). Di layar tinggi (tablet) tinggi kartu dibatasi dan dipusatkan (`CARD_MAX_H`).
+- **Journey** (Story, selalu 1 vs 1): hanya benua pertama (Aetherion) yang terbuka di awal, benua lain **terkunci**. Menang di sebuah benua dengan **masing-masing dari 4 faksi benua itu**
+  (faksi = King di Deck, jadi ganti faksi di Deck lalu menang lagi) membuat benua itu **mastered**. Setiap benua mastered memberi **satu hak memilih** salah satu benua terkunci
+  (bebas benua mana saja, bukan berurutan): setup Journey menampilkan "Tap to unlock" di benua terkunci, lalu konfirmasi. Satu hak = satu benua; benua baru itu harus di-master untuk hak berikutnya.
+  Faksi dari benua lain tidak dihitung untuk mastery benua ini (hint di setup menjelaskannya). Baris benua menampilkan "Factions won 2 / 4" atau "Mastered"; layar hasil menulis kemajuannya.
+  Logika di `SaveManager`: `journey_won_factions`, `is_journey_cleared` (= mastered), `journey_picks_available`, `choose_continent`, `journey_frontier`; key save `journey_wins` (continent -> faksi yang menang).
+- **Arena**: match bebas melawan AI di benua yang sudah terbuka. Players: **1 vs 1**, **2 vs 2**, **4 Player**. **Tidak membuka benua** (kemenangan tetap memberi koin, statistik, dan kartu Support).
+  Flag `journey` ikut di config match (`GameSession.category`) dan di save/resume (`MatchController.journey`); `SaveManager.record_match(..., journey)` hanya membuka benua jika `journey` true.
+- **Faksi tidak dipilih di New Match.** Kolom kanan setup hanya menampilkan faksi + King dari Deck (read-only) dan tombol **Change faction in Deck**
+  (membuka Collection & Deck -> Deck -> tab Faction; Back kembali ke New Match lewat `GameSession.collection_return`, `open_deck_tab`).
+- **Faksi dipilih di Deck**: tab **Faction** (dulu "King") di Collection & Deck menampilkan 28 faksi per benua. Faksi dari benua yang belum terbuka **terkunci** (tombol nonaktif,
+  "Locked - unlock X in Journey") dan tidak bisa dipilih; faksi 4 benua yang terbuka bisa dipilih. Faksi terkunci terbuka otomatis saat benuanya dibuka lewat Journey.
+  King pilihan = faksi pemain di setiap match dan di Battle Chess (`SaveManager.player_champion_id()` / `player_faction_id()`; King dari faksi terkunci di save lama jatuh kembali ke faksi terbuka pertama).
+  Faksi pemain boleh dari benua lain daripada benua match (musuh AI tetap dari faksi benua match); `GameData.find_faction` mencari di semua benua.
+- **Aturan home-continent** (`GameData.is_home_faction`): faksi tidak dibatasi benua dan bisa dimainkan di benua lain (hanya di luar Journey, mis. Arena; faksi tetap harus sudah terbuka).
+  Bonus faksi hanya aktif jika faksi dimainkan di **benua asalnya** (seluruh bidak dek = benua yang sama): **buff King** baru (`data/king_buffs.json`, 28 buff, dipasang saat King masuk Last Stand di `BattleEngine._enter_king`), **buff kartu unit** (`card_buffs.json`, dimatikan di `BattleEngine._spawn_unit` lewat `_home_bonus`) dan **Faction Synergy** 2/4/6 unit. Kartu unit dek selalu milik faksi benua yang dimainkan, jadi Faction Synergy otomatis terikat benua;
+  `BattleEngine._synergy` dan panel Synergy juga menolak faksi non-home sebagai pengaman (mis. bidak shared milik King asing).
+  Di benua asing faksi tetap bisa main, tanpa buff King, tanpa buff kartu, dan tanpa Faction Synergy (passive King tetap aktif di mana pun) untuk faksi itu (Role Synergy dan modifier benua tidak terpengaruh).
+  **Journey wajib faksi asal**: tombol START MATCH nonaktif jika faksi di Deck bukan faksi benua Journey. Setup menampilkan catatan status bonus.
+- **Battle Chess**: membuka scene Battle (sebelumnya tombol "Battle Practice"). **Tutorial**: match panduan seperti sebelumnya.
+- Perubahan perilaku: sebelumnya kemenangan di mode apa pun membuka benua berikutnya secara berurutan; sekarang hanya Journey, lewat mastery dan pilihan pemain. Benua yang sudah terbuka di save lama tetap terbuka (tetapi tidak memberi hak pilih; kemenangan lama tidak tercatat per faksi).
+- Tes: `godot --headless --path . res://tests/newmatch_test.tscn` -> `NEW MATCH TEST RESULT: PASS` (aturan unlock, config, hub, setup). `tests/layout_test` ikut memeriksa hub (offline / online) dan setup Arena / Journey di 7 rasio layar.
+  Screenshot untuk review: `xvfb-run godot --path . res://tests/newmatch_shots.tscn` menulis PNG ke `/tmp/shots`.
+
+## Mode 2vs2 (tim, New Match -> Offline -> Arena -> Players)
+Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI)**, dan **4 Player (free-for-all vs 3 AI)**.
+- 4 pemain, 2 tim: **Team A** = Anda (kursi 0) + sekutu AI (kursi 2, bernama "(Ally)"); **Team B** = 2 AI (kursi 1 dan 3). Giliran bergantian A, B, A, B.
+  Kartu pemain menampilkan tag `[A]` / `[B]`. Tiap pemain tetap punya Life, gold, wilayah, dan pasukan sendiri.
+- **Sekutu**: mendarat di wilayah sekutu = gratis (tanpa rent, tanpa Encounter/Duel). Tribute (Grand Festival, Special Tribute) hanya memungut dari lawan,
+  dan Order Die "skip next" tidak pernah mengenai sekutu. Rent, Majority, dan Regional Dominion tetap dihitung per pemilik (wilayah tim tidak digabung).
+- **Lawan**: aturan lama berlaku penuh (rent, Tax atau Duel, Conquest, Auction). AI tidak menawar melawan sekutu di Auction dan tidak menghitung sekutu sebagai pesaing.
+- **Menang**: seluruh pemain tim lawan tereliminasi, atau saat batas ronde tim dengan **net worth gabungan** (pemain yang masih hidup) terbesar menang.
+  Jika Anda tereliminasi tetapi sekutu masih hidup, match berlanjut (AI yang bermain); kalah hanya jika seluruh Team A habis atau Team B lebih kaya di akhir.
+- Menang/kalah dicatat untuk tim Anda (profil, unlock benua, hadiah), sama seperti mode lain. Save/resume menyimpan tim.
+- Kode: `MatchController` (`team_mode`, `is_ally`, `team_networth`, `human_won`), `AIController`, `match_setup.gd`, `territory_board.gd`; tes: `tests/team_test.tscn`.
 
 ## Sistem kartu (Phase 3)
 - `data/cards.json`: per dek 15 tipe unit (8 Pawn benua + 7 bidak milik faksi: 2 Rook, 2 Knight, 2 Bishop, 1 Queen) + 105 Support (15 per kategori x 7 kategori).
@@ -47,24 +87,34 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - Koleksi awal: semua unit x9 dan 15 dari 105 Support; 90 Support terkunci (cara membuka: tiap kemenangan membuka satu Support terkunci, lihat "Aturan tambahan").
 
 ## Deck (Main Menu -> Collection & Deck -> tab Deck)
-- Editor dengan **15 slot Unit** dan **15 slot Support** yang bisa diisi/dikosongkan, plus slot **King**. Ketuk kartu di panel kanan untuk memasang/melepas,
-  atau ketuk slot terisi untuk melepasnya. Tab kanan: Units (filter per faksi), Support (filter per kategori), King.
-- **Kartu Unit mengikuti benua**: pilih benua di bagian atas; yang bisa dipasang = 8 Pawn + 28 bidak dari 4 faksi benua itu. Faksi **boleh dicampur** selama
+- Editor bergaya Clash Royale: **deck sebagai kartu visual di kiri** (grid 3 x 5, lencana biaya capacity di tiap kartu, "avg cost" di judul) dan **koleksi di kanan** (5 kolom).
+  Tab: **Units n / 15** (filter per faksi), **Support n / 15** (filter per kategori), **Faction** (kartu faksi per benua dengan gaya yang sama; panel kiri menampilkan King terpilih + skill-nya; faksi terkunci diberi overlay LOCKED).
+  Ketuk kartu koleksi untuk memasang (kartu yang sudah di deck tampak redup; ketuk lagi untuk melepas). Jika deck penuh, kartu itu "dipegang" dan semua slot menyala emas:
+  ketuk satu kartu deck untuk menukarnya. Ketuk kartu di deck tanpa memegang kartu = melepasnya. Tooltip menampilkan skill/deskripsi.
+- **Kartu Unit mengikuti benua**: di tab Units, chip benua muncul begitu ada lebih dari satu benua terbuka (benua terkunci disembunyikan); yang bisa dipasang = 8 Pawn + 28 bidak dari 4 faksi benua itu. Faksi **boleh dicampur** selama
   satu benua. Tiap benua punya susunan unit sendiri (disimpan per benua). Tiap tipe unit = 9 salinan (15 x 9 = 135).
 - **King tidak terikat benua** (semua 28 King bisa dipilih) dan Support dipakai bersama semua benua. Total dek tetap 151 kartu.
 - Save hanya aktif jika 15 unit + 15 support terisi. "Reset to default" mengembalikan unit bawaan faksi King.
-- Di match, kartu unit = susunan benua yang dimainkan; King mengikuti faksi yang dipilih di New Match; di Battle Practice King mengikuti pilihan di dek.
+- Di match, kartu unit = susunan benua yang dimainkan; King mengikuti faksi yang dipilih di Deck; di Battle Chess (Battle Practice) King mengikuti pilihan di dek.
   Lawan AI tetap memakai dek bawaan faksinya.
 
-## Battle System (Phase 4) — Main Menu -> New Match -> Battle Practice
+## Battle System (Phase 4) — Main Menu -> New Match -> Offline -> Battle Chess (dulu "Battle Practice")
 - Grid 8x8; kamu di baris 4-7 (area 4x8), lawan di baris 0-3. Tanpa kontrol manual: semua unit bergerak/menyerang sendiri.
 - Persiapan (`BattlePrep`): Battle Shop 5 unit, Reroll, Buy/Sell, Level Up (kapasitas 9 -> 30), Preparation Area 10 slot,
   Deploy/Return (ketuk unit lalu ketuk petak), Auto Deploy. Satu mata uang (Dominion Gold); "budget" hanya batas belanja.
 - Engine (`BattleEngine`, deterministik per seed): 1 tick = 0.25 detik; prioritas target per role (Assassin = HP terendah,
   Marksman/Mage = musuh terlemah dalam jangkauan, lainnya = terdekat), range Chebyshev, gerak BFS 8 arah,
-  15 skill unit, Faction Synergy (2 unit sefaksi +5%, 4 = +15%, 6 = +30% HP/ATK).
+  15 skill unit, Faction Synergy (2 unit sefaksi +5%, 4 = +15%, 6 = +30% HP/ATK) dan Role Synergy (2 unit semisi role +8%, 4 = +20%, 6 = +35%; Tank/Support = HP, Assassin/Mage/Marksman = ATK, Fighter/Controller = HP+ATK 60%).
 - **Champion Last Stand**: Champion hanya masuk arena saat semua unit biasa pihaknya kalah (dan langsung masuk jika tanpa unit),
   lalu memakai skill aktifnya. Champion kalah = pihak itu kalah. HP Champion di battle = HP x3 (`champion_hp_mult`).
+- **King di battle punya tiga hal terpisah**: **Pasif** (`data/king_passives.json`, aktif sejak battle mulai di benua mana pun: +HP/+ATK/-damage/shield untuk semua unit, atau +HP/+ATK King saat masuk); **Buff** (`data/king_buffs.json`, hanya di benua asal, melekat pada King saat masuk); **Aktif** = skill King
+  (Sun Judgment, Starfall Decree, dst.) yang dipakai **manual, sekali** lewat tombol di panel King (kiri) setelah King masuk lewat Last Stand. Sisi AI / auto memakainya otomatis saat masuk.
+  Engine: `manual_king` di cfg, `can_use_king_skill`, `use_king_skill`, `king_skill_used`; tes di `battle_test` (`_test_manual_king`).
+- **Support di Battle Shop**: kartu Support dari Deck **muncul di roll Battle Shop** bersama bidak (tiap slot ada peluang `shop_support_chance` = 20%), tidak lagi dibagikan acak 3 kartu.
+  Dibeli dengan gold (`support_price`: Common 40, Rare 100, Epic 220, Legendary 450) dan **butuh level** (`support_level_req`: Common 3, Rare 5, Epic 7, Legendary 9; kartu di atas level tampil terkunci).
+  Kartu masuk **hand** (maks `hand_max` = 5), disimpan antar duel sampai dimainkan manual di battle (sekali). Kartu yang dimainkan terpakai dan kembali ke tumpukan shop.
+  Hand bisa dijual (50%) di panel persiapan; Mercenary Pact dan Merchant Contract langsung berlaku saat dibeli (tidak bisa dijual). AI membeli Support lewat shop yang sama.
+  Kode: `BattleDeck.support_pool` / `draw_shop`, `BattlePrep.hand` / `can_buy` / `buy` / `consume_used`, `PlayerState.hand` (ikut save/resume: `spile`, `hand`); tes `battle_test._test_shop_supports`.
 - Support card yang sudah berfungsi: Fireball (area_damage), Arcane Heal (heal_all), Battle Cry (team_atk),
   Blessing of Light (shield_all), Summon Recruits (summon_pawns), Fortune's Favor (gold_on_win). (Catatan lama: sejak Phase 6 SEMUA 21 efek Support berfungsi.)
 - Lawan AI membangun pasukan lewat shop yang sama (budget easy 250 / normal 450 / hard 700) dan memakai Support.
@@ -115,7 +165,7 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 
 ## Konten (Phase 6)
 - **7 benua dapat dimainkan**, masing-masing 4 regional bernama, 10 awalan nama wilayah, 4 faction, dan 1 world modifier.
-  Menang di sebuah benua membuka benua berikutnya (tidak ada fitur "Unlock all").
+  Benua selain Aetherion dibuka lewat Journey: master sebuah benua (menang dengan ke-4 faksinya) lalu pilih satu benua terkunci untuk dibuka (Arena tidak membuka apa pun; tidak ada fitur "Unlock all").
 - **28 Champion berbeda** (`data/champions.json`): 10 passive papan x 11 skill aktif Last Stand, nilai tiap Champion beda dan dibaca dari data
   (`passive_value`, `active_value`). Passive: Royal Treasury, Shadow Ledger, Landlord, Fortune Weave, Toll Keeper, Treasure Hunter,
   Spoils of War, Quartermaster, Mender, Vanguard. Aktif: Sun Judgment, Starfall Decree, Eclipse Veil, Banner of Iron, Inferno Burst,
@@ -155,7 +205,7 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
 - **Build di GitHub dan Gradle/AAB**: `.github/workflows/` (tes otomatis + APK + AAB, Godot 4.7); lihat BUILD_ANDROID.md. Skrip tes: `tools/run_tests.sh`. Proyek kini memakai Godot 4.7 (target API 36 untuk Google Play).
 
 ## Tutorial, Auction, Special Dice, seni, audio, kartu baru
-- **Tutorial** (menu utama -> New Match): match 1v1 melawan AI Easy di Aetherion, 10 ronde, seed tetap. AI sudah memiliki wilayah di depan pemain dan
+- **Tutorial** (New Match -> Offline -> Tutorial): match 1v1 melawan AI Easy di Aetherion, 10 ronde, seed tetap. AI sudah memiliki wilayah di depan pemain dan
   tawaran duel pertama selalu muncul. `TutorialGuide` menjelaskan tiap aturan saat pertama kali muncul (panel petunjuk di papan; tips
   di atas separuh papan musuh saat persiapan duel). Hasilnya tidak dihitung ke statistik; `profile.tutorial_done` disimpan.
 - **Auction sungguhan**: lot acak dilelang ke semua pemain hidup, mulai dari yang mendarat; buka 40% harga, naik 10% per tawaran;
@@ -174,11 +224,11 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
 - Pool kartu unit baru (varian pengganti) dan Champion/Rule Card sebagai sumber Special Dice.
 - Nama dan ilustrasi unik per benua/Champion (seni sekarang prosedural dan generik); sprite dan animasi unit sungguhan.
 - Musik latar; suara masih sintetis sederhana.
-- Multiplayer (1v1, 2v2, FFA online, Ranked, Lobi, Turnamen) dan Story Campaign: belum ada.
+- Multiplayer online (Classic dan Ranked 1v1 / 2v2 / 4 player, Battle Chess online, Lobi, Turnamen): belum ada, tab ONLINE di New Match hanya menampilkan kartunya sebagai "Coming soon". Journey sekarang hanya jalur unlock benua 1v1; alur cerita/campaign dengan misi khusus belum ada. (2vs2 melawan AI sudah ada, lihat bagian Mode 2vs2.)
 - Pemilihan target manual untuk kartu Artifact (Crown of Valor, Aegis Shield, Windboots).
 - Uji di perangkat Android nyata (lihat BUILD_ANDROID.md).
 - Keseimbangan: eliminasi total jarang (3-4%); game biasanya diputuskan net worth di ronde 30. Diukur per benua dengan `tools/balance_report`.
 
 ## Peta Territory: zoom dan kamera
 Layar Territory dan Battle tiga kolom ala Monopoly (Battle: tombol + kartu Support di kiri, papan 8x8 di tengah, shop + bench di kanan, log di kanan saat bertarung). Territory: papan di tengah, log di kiri (aksi di bawah log; tombol dadu di dalam papan), pemain di kanan. Papan tampil utuh (zoom 1x) dan kamera mengikuti pion saat di-zoom. Geser dengan drag, cubit atau roda mouse untuk zoom,
-tombol + / - / Fit dan Speed (kiri tengah papan); tombol dadu (Roll Dice, Reroll, special dice) di pojok kiri bawah di dalam papan, aksi lain (Move, End Turn, Buy) di kiri bawah layar di bawah log untuk zoom manual atau melihat seluruh papan. Ketuk petak untuk info. Kode: `scripts/ui/board_view.gd`.
+tombol + / - / Fit dan Speed di pojok kiri bawah layar; semua tombol aksi (Roll Dice, Reroll, Move, End Turn, Buy, special dice) di pojok kanan bawah layar untuk zoom manual atau melihat seluruh papan. Ketuk petak untuk info. Kode: `scripts/ui/board_view.gd`.

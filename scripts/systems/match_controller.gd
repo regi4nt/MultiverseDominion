@@ -36,6 +36,9 @@ var pending: Dictionary = {}
 var last_dice: Vector2i = Vector2i.ZERO
 var winner_id: int = -1
 var human_present: bool = true
+var team_mode: bool = false  # 2vs2: seats 0 + 2 (Team A) against seats 1 + 3 (Team B)
+var winner_team: int = -1
+var journey: bool = false  # Journey match: a human win unlocks the next continent (Arena matches unlock nothing)
 var tutorial: bool = false  # guided first match: contextual hints, scripted start, forced first duel
 var round_limit: int = 30
 var tutorial_seen: Array[String] = []
@@ -67,31 +70,43 @@ func setup(cfg: Dictionary) -> void:
 
 	players.clear()
 	human_present = not bool(cfg.get("all_ai", false))
+	team_mode = bool(cfg.get("team_mode", false))
+	journey = bool(cfg.get("journey", false))
 	var difficulty: String = cfg.get("difficulty", "normal")
 	var faction_ids: Array = []
 	for f in continent.get("factions", []):
 		faction_ids.append(f["id"])
-	var human_faction: String = cfg.get("faction_id", faction_ids[0])
+	var human_faction: String = cfg.get("faction_id", faction_ids[0])  # from the Deck: may belong to another continent
+	if GameData.find_faction(human_faction).get("champion", "") == "":
+		human_faction = faction_ids[0]
 	var pool: Array = faction_ids.duplicate()
 	pool.erase(human_faction)
 	_shuffle(pool)
 	var order: Array = [human_faction]
 	order.append_array(pool)
 	var ai_count: int = clampi(int(cfg.get("ai_count", 3)), 1, 3)
+	if team_mode:
+		ai_count = 3  # 2vs2 always seats four rulers
 
 	for i in range(ai_count + 1):
 		var is_ai := (i > 0) or not human_present
 		var fac := GameData.get_faction(continent["id"], order[i])
-		var pname: String = String(cfg.get("player_name", "You")) if not is_ai else "%s (AI)" % fac.get("name", "AI")
+		var tag := "AI"
+		if team_mode and i == 2:
+			tag = "Ally"  # seat 2 is the human's teammate
+		var pname: String = String(cfg.get("player_name", "You")) if not is_ai else "%s (%s)" % [fac.get("name", "AI"), tag]
 		var diffs: Array = cfg.get("difficulties", [])  # optional per-seat difficulty (balance tests)
 		var seat_diff: String = String(diffs[i]) if i < diffs.size() else difficulty
 		players.append(_make_player(i, order[i], is_ai, seat_diff, pname))
+		if team_mode:
+			players[i].team = i % 2  # turn order alternates: A, B, A, B
 
 	current = 0
 	round_number = 1
 	state = State.AWAIT_ROLL
 	pending = {}
 	winner_id = -1
+	winner_team = -1
 	round_limit = int(cfg.get("round_limit", int(GameData.b("max_rounds"))))
 	tutorial = bool(cfg.get("tutorial", false))
 	if tutorial:
@@ -101,6 +116,8 @@ func setup(cfg: Dictionary) -> void:
 			if tiles[i].type == BoardTile.Type.TERRITORY:
 				tiles[i].owner_id = 1
 	_log("Match start on %s. %d players. Good luck!" % [continent.get("name", "?"), players.size()])
+	if team_mode:
+		_log("2vs2: Team A (%s) against Team B (%s). Allies pay no rent to each other." % [_team_names(0), _team_names(1)])
 	if WorldMods.modifier_name != "":
 		_log("World modifier - %s: %s" % [WorldMods.modifier_name, continent["modifier"].get("description", "")])
 
@@ -113,6 +130,8 @@ func _make_player(id: int, faction_id: String, is_ai: bool, difficulty: String, 
 	p.difficulty = difficulty
 	p.faction_id = faction_id
 	var fac := GameData.get_faction(continent["id"], faction_id)
+	if fac.is_empty():
+		fac = GameData.find_faction(faction_id)
 	p.champion_id = fac.get("champion", "")
 	var champ := GameData.get_champion(p.champion_id)
 	p.passive = champ.get("passive", "")
@@ -181,6 +200,46 @@ func alive_players() -> Array[PlayerState]:
 		if p.alive:
 			out.append(p)
 	return out
+
+
+## 2vs2: true when both seats are on the same team (never in a free-for-all, never for the same seat).
+func is_ally(a_id: int, b_id: int) -> bool:
+	if not team_mode or a_id < 0 or b_id < 0 or a_id == b_id:
+		return false
+	return players[a_id].team == players[b_id].team
+
+
+## "A" / "B" in 2vs2, "" otherwise.
+func team_label(p: PlayerState) -> String:
+	if not team_mode or p.team < 0:
+		return ""
+	return "A" if p.team == 0 else "B"
+
+
+func _team_names(team: int) -> String:
+	var names: Array[String] = []
+	for p in players:
+		if p.team == team:
+			names.append(p.display_name)
+	return " + ".join(names)
+
+
+## Combined net worth of the living members of a team.
+func team_networth(team: int) -> int:
+	var total := 0
+	for p in players:
+		if p.alive and p.team == team:
+			total += networth(p)
+	return total
+
+
+## True when the human's side won (their team in 2vs2, themselves otherwise).
+func human_won() -> bool:
+	if not human_present or winner_id < 0:
+		return false
+	if team_mode:
+		return players[winner_id].team == players[0].team
+	return winner_id == 0
 
 
 func count_owned(player_id: int) -> int:
@@ -475,8 +534,8 @@ func _end_of_round() -> void:
 	players_changed.emit()
 	tiles_changed.emit()
 	if round_number > round_limit:
-		_log("Round limit reached: the richest ruler wins.")
-		_end_game(_richest(alive_players()))
+		_log("Round limit reached: the richest %s wins." % ("team" if team_mode else "ruler"))
+		_end_game(_round_limit_winner())
 
 
 func _move_player(p: PlayerState, steps: int) -> void:
@@ -593,6 +652,8 @@ func _resolve_territory(p: PlayerState, t: BoardTile) -> void:
 			_log("%s cannot afford %s (%d G)." % [p.display_name, t.name, price])
 	elif t.owner_id == p.id:
 		_log("%s visits their own land %s. TODO (later): upgrades." % [p.display_name, t.name])
+	elif is_ally(t.owner_id, p.id):
+		_log("%s visits the allied land %s: no rent, no duel." % [p.display_name, t.name])
 	else:
 		var owner_p := players[t.owner_id]
 		var base_rent := EconomySystem.rent_of(t, tiles)
@@ -727,9 +788,7 @@ func _resolve_event(p: PlayerState) -> void:
 		"reroll_token":
 			p.reroll_tokens += value
 		"collect_from_all":
-			for o in players.duplicate():
-				if o.alive and o.id != p.id and state != State.GAME_OVER:
-					_pay(o, value, p.id, "tribute")
+			_collect_from_rivals(p, value, "tribute")
 		"extra_roll":
 			_extra_roll = true
 		"special_die":
@@ -752,10 +811,15 @@ func _resolve_special(p: PlayerState) -> void:
 			_nested_resolve(p)
 		2:
 			_log("Special: Tribute! %s collects 25 G from each rival." % p.display_name)
-			for o in players.duplicate():
-				if o.alive and o.id != p.id and state != State.GAME_OVER:
-					_pay(o, 25, p.id, "tribute")
+			_collect_from_rivals(p, 25, "tribute")
 	players_changed.emit()
+
+
+## Every living rival pays `amount` to p. Teammates (2vs2) are never charged.
+func _collect_from_rivals(p: PlayerState, amount: int, reason: String) -> void:
+	for o in players.duplicate():
+		if o.alive and o.id != p.id and not is_ally(o.id, p.id) and state != State.GAME_OVER:
+			_pay(o, amount, p.id, reason)
 
 
 func _do_buy(p: PlayerState, t: BoardTile, price: int) -> void:
@@ -845,10 +909,36 @@ func _check_game_over() -> void:
 	if state == State.GAME_OVER:
 		return
 	var alive := alive_players()
+	if team_mode:  # 2vs2: the match ends when only one team has rulers left
+		var teams: Array[int] = []
+		for q in alive:
+			if not teams.has(q.team):
+				teams.append(q.team)
+		if teams.size() <= 1:
+			_end_game(_richest(alive))
+		return
 	if human_present and not players[0].alive:
 		_end_game(_richest(alive))
 	elif alive.size() <= 1:
 		_end_game(alive[0].id if alive.size() == 1 else -1)
+
+
+## Round limit: the richest player in FFA; in 2vs2 the richest living member of the richest team.
+func _round_limit_winner() -> int:
+	if not team_mode:
+		return _richest(alive_players())
+	var best_team := -1
+	var best_worth := -1
+	for team in [0, 1]:
+		var w := team_networth(team)
+		if w > best_worth:
+			best_worth = w
+			best_team = team
+	var members: Array[PlayerState] = []
+	for p in alive_players():
+		if p.team == best_team:
+			members.append(p)
+	return _richest(members)
 
 
 func _richest(list: Array[PlayerState]) -> int:
@@ -868,7 +958,13 @@ func _end_game(winner: int) -> void:
 	state = State.GAME_OVER
 	pending = {}
 	winner_id = winner
-	_log("=== GAME OVER. Winner: %s ===" % (players[winner].display_name if winner >= 0 else "nobody"))
+	winner_team = players[winner].team if (team_mode and winner >= 0) else -1
+	var who := "nobody"
+	if winner >= 0:
+		who = players[winner].display_name
+		if team_mode:
+			who = "Team %s (%s)" % [team_label(players[winner]), _team_names(players[winner].team)]
+	_log("=== GAME OVER. Winner: %s ===" % who)
 	players_changed.emit()
 	state_changed.emit()
 	game_over.emit(winner)
@@ -946,6 +1042,8 @@ func auto_duel() -> void:
 	while not e.finished and guard < BattleEngine.MAX_TICKS + 5:
 		e.step()
 		guard += 1
+	a.consume_supports(e.used_supports[0])  # played Support cards are spent
+	d.consume_supports(e.used_supports[1])
 	var winner_pid := -1
 	var bonus := 0
 	if e.winner == 0:
@@ -1025,8 +1123,8 @@ func _player_to_dict(p: PlayerState) -> Dictionary:
 		"id": p.id, "name": p.display_name, "is_ai": p.is_ai, "difficulty": p.difficulty, "faction": p.faction_id,
 		"champion": p.champion_id, "passive": p.passive, "passive_value": p.passive_value, "color": p.color.to_html(),
 		"position": p.position, "gold": p.gold, "life": p.life, "level": p.level, "capacity": p.capacity,
-		"tokens": p.reroll_tokens, "skip": p.skip_turns, "alive": p.alive, "dice": p.special_dice.duplicate(), "move_bonus": p.move_bonus,
-		"deck": p.deck.to_dict(), "pile": p.battle_deck.pool.duplicate(), "units": units}
+		"tokens": p.reroll_tokens, "skip": p.skip_turns, "alive": p.alive, "team": p.team, "dice": p.special_dice.duplicate(), "move_bonus": p.move_bonus,
+		"deck": p.deck.to_dict(), "pile": p.battle_deck.pool.duplicate(), "spile": p.battle_deck.support_pool.duplicate(), "hand": p.hand.duplicate(), "units": units}
 
 
 ## Serialises the match. Only possible at a stable moment: start of a turn or end of a turn
@@ -1043,8 +1141,8 @@ func to_dict() -> Dictionary:
 	return {
 		"version": SAVE_FORMAT, "continent_id": continent["id"], "round": round_number, "current": current,
 		"state": int(state), "last_dice": [last_dice.x, last_dice.y], "winner_id": winner_id,
-		"human_present": human_present, "roll_double": _roll_was_double, "extra_roll": _extra_roll, "bonus_rolls": _bonus_rolls,
-		"tutorial": tutorial, "round_limit": round_limit, "tutorial_seen": tutorial_seen.duplicate(),
+		"human_present": human_present, "team_mode": team_mode, "winner_team": winner_team, "roll_double": _roll_was_double, "extra_roll": _extra_roll, "bonus_rolls": _bonus_rolls,
+		"tutorial": tutorial, "journey": journey, "round_limit": round_limit, "tutorial_seen": tutorial_seen.duplicate(),
 		"stats": stats.duplicate(), "players": plist, "tiles": tl, "log": recent_log.duplicate(),
 		# 64-bit values are stored as text: JSON numbers are doubles and would lose precision.
 		"rng_seed": str(rng.seed), "rng_state": str(rng.state)}
@@ -1061,6 +1159,8 @@ static func from_dict(d: Dictionary) -> MatchController:
 		c.tiles[i].owner_id = int(tl[i][0])
 		c.tiles[i].portal_active = bool(tl[i][1])
 	c.human_present = bool(d["human_present"])
+	c.team_mode = bool(d.get("team_mode", false))
+	c.winner_team = int(d.get("winner_team", -1))
 	for pd in d["players"]:
 		var p := PlayerState.new()
 		p.id = int(pd["id"])
@@ -1080,6 +1180,7 @@ static func from_dict(d: Dictionary) -> MatchController:
 		p.reroll_tokens = int(pd["tokens"])
 		p.skip_turns = int(pd["skip"])
 		p.alive = bool(pd["alive"])
+		p.team = int(pd.get("team", -1))
 		for did in pd.get("dice", []):
 			p.special_dice.append(String(did))
 		p.move_bonus = int(pd.get("move_bonus", 0))
@@ -1088,6 +1189,12 @@ static func from_dict(d: Dictionary) -> MatchController:
 		p.battle_deck.pool.clear()
 		for id in pd["pile"]:
 			p.battle_deck.pool.append(String(id))
+		if pd.has("spile"):  # older saves: every Support stays in the pile, empty hand
+			p.battle_deck.support_pool.clear()
+			for sid in pd["spile"]:
+				p.battle_deck.support_pool.append(String(sid))
+		for hid in pd.get("hand", []):
+			p.hand.append(String(hid))
 		p.roster = UnitRoster.new()
 		for ud in pd["units"]:
 			var u := UnitInstance.new(String(ud["id"]), int(ud["stars"]))
@@ -1095,6 +1202,7 @@ static func from_dict(d: Dictionary) -> MatchController:
 			p.roster.units.append(u)
 		c.players.append(p)
 	c.tutorial = bool(d.get("tutorial", false))
+	c.journey = bool(d.get("journey", false))
 	c.round_limit = int(d.get("round_limit", int(GameData.b("max_rounds"))))
 	for id in d.get("tutorial_seen", []):
 		c.tutorial_seen.append(String(id))
@@ -1158,7 +1266,7 @@ func use_special_die(index: int) -> String:
 					var n := players.size()
 					for i in range(1, n):
 						var q := players[(current + i) % n]
-						if q.alive:
+						if q.alive and not is_ally(current, q.id):
 							q.skip_turns += 1
 							_log("%s will skip their next turn." % q.display_name)
 							break

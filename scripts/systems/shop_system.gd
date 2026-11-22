@@ -1,6 +1,6 @@
 class_name ShopSystem
 extends RefCounted
-## Shop rules: Aether Coins (the persistent currency, earned by playing matches), the Support card Gacha and direct card purchase.
+## Shop rules: Aether Coins (the persistent currency, earned by playing matches), the Support card Gacha, direct card purchase and Card Fragments (Gacha duplicates, exchanged for locked cards).
 ## All state lives in SaveManager.data ("wallet", "shop", "collection"). Every number the player can see is a constant here.
 
 const START_COINS := 600  # mirrored by SaveManager.default_data()
@@ -13,12 +13,19 @@ const RARITY_ORDER: Array[String] = ["common", "rare", "epic", "legendary"]
 const RATES := {"common": 60, "rare": 28, "epic": 10, "legendary": 2}  # percent
 ## Direct purchase of a locked Support card (more expensive than the average Gacha pull: the card is guaranteed).
 const BUY_PRICE := {"common": 200, "rare": 500, "epic": 1200, "legendary": 3000}
-## A Gacha duplicate (card already owned) turns into coins.
-const DUPLICATE_REFUND := {"common": 15, "rare": 40, "epic": 100, "legendary": 250}
+## A Gacha duplicate (card already owned) turns into Card Fragments: the rarer the card, the more fragments.
+const DUPLICATE_FRAGMENTS := {"common": 10, "rare": 25, "epic": 60, "legendary": 150}
+## Exchanging fragments for a locked Support card: the rarer the card, the more fragments it costs
+## (5 / 6 / ~7 / ~7 duplicates of the same rarity).
+const FRAGMENT_PRICE := {"common": 50, "rare": 150, "epic": 400, "legendary": 1000}
 
 
 static func buy_price(card: Dictionary) -> int:
 	return int(BUY_PRICE.get(String(card.get("rarity", "common")), 200))
+
+
+static func fragment_price(card: Dictionary) -> int:
+	return int(FRAGMENT_PRICE.get(String(card.get("rarity", "common")), 50))
 
 
 ## Support cards the player does not own yet, in database order (optionally one category only).
@@ -39,6 +46,20 @@ static func buy(card_id: String) -> String:
 		return "You already own this card."
 	if not SaveManager.spend_coins(buy_price(s)):
 		return "Not enough Aether Coins."
+	SaveManager.unlock_card(card_id)
+	SaveManager.save_game()
+	return ""
+
+
+## Exchanges Card Fragments for a locked Support card. Returns "" on success or the reason it failed.
+static func exchange(card_id: String) -> String:
+	var s := CardDatabase.get_support(card_id)
+	if s.is_empty():
+		return "Unknown card."
+	if SaveManager.owned_count(card_id) > 0:
+		return "You already own this card."
+	if not SaveManager.spend_fragments(fragment_price(s)):
+		return "Not enough Card Fragments."
 	SaveManager.unlock_card(card_id)
 	SaveManager.save_game()
 	return ""
@@ -68,7 +89,7 @@ static func roll_rarity(rng: RandomNumberGenerator, pity_count: int, min_index: 
 	return RARITY_ORDER[RARITY_ORDER.size() - 1]
 
 
-## One pull WITHOUT charging (use pull_batch). Returns {id, rarity, new, refund}.
+## One pull WITHOUT charging (use pull_batch). Returns {id, rarity, new, fragments} (fragments > 0 for a duplicate).
 static func _pull_one(rng: RandomNumberGenerator, min_index: int) -> Dictionary:
 	var shop: Dictionary = SaveManager.data["shop"]
 	var rarity := roll_rarity(rng, int(shop.get("pity", 0)), min_index)
@@ -83,13 +104,13 @@ static func _pull_one(rng: RandomNumberGenerator, min_index: int) -> Dictionary:
 	shop["pulls"] = int(shop.get("pulls", 0)) + 1
 	var id := String(card["id"])
 	var is_new := SaveManager.owned_count(id) == 0
-	var refund := 0
+	var fragments := 0
 	if is_new:
 		SaveManager.unlock_card(id)
 	else:
-		refund = int(DUPLICATE_REFUND[String(card["rarity"])])
-		SaveManager.add_coins(refund)
-	return {"id": id, "rarity": String(card["rarity"]), "new": is_new, "refund": refund}
+		fragments = int(DUPLICATE_FRAGMENTS[String(card["rarity"])])
+		SaveManager.add_fragments(fragments)
+	return {"id": id, "rarity": String(card["rarity"]), "new": is_new, "fragments": fragments}
 
 
 static func batch_price(count: int) -> int:

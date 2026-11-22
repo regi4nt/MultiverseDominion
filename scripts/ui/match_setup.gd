@@ -1,10 +1,45 @@
 extends Control
-## Mode -> Continent -> Faction -> Champion -> Difficulty -> Start. The bottom bar also holds Tutorial and Battle Practice.
+## New Match. Two views in one scene:
+##  - HUB: OFFLINE tab (Journey, Arena, Battle Chess, Tutorial) and ONLINE tab (Classic, Ranked, Battle Chess: coming soon).
+##  - SETUP (Journey / Arena): players -> difficulty -> continent -> START MATCH. There is no faction choice here: the
+##    faction (and its King) is chosen in Collection & Deck -> Deck -> Faction; locked factions cannot be picked.
+## Journey = 1vs1 story path: win on a continent with each of its 4 factions to master it; every mastered continent lets the
+## player CHOOSE one locked continent to open. Arena = free match (1vs1, 2vs2, 4 player) on open continents, unlocks nothing.
+## Battle Chess opens the 8x8 auto-battle (Battle Practice); Tutorial starts the guided match.
 
-var _faction_box: VBoxContainer
+const BOARD_SCENE := "res://scenes/territory_board/territory_board.tscn"
+const BATTLE_SCENE := "res://scenes/battle_board/battle_board.tscn"
+const MENU_SCENE := "res://scenes/main_menu/main_menu.tscn"
+const CARD_MAX_H := 470.0  # on tall screens (tablets) the mode cards stop growing and are centred instead
+
+const ACCENT := {
+	"journey": Color("e0b64a"), "arena": Color("e0644f"), "battle_chess": Color("3fb5a3"), "tutorial": Color("69c46d"),
+	"classic": Color("6f8fd6"), "ranked": Color("b07ad6"), "online_chess": Color("5fa8c8"),
+}
+
+## Arena player formats: label, caption, GameSession.mode, number of AI opponents.
+const ARENA_MODES := [
+	{"label": "1 vs 1", "sub": "You vs 1 AI", "mode": "custom_ai", "ai": 1},
+	{"label": "2 vs 2", "sub": "You + 1 AI vs 2 AI", "mode": "team_2v2", "ai": 3},
+	{"label": "4 Player", "sub": "Free-for-all vs 3 AI", "mode": "ffa_ai", "ai": 3},
+]
+
+var _view: String = "hub"  # "hub" | "setup"
+var _tab: String = "offline"  # hub tab: "offline" | "online"
+var _kind: String = "arena"  # setup kind: "journey" | "arena"
+
+var _margin: MarginContainer
+var _root: VBoxContainer
+var _cards_holder: VBoxContainer
+var _cards_row: HBoxContainer
+var _tab_note: Label
+var _tab_buttons: Dictionary = {}
 var _champion_text: RichTextLabel
 var _portrait: PortraitView
 var _continent_text: Label
+var _journey_hint: Label
+var _start_btn: Button
+var _home_note: Label
 
 
 func _ready() -> void:
@@ -14,108 +49,356 @@ func _ready() -> void:
 		GameSession.mode = "ffa_ai"
 		GameSession.ai_count = 3
 	add_child(UiTheme.make_background())
-	var margin := UiTheme.make_margin(24)
-	add_child(margin)
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 10)
-	margin.add_child(root)
-	root.add_child(UiTheme.make_label("NEW MATCH", 40, UiTheme.COL_GOLD))
-	root.add_child(UiTheme.make_divider())
+	_margin = UiTheme.make_margin(24)
+	add_child(_margin)
+	_show_hub()
+
+
+## Android Back / Esc: from the setup view go back to the mode hub, from the hub leave to the Main Menu.
+func on_back_requested() -> void:
+	if _view == "setup":
+		_show_hub()
+	else:
+		get_tree().change_scene_to_file(MENU_SCENE)
+
+
+func _reset_root() -> void:
+	if _root != null:
+		_margin.remove_child(_root)
+		_root.queue_free()
+	_cards_holder = null
+	_cards_row = null
+	_tab_note = null
+	_tab_buttons = {}
+	_champion_text = null
+	_portrait = null
+	_continent_text = null
+	_journey_hint = null
+	_start_btn = null
+	_home_note = null
+	_root = VBoxContainer.new()
+	_root.add_theme_constant_override("separation", 10)
+	_margin.add_child(_root)
+
+
+# ============================================================ HUB
+
+func _show_hub() -> void:
+	_view = "hub"
+	_reset_root()
+	_root.add_child(UiTheme.make_label("NEW MATCH", 40, UiTheme.COL_GOLD))
+	_root.add_child(UiTheme.make_divider())
+
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 12)
+	_root.add_child(tabs)
+	var group := ButtonGroup.new()
+	for t in [["offline", "OFFLINE"], ["online", "ONLINE  -  COMING SOON"]]:
+		var b := UiTheme.make_toggle(t[1], group, 60)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 24)
+		b.button_pressed = (_tab == t[0])
+		var id: String = t[0]
+		b.pressed.connect(func(): _set_tab(id))
+		tabs.add_child(b)
+		_tab_buttons[id] = b
+
+	_tab_note = UiTheme.make_label("", 17, UiTheme.COL_MUTED)
+	_root.add_child(_tab_note)
+
+	_cards_holder = VBoxContainer.new()
+	_cards_holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_cards_holder.alignment = BoxContainer.ALIGNMENT_CENTER
+	_root.add_child(_cards_holder)
+	_cards_row = HBoxContainer.new()
+	_cards_row.add_theme_constant_override("separation", 14)
+	_cards_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_cards_holder.add_child(_cards_row)
+	_root.resized.connect(_cap_cards)
+
+	var bottom := HBoxContainer.new()
+	_root.add_child(bottom)
+	var back := UiTheme.make_button("Back", 60)
+	back.custom_minimum_size.x = 260
+	back.pressed.connect(func(): get_tree().change_scene_to_file(MENU_SCENE))
+	bottom.add_child(back)
+	_fill_cards()
+	_cap_cards.call_deferred()
+
+
+## Cards fill the free height on phones; on tall screens they are capped at CARD_MAX_H and centred.
+func _cap_cards() -> void:
+	if _root == null or _cards_row == null or _cards_holder == null:
+		return
+	var fixed := 0.0
+	for ch in _root.get_children():
+		if ch != _cards_holder:
+			fixed += (ch as Control).get_combined_minimum_size().y + 10.0
+	if _root.size.y - fixed > CARD_MAX_H:
+		_cards_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_cards_row.custom_minimum_size.y = CARD_MAX_H
+	else:
+		_cards_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_cards_row.custom_minimum_size.y = 0.0
+
+
+func _set_tab(id: String) -> void:
+	_tab = id
+	if _tab_buttons.has(id):
+		(_tab_buttons[id] as Button).button_pressed = true
+	_fill_cards()
+
+
+func _fill_cards() -> void:
+	for ch in _cards_row.get_children():
+		_cards_row.remove_child(ch)
+		ch.queue_free()
+	var online := _tab == "online"
+	_tab_note.text = "Online matches are not available yet. Everything under OFFLINE is fully playable." if online else "Choose how you want to play."
+	for c in (_online_cards() if online else _offline_cards()):
+		_cards_row.add_child(_make_card(c, online))
+
+
+func _offline_cards() -> Array:
+	return [
+		{"id": "journey", "icon": "knight", "title": "JOURNEY", "sub": "Story  ·  1 vs 1",
+			"desc": "Win a 1 vs 1 on a continent with all 4 of its factions to master it, then choose a new continent to unlock.",
+			"chips": ["1 vs 1", "Unlocks continents"], "status": _journey_status()},
+		{"id": "arena", "icon": "king", "title": "ARENA", "sub": "Free match",
+			"desc": "Play a free match against AI on any unlocked continent. Nothing to unlock, just fight for the crown.",
+			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "%d of %d continents open" % [_open_continents(), GameData.continents.size()]},
+		{"id": "battle_chess", "icon": "rook", "title": "BATTLE CHESS", "sub": "8 x 8 auto battle",
+			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle.",
+			"chips": ["8 x 8", "Auto battle"], "status": "Practice against AI"},
+		{"id": "tutorial", "icon": "pawn", "title": "TUTORIAL", "sub": "10 rounds  ·  1 vs 1",
+			"desc": "A guided match against an easy AI that explains dice, land, tax and duels as you meet them.",
+			"chips": ["Guided", "Easy AI"],
+			"status": "Completed  -  replay anytime" if SaveManager.data["profile"].get("tutorial_done", false) else "Recommended for new players"},
+	]
+
+
+func _online_cards() -> Array:
+	return [
+		{"id": "classic", "icon": "king", "title": "CLASSIC", "sub": "Casual online",
+			"desc": "Relaxed online matches against other players.",
+			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "COMING SOON"},
+		{"id": "ranked", "icon": "queen", "title": "RANKED", "sub": "Competitive ladder",
+			"desc": "Climb the ranked ladder in 1 vs 1, 2 vs 2 or 4-player matches.",
+			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "COMING SOON"},
+		{"id": "online_chess", "icon": "rook", "title": "BATTLE CHESS", "sub": "Online 8 x 8",
+			"desc": "Send your army into the 8x8 auto battle against a real opponent.",
+			"chips": ["8 x 8", "PvP"], "status": "COMING SOON"},
+	]
+
+
+func _open_continents() -> int:
+	var n := 0
+	for c in GameData.continents:
+		if c.get("playable", false) and SaveManager.is_continent_unlocked(String(c["id"])):
+			n += 1
+	return n
+
+
+func _journey_status() -> String:
+	if SaveManager.journey_picks_available() > 0:
+		return "Continent unlock ready  -  choose one!"
+	var cid := SaveManager.journey_frontier()
+	return "%s: %d / %d factions won" % [GameData.get_continent(cid)["name"], SaveManager.journey_won_factions(cid).size(), SaveManager.journey_faction_total(cid)]
+
+
+func _on_card(id: String) -> void:
+	match id:
+		"journey", "arena":
+			_show_setup(id)
+		"battle_chess":
+			get_tree().change_scene_to_file(BATTLE_SCENE)
+		"tutorial":
+			SaveManager.clear_match()  # the tutorial replaces the saved match, like START MATCH
+			GameSession.start_tutorial()
+			get_tree().change_scene_to_file(BOARD_SCENE)
+
+
+## One mode card: a flat Button (background, hover, press, disabled) with the content stacked on top of it.
+func _make_card(c: Dictionary, disabled: bool) -> Control:
+	var accent: Color = ACCENT[c["id"]]
+	var card := PanelContainer.new()
+	card.name = "Card_" + String(c["id"])
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var btn := Button.new()
+	btn.name = "Tap"
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.disabled = disabled
+	btn.add_theme_stylebox_override("normal", _card_box(accent, 0))
+	btn.add_theme_stylebox_override("hover", _card_box(accent, 1))
+	btn.add_theme_stylebox_override("pressed", _card_box(accent, 2))
+	btn.add_theme_stylebox_override("disabled", _card_box(accent, -1))
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	if not disabled:
+		btn.pressed.connect(Sfx.click)
+		btn.pressed.connect(_on_card.bind(String(c["id"])))
+	card.add_child(btn)
+
+	var pad := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 16)
+	card.add_child(pad)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	pad.add_child(v)
+
+	var icon := ModeIcon.new(String(c["icon"]), accent)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(icon)
+	v.add_child(_centered(UiTheme.make_label(String(c["title"]), 28, accent.lightened(0.3))))
+	v.add_child(_centered(UiTheme.make_label(String(c["sub"]), 16, UiTheme.COL_MUTED)))
+	var desc := _centered(UiTheme.make_label(String(c["desc"]), 17))
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(desc)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(spacer)
+	var chips := HFlowContainer.new()
+	chips.alignment = FlowContainer.ALIGNMENT_CENTER
+	chips.add_theme_constant_override("h_separation", 6)
+	chips.add_theme_constant_override("v_separation", 6)
+	for t in c["chips"]:
+		chips.add_child(_chip(String(t), accent))
+	v.add_child(chips)
+	if String(c["status"]) != "":
+		var st := _centered(UiTheme.make_label(String(c["status"]), 16, UiTheme.COL_GOLD if disabled else accent.lightened(0.2)))
+		st.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(st)
+	_ignore_mouse(pad)  # only the Button underneath receives taps
+	if disabled:
+		card.modulate = Color(1, 1, 1, 0.62)
+	return card
+
+
+func _card_box(accent: Color, state: int) -> StyleBoxFlat:
+	var bg := Color(accent.darkened(0.82), 0.96)
+	var border := accent.darkened(0.45)
+	var width := 2
+	var shadow := 8
+	match state:
+		1:  # hover
+			bg = Color(accent.darkened(0.72), 0.98)
+			border = accent
+			shadow = 12
+		2:  # pressed
+			bg = Color(accent.darkened(0.6), 1.0)
+			border = accent.lightened(0.2)
+			width = 3
+			shadow = 0
+		-1:  # disabled (online, coming soon)
+			bg = Color(UiTheme.COL_PANEL, 0.85)
+			border = Color("2e3350")
+			shadow = 0
+	return UiTheme.make_box(bg, border, width, 18, shadow)
+
+
+func _chip(text: String, accent: Color) -> Control:
+	var p := PanelContainer.new()
+	var sb := UiTheme.make_box(Color(accent, 0.16), accent.darkened(0.25), 1, 10, 0)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	p.add_theme_stylebox_override("panel", sb)
+	p.add_child(UiTheme.make_label(text, 15, accent.lightened(0.35)))
+	return p
+
+
+func _centered(l: Label) -> Label:
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return l
+
+
+func _ignore_mouse(n: Node) -> void:
+	if n is Control:
+		(n as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for ch in n.get_children():
+		_ignore_mouse(ch)
+
+
+# ============================================================ SETUP (Journey / Arena)
+
+func _show_setup(kind: String) -> void:
+	_view = "setup"
+	_kind = kind
+	GameSession.category = kind
+	GameSession.faction_id = SaveManager.player_faction_id()  # from the Deck, never chosen here
+	if kind == "journey":
+		GameSession.mode = "custom_ai"  # Journey is always 1 vs 1
+		GameSession.ai_count = 1
+		GameSession.continent_id = SaveManager.journey_frontier()
+	else:
+		var known := false
+		for m in ARENA_MODES:
+			if GameSession.mode == m["mode"] and GameSession.ai_count == m["ai"]:
+				known = true
+		if not known:
+			GameSession.mode = "ffa_ai"
+			GameSession.ai_count = 3
+		if not SaveManager.is_continent_unlocked(GameSession.continent_id):
+			GameSession.continent_id = "aetherion"
+	_reset_root()
+
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 6)
+	_root.add_child(head)
+	head.add_child(UiTheme.make_label("NEW MATCH", 40, UiTheme.COL_GOLD))
+	var crumb := UiTheme.make_label("   >   OFFLINE   >   %s" % kind.to_upper(), 24, ACCENT[kind].lightened(0.2))
+	crumb.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	head.add_child(crumb)
+	_root.add_child(UiTheme.make_divider())
 
 	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 16)
+	cols.add_theme_constant_override("separation", 14)
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(cols)
-
-	# Column 1: mode + difficulty
-	var c1 := _column(cols, "Game Mode")
-	var mode_group := ButtonGroup.new()
-	var modes := [["4 Player FFA (vs 3 AI)", "ffa_ai", 3], ["Custom vs 2 AI", "custom_ai", 2], ["Custom vs 1 AI", "custom_ai", 1]]
-	for m in modes:
-		var b := UiTheme.make_toggle(m[0], mode_group)
-		b.button_pressed = (GameSession.mode == m[1] and GameSession.ai_count == m[2])
-		b.pressed.connect(func():
-			GameSession.mode = m[1]
-			GameSession.ai_count = m[2])
-		UiTheme.scroll_passthrough(b)
-		c1.add_child(b)
-	c1.add_child(UiTheme.make_label("AI Difficulty", 22, UiTheme.COL_GOLD))
-	var diff_group := ButtonGroup.new()
-	for d in ["easy", "normal", "hard"]:
-		var b := UiTheme.make_toggle(d.capitalize(), diff_group)
-		b.button_pressed = (GameSession.difficulty == d)
-		b.pressed.connect(func(): GameSession.difficulty = d)
-		UiTheme.scroll_passthrough(b)
-		c1.add_child(b)
-
-	# Column 2: continent + faction
-	var c2 := _column(cols, "Continent")
-	var cont_group := ButtonGroup.new()
-	for c in GameData.continents:
-		var playable: bool = c.get("playable", false) and SaveManager.is_continent_unlocked(c["id"])
-		var b := UiTheme.make_toggle(c["name"] if playable else "%s (locked)" % c["name"], cont_group, 44)
-		b.disabled = not playable
-		b.button_pressed = (GameSession.continent_id == c["id"])
-		b.pressed.connect(func():
-			GameSession.continent_id = c["id"]
-			_refresh_factions())
-		UiTheme.scroll_passthrough(b)
-		c2.add_child(b)
-
-	# Column 3: faction + champion + start
-	var c3 := _column(cols, "Faction & Champion")
-	_continent_text = UiTheme.make_label("", 16, UiTheme.COL_MUTED)
-	_continent_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	c3.add_child(_continent_text)
-	_faction_box = VBoxContainer.new()
-	_faction_box.add_theme_constant_override("separation", 6)
-	c3.add_child(_faction_box)
-	var champ_row := HBoxContainer.new()
-	champ_row.add_theme_constant_override("separation", 8)
-	c3.add_child(champ_row)
-	_portrait = PortraitView.new()
-	_portrait.custom_minimum_size = Vector2(84, 98)
-	_portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	champ_row.add_child(_portrait)
-	_champion_text = RichTextLabel.new()
-	_champion_text.bbcode_enabled = true
-	_champion_text.fit_content = true
-	_champion_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_champion_text.add_theme_font_size_override("normal_font_size", 16)
-	champ_row.add_child(_champion_text)
+	_root.add_child(cols)
+	_build_match_column(cols)
+	_build_continent_column(cols)
+	_build_champion_column(cols)
 
 	var bottom := HBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 16)
-	root.add_child(bottom)
+	_root.add_child(bottom)
 	var back := UiTheme.make_button("Back", 60)
 	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
+	back.size_flags_stretch_ratio = 1.0
+	back.pressed.connect(_show_hub)
 	bottom.add_child(back)
-	var tut := UiTheme.make_button("TUTORIAL  (done)" if SaveManager.data["profile"].get("tutorial_done", false) else "TUTORIAL", 60)
-	tut.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tut.pressed.connect(func():
-		SaveManager.clear_match()  # the tutorial replaces the saved match, like START MATCH
-		GameSession.start_tutorial()
-		get_tree().change_scene_to_file("res://scenes/territory_board/territory_board.tscn"))
-	bottom.add_child(tut)
-	var practice := UiTheme.make_button("BATTLE PRACTICE", 60)
-	practice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	practice.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/battle_board/battle_board.tscn"))
-	bottom.add_child(practice)
-	var start := UiTheme.make_button("START MATCH", 60)
+	var start := UiTheme.make_primary("START MATCH", 60)
 	start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	start.pressed.connect(func():
-		SaveManager.clear_match()  # a new match replaces the saved one
-		GameSession.resume_match = false
-		get_tree().change_scene_to_file("res://scenes/territory_board/territory_board.tscn"))
+	start.size_flags_stretch_ratio = 2.0
+	start.pressed.connect(_on_start)
 	bottom.add_child(start)
+	_start_btn = start
 
-	_refresh_factions()
+	_refresh_continent_info()
+	_refresh_champion()
+	_refresh_journey_hint()
 
 
-func _column(parent: Control, title: String) -> VBoxContainer:
+func _on_start() -> void:
+	if not _can_start():
+		return
+	SaveManager.clear_match()  # a new match replaces the saved one
+	GameSession.resume_match = false
+	GameSession.category = _kind
+	GameSession.faction_id = SaveManager.player_faction_id()
+	if _kind == "journey":
+		GameSession.mode = "custom_ai"
+		GameSession.ai_count = 1
+	get_tree().change_scene_to_file(BOARD_SCENE)
+
+
+func _column(parent: Control, title: String, ratio: float) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = ratio
 	parent.add_child(panel)
 	var scroll := UiTheme.make_scroll()
 	panel.add_child(scroll)
@@ -127,41 +410,241 @@ func _column(parent: Control, title: String) -> VBoxContainer:
 	return v
 
 
-func _refresh_factions() -> void:
-	for ch in _faction_box.get_children():
-		_faction_box.remove_child(ch)
-		ch.queue_free()
+func _build_match_column(parent: Control) -> void:
+	var c := _column(parent, "Match", 0.85)
+	if _kind == "arena":
+		var note := UiTheme.make_label("Free match against AI. Wins here do not unlock continents.", 15, UiTheme.COL_MUTED)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		c.add_child(note)
+		c.add_child(UiTheme.make_label("Players", 20, UiTheme.COL_TEXT))
+		var group := ButtonGroup.new()
+		for m in ARENA_MODES:
+			var b := UiTheme.make_toggle("%s\n%s" % [m["label"], m["sub"]], group, 70)
+			b.button_pressed = (GameSession.mode == m["mode"] and GameSession.ai_count == m["ai"])
+			b.pressed.connect(func():
+				GameSession.mode = m["mode"]
+				GameSession.ai_count = m["ai"])
+			UiTheme.scroll_passthrough(b)
+			c.add_child(b)
+	else:
+		var note := UiTheme.make_label("Story path: master a continent to unlock another one.", 15, UiTheme.COL_MUTED)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		c.add_child(note)
+		c.add_child(UiTheme.make_label("Players", 20, UiTheme.COL_TEXT))
+		var fmt := PanelContainer.new()
+		var fsb := UiTheme.make_box(Color(ACCENT["journey"], 0.12), ACCENT["journey"].darkened(0.35), 2, 12, 0)
+		fmt.add_theme_stylebox_override("panel", fsb)
+		fmt.custom_minimum_size = Vector2(0, 70)
+		var fv := VBoxContainer.new()
+		fv.alignment = BoxContainer.ALIGNMENT_CENTER
+		fv.add_child(_centered(UiTheme.make_label("1 vs 1", 22, ACCENT["journey"].lightened(0.3))))
+		fv.add_child(_centered(UiTheme.make_label("You vs 1 AI", 17, UiTheme.COL_MUTED)))
+		fmt.add_child(fv)
+		_ignore_mouse(fmt)  # a pure info box: drags on it still scroll the column
+		c.add_child(fmt)
+		_journey_hint = UiTheme.make_label("", 16, UiTheme.COL_GOLD)
+		_journey_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		c.add_child(_journey_hint)
+	c.add_child(UiTheme.make_label("AI Difficulty", 20, UiTheme.COL_TEXT))
+	var drow := HBoxContainer.new()
+	drow.add_theme_constant_override("separation", 8)
+	c.add_child(drow)
+	var dgroup := ButtonGroup.new()
+	for d in ["easy", "normal", "hard"]:
+		var b := UiTheme.make_toggle(d.capitalize(), dgroup, 52)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.button_pressed = (GameSession.difficulty == d)
+		b.pressed.connect(func(): GameSession.difficulty = d)
+		UiTheme.scroll_passthrough(b)
+		drow.add_child(b)
+
+
+func _build_continent_column(parent: Control) -> void:
+	var c := _column(parent, "Journey Map" if _kind == "journey" else "Continent", 1.0)
+	var picks := SaveManager.journey_picks_available() if _kind == "journey" else 0
+	var cnote: Label
+	if _kind == "arena":
+		cnote = UiTheme.make_label("Locked continents open by mastering continents in Journey.", 15, UiTheme.COL_MUTED)
+	elif picks > 0:
+		cnote = UiTheme.make_label("You can unlock %d continent%s! Tap a locked one to open it." % [picks, "" if picks == 1 else "s"], 15, UiTheme.COL_GOLD)
+	else:
+		cnote = UiTheme.make_label("Win with all 4 factions of a continent to unlock another one of your choice.", 15, UiTheme.COL_MUTED)
+	cnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	c.add_child(cnote)
+	var group := ButtonGroup.new()
+	for i in range(GameData.continents.size()):
+		var cont: Dictionary = GameData.continents[i]
+		var id := String(cont["id"])
+		var open: bool = cont.get("playable", false) and SaveManager.is_continent_unlocked(id)
+		if not open and picks > 0 and cont.get("playable", false):  # a pick is ready: this locked continent can be chosen
+			var ub := UiTheme.make_button("%d.  %s\nTap to unlock" % [i + 1, cont["name"]], 58)
+			ub.add_theme_color_override("font_color", UiTheme.COL_GOLD)
+			ub.add_theme_stylebox_override("normal", UiTheme.make_box(Color("2a2410"), UiTheme.COL_GOLD_DIM, 2, 12, 6))
+			ub.pressed.connect(_ask_unlock.bind(id))
+			UiTheme.scroll_passthrough(ub)
+			c.add_child(ub)
+			continue
+		var b := UiTheme.make_toggle("%d.  %s\n%s" % [i + 1, cont["name"], _continent_state(id, open)], group, 58)
+		b.disabled = not open
+		b.button_pressed = (GameSession.continent_id == id)
+		b.pressed.connect(func():
+			GameSession.continent_id = id
+			_refresh_continent_info()
+			_refresh_journey_hint())
+		UiTheme.scroll_passthrough(b)
+		c.add_child(b)
+
+
+func _continent_state(id: String, open: bool) -> String:
+	if not open:
+		return "Locked"
+	if _kind != "journey":
+		return "Open"
+	if SaveManager.is_journey_cleared(id):
+		return "Mastered  (%d / %d)" % [SaveManager.journey_faction_total(id), SaveManager.journey_faction_total(id)]
+	return "Factions won  %d / %d" % [SaveManager.journey_won_factions(id).size(), SaveManager.journey_faction_total(id)]
+
+
+func _ask_unlock(id: String) -> void:
+	var dlg := UiDialog.new()
+	dlg.name = "UnlockDialog"
+	dlg.title = "Unlock %s?" % GameData.get_continent(id)["name"]
+	dlg.dialog_text = "This uses your continent unlock. Its 4 factions become available in your Deck. Master another continent to earn the next unlock."
+	dlg.ok_button_text = "Unlock"
+	dlg.cancel_button_text = "Cancel"
+	dlg.confirmed.connect(func():
+		SaveManager.choose_continent(id)
+		dlg.queue_free()
+		_show_setup("journey"))
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered(Vector2i(520, 0))
+
+
+## Read-only: the faction comes from the Deck. The button jumps to the Deck's faction list.
+func _build_champion_column(parent: Control) -> void:
+	var c := _column(parent, "Your Faction", 1.3)
+	var note := UiTheme.make_label("Chosen in your Deck and used in every match.", 15, UiTheme.COL_MUTED)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	c.add_child(note)
+	var champ_row := HBoxContainer.new()
+	champ_row.add_theme_constant_override("separation", 8)
+	c.add_child(champ_row)
+	_portrait = PortraitView.new()
+	_portrait.custom_minimum_size = Vector2(84, 98)
+	_portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	champ_row.add_child(_portrait)
+	_champion_text = RichTextLabel.new()
+	_champion_text.bbcode_enabled = true
+	_champion_text.fit_content = true
+	_champion_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_champion_text.add_theme_font_size_override("normal_font_size", 16)
+	champ_row.add_child(_champion_text)
+	var change := UiTheme.make_button("Change faction in Deck", 56)
+	change.pressed.connect(_open_deck)
+	UiTheme.scroll_passthrough(change)
+	c.add_child(change)
+	c.add_child(UiTheme.make_label("Continent", 20, UiTheme.COL_TEXT))
+	_continent_text = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
+	_continent_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	c.add_child(_continent_text)
+	_home_note = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
+	_home_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	c.add_child(_home_note)
+
+
+func _open_deck() -> void:
+	GameSession.open_deck_tab = true
+	GameSession.collection_return = "res://scenes/match_setup/match_setup.tscn"
+	get_tree().change_scene_to_file("res://scenes/card_collection/card_collection.tscn")
+
+
+func _continent_index(id: String) -> int:
+	for i in range(GameData.continents.size()):
+		if GameData.continents[i]["id"] == id:
+			return i
+	return 0
+
+
+## Home-continent rule: the faction (and its bonuses) is at home only on its own continent.
+## Journey requires a home faction; Arena allows any unlocked faction on any continent.
+func _is_home() -> bool:
+	return GameData.is_home_faction(SaveManager.player_faction_id(), GameSession.continent_id)
+
+
+func _can_start() -> bool:
+	return _kind != "journey" or _is_home()
+
+
+func _refresh_home_note() -> void:
+	if _start_btn != null:
+		_start_btn.disabled = not _can_start()
+	if _home_note == null:
+		return
+	var cname := String(GameData.get_continent(GameSession.continent_id).get("name", GameSession.continent_id))
+	var fid := SaveManager.player_faction_id()
+	var fname := String(GameData.find_faction(fid).get("name", fid.capitalize()))
+	if _is_home():
+		_home_note.text = "Home continent: %s bonuses (King Buff + unit buffs + Faction Synergy) are active on %s." % [fname, cname]
+		_home_note.add_theme_color_override("font_color", UiTheme.COL_GOLD)
+	elif _kind == "journey":
+		_home_note.text = "Journey needs a faction of %s. Change faction in your Deck." % cname
+		_home_note.add_theme_color_override("font_color", UiTheme.COL_MUTED)
+	else:
+		_home_note.text = "%s is foreign to %s: playable, but without its King Buff, unit buffs and Faction Synergy (the Battle Passive still works)." % [fname, cname]
+		_home_note.add_theme_color_override("font_color", UiTheme.COL_MUTED)
+
+
+func _refresh_journey_hint() -> void:
+	_refresh_home_note()
+	if _journey_hint == null:
+		return
+	var cid := GameSession.continent_id
+	var cname := String(GameData.get_continent(cid).get("name", cid))
+	var fid := SaveManager.player_faction_id()
+	var fname := String(GameData.find_faction(fid).get("name", fid.capitalize()))
+	var won := SaveManager.journey_won_factions(cid).size()
+	var total := SaveManager.journey_faction_total(cid)
+	if SaveManager.is_journey_cleared(cid) and GameData.get_faction(cid, fid).is_empty():
+		_journey_hint.text = "%s is mastered, but Journey still needs one of its factions. Pick one in your Deck." % cname
+	elif SaveManager.is_journey_cleared(cid):
+		_journey_hint.text = "%s is mastered. Wins still earn Aether Coins." % cname
+	elif GameData.get_faction(cid, fid).is_empty():
+		_journey_hint.text = "%s is not a faction of %s: Journey only allows its own factions. Pick one in your Deck (%d / %d won)." % [fname, cname, won, total]
+	elif SaveManager.journey_won_factions(cid).has(fid):
+		_journey_hint.text = "%s already won on %s (%d / %d). Switch faction in your Deck to progress." % [fname, cname, won, total]
+	else:
+		_journey_hint.text = "Win with %s to progress on %s (%d / %d factions won)." % [fname, cname, won, total]
+
+
+func _refresh_continent_info() -> void:
+	if _continent_text == null:
+		return
 	var cont := GameData.get_continent(GameSession.continent_id)
 	_continent_text.text = "%s: %s" % [cont["modifier"]["name"], cont["modifier"]["description"]]
-	_continent_text.add_theme_font_size_override("font_size", 14)
 	_continent_text.tooltip_text = String(cont.get("theme", ""))
-	var group := ButtonGroup.new()
-	var valid := false
-	for f in cont.get("factions", []):
-		if f["id"] == GameSession.faction_id:
-			valid = true
-	if not valid:
-		GameSession.faction_id = cont["factions"][0]["id"]
-	for f in cont.get("factions", []):
-		var unlocked: bool = SaveManager.is_faction_unlocked(f["id"]) and f.get("champion", "") != ""
-		var b := UiTheme.make_toggle(f["name"] if unlocked else "%s (TODO)" % f["name"], group, 44)
-		b.disabled = not unlocked
-		b.button_pressed = (GameSession.faction_id == f["id"])
-		b.pressed.connect(func():
-			GameSession.faction_id = f["id"]
-			_refresh_champion())
-		UiTheme.scroll_passthrough(b)
-		_faction_box.add_child(b)
-	_refresh_champion()
+
+
+func _king_buff_line(champion_id: String) -> String:
+	var out := ""
+	var kp: Dictionary = GameData.king_passives.get(champion_id, {})
+	if not kp.is_empty():
+		out += "\n[b]Battle Passive %s:[/b] %s" % [kp["name"], kp["desc"]]
+	var kb := CardDatabase.king_buff(champion_id, false)
+	if not kb.is_empty():
+		out += "\n[b]King Buff %s:[/b] %s (%s)" % [kb["name"], kb["desc"], "active" if _is_home() else "home continent only"]
+	return out
 
 
 func _refresh_champion() -> void:
-	var fac := GameData.get_faction(GameSession.continent_id, GameSession.faction_id)
-	var ch := GameData.get_champion(fac.get("champion", ""))
+	var fid := SaveManager.player_faction_id()
+	GameSession.faction_id = fid
+	var fac := GameData.find_faction(fid)
+	var ch := GameData.get_champion(String(fac.get("champion", "")))
 	if ch.is_empty():
 		_champion_text.text = ""
 		_portrait.setup("")
 		return
 	_portrait.setup(String(fac.get("champion", "")))
-	_champion_text.text = "[color=#d4af37][b]%s[/b][/color]\n[color=#d4af37]%s King - Last Stand[/color]\nHP %d   ATK %d   Capacity %d\n[b]%s:[/b] %s\n[b]%s:[/b] %s" % [
-		ch["name"], String(ch.get("rarity", "legendary")).capitalize(), ch["hp"], ch["atk"], ch["capacity"], ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"]]
+	_champion_text.text = "[color=#d4af37][b]%s[/b][/color]\n[color=#d4af37]%s  -  %s King, Last Stand[/color]\nHP %d   ATK %d   Capacity %d\n[b]%s:[/b] %s\n[b]%s:[/b] %s%s" % [
+		fac.get("name", fid.capitalize()), ch["name"], String(ch.get("rarity", "legendary")).capitalize(), ch["hp"], ch["atk"], ch["capacity"], ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"], _king_buff_line(String(fac.get("champion", "")))]

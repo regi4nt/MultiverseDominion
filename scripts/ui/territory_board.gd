@@ -17,6 +17,7 @@ var _stats_saved := false
 var _duel_node: Control = null
 var _guide: TutorialGuide = null
 var _new_card: String = ""
+var _journey_lines: Array[String] = []  # Journey progress shown on the result screen
 var _hint_panel: PanelContainer
 var _hint_label: Label
 var _pan_key: String = ""  # "round:player" of the last turn the camera was moved for
@@ -154,23 +155,48 @@ func _build_ui() -> void:
 	log_view.add_theme_font_size_override("normal_font_size", 15)
 	log_panel.add_child(log_view)
 
-	# --- bottom of the screen's LEFT column (below the log): whose turn it is + the action buttons
-	# (Roll Dice, Reroll, Move, End Turn, Buy, Tax / Duel, ...). It never floats over the board: only the dice ANIMATION
-	# is drawn inside the map (BoardView).
+	# --- bottom-RIGHT corner of the screen: whose turn it is + the action buttons (Roll Dice, Reroll, Move, End Turn, Buy, Tax / Duel, ...).
+	# It floats over the corner of the side column (a spacer below keeps that column's content clear of it); the board itself stays
+	# uncovered: only the dice ANIMATION is drawn inside the map (BoardView).
+	var corner_gap := Control.new()
+	corner_gap.custom_minimum_size = Vector2(0, 190)
+	left.add_child(corner_gap)  # `left` is the column shown on the right
 	_centre = PanelContainer.new()
 	_centre.add_theme_stylebox_override("panel", UiTheme.make_box(Color(UiTheme.COL_PANEL, 0.96), UiTheme.COL_GOLD_DIM, 2, 10))
-	right.add_child(_centre)  # `right` is the column shown on the left (sides swapped, see above)
+	add_child(_centre)
+	_centre.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_centre.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_centre.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_centre.offset_right = -12
+	_centre.offset_bottom = -12
+	_centre.offset_left = -12
+	_centre.offset_top = -12
 	var cv := VBoxContainer.new()
 	cv.add_theme_constant_override("separation", 6)
 	_centre.add_child(cv)
 	turn_label = UiTheme.make_label("", 20)
 	turn_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	turn_label.custom_minimum_size.x = 230
 	cv.add_child(turn_label)
 	action_box = HFlowContainer.new()
 	action_box.alignment = FlowContainer.ALIGNMENT_BEGIN
 	action_box.add_theme_constant_override("h_separation", 8)
 	action_box.add_theme_constant_override("v_separation", 8)
 	cv.add_child(action_box)
+
+	# --- bottom-LEFT corner of the screen: zoom (+, -, Fit) and Speed, taken over from the board view.
+	var map_controls := board_view.take_controls()
+	var left_gap := Control.new()
+	left_gap.custom_minimum_size = Vector2(0, 118)
+	right.add_child(left_gap)  # `right` is the column shown on the left
+	add_child(map_controls)
+	map_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	map_controls.grow_horizontal = Control.GROW_DIRECTION_END
+	map_controls.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	map_controls.offset_left = 12
+	map_controls.offset_bottom = -12
+	map_controls.offset_right = 12
+	map_controls.offset_top = -12
 
 
 # ------------------------------------------------------------------ signals
@@ -261,6 +287,8 @@ func _refresh_players() -> void:
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(col)
 		var nm := String(p.display_name)
+		if ctrl.team_mode:
+			nm += "  [%s]" % ctrl.team_label(p)
 		var name_l := UiTheme.make_label(nm, 17, UiTheme.COL_TEXT if p.alive else UiTheme.COL_MUTED)
 		name_l.clip_text = true
 		col.add_child(name_l)
@@ -348,32 +376,48 @@ func on_back_requested() -> void:
 	_leave_dialog.popup_centered(Vector2i(520, 200))
 
 
-func _on_game_over(winner: int) -> void:
+func _on_game_over(_winner: int) -> void:
 	SaveManager.clear_match()
-	Sfx.play("victory" if ctrl.human_present and winner == 0 else "defeat")
-	var human_won := ctrl.human_present and winner == 0
+	var human_won := ctrl.human_won()
+	Sfx.play("victory" if human_won else "defeat")
 	if ctrl.tutorial:
 		SaveManager.data["profile"]["tutorial_done"] = true
 		SaveManager.save_game()
 	if ctrl.human_present and not _stats_saved and not ctrl.tutorial:  # the tutorial does not count as a ranked result
 		_stats_saved = true
-		_new_card = SaveManager.record_match(human_won, ctrl.round_number, ctrl.players[0].gold, String(ctrl.continent["id"]))
+		var cid := String(ctrl.continent["id"])
+		var mastered_before := SaveManager.is_journey_cleared(cid)
+		_new_card = SaveManager.record_match(human_won, ctrl.round_number, ctrl.players[0].gold, cid, ctrl.journey, String(ctrl.players[0].faction_id))
+		if ctrl.journey:
+			var cname := String(ctrl.continent.get("name", cid))
+			_journey_lines.append("%s: %d / %d factions won" % [cname, SaveManager.journey_won_factions(cid).size(), SaveManager.journey_faction_total(cid)])
+			if human_won and not mastered_before and SaveManager.is_journey_cleared(cid):
+				_journey_lines.append("%s mastered! Choose a new continent to unlock in Journey." % cname)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(520, 0)
-	dim.add_child(panel)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	var cc := CenterContainer.new()  # keeps the panel exactly in the middle of the screen whatever its size
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(cc)
+	cc.add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	panel.add_child(v)
 	var title := "VICTORY" if human_won else "DEFEAT"
 	v.add_child(UiTheme.make_label(title, 48, UiTheme.COL_GOLD if human_won else UiTheme.COL_DANGER))
 	v.add_child(UiTheme.make_divider())
+	if ctrl.team_mode:
+		for team in [0, 1]:
+			var line := "Team %s - %d G%s" % ["A" if team == 0 else "B", ctrl.team_networth(team), "  (WINNER)" if ctrl.winner_team == team else ""]
+			v.add_child(UiTheme.make_label(line, 24, UiTheme.COL_GOLD))
 	for p in ctrl.ranking():
-		v.add_child(UiTheme.make_label("%s - net worth %d G%s" % [p.display_name, ctrl.networth(p), "  (OUT)" if not p.alive else ""], 20, p.color))
+		var tag := ("  [%s]" % ctrl.team_label(p)) if ctrl.team_mode else ""
+		v.add_child(UiTheme.make_label("%s%s - net worth %d G%s" % [p.display_name, tag, ctrl.networth(p), "  (OUT)" if not p.alive else ""], 20, p.color))
+	for line in _journey_lines:
+		v.add_child(UiTheme.make_label(line, 20, UiTheme.COL_GOLD))
 	if _new_card != "":
 		v.add_child(UiTheme.make_label("New card unlocked: %s" % CardDatabase.get_support(_new_card)["name"], 20, UiTheme.COL_GOLD))
 	if _stats_saved:

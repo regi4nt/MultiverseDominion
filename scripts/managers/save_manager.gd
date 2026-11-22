@@ -21,14 +21,15 @@ func default_data() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"profile": {"name": "Player", "level": 1, "xp": 0, "tutorial_done": false},
-		"settings": {"master_volume": 0.8, "default_difficulty": "normal", "sfx": true, "check_updates": true, "skipped_update": ""},
+		"settings": {"master_volume": 0.8, "default_difficulty": "normal", "sfx": true, "check_updates": true, "skipped_update": "", "fullscreen": false},
 		"campaign": {"progress": 0},  # TODO (Phase 6): Story Campaign
 		"unlocked_continents": ["aetherion"],
+		"journey_wins": {},  # continent id -> ids of the factions that won a Journey match on it
 		"unlocked_factions": ["solvaris", "nocthyr", "valdoria", "elarion"],
 		"collection": {},  # TODO (Phase 3): Card Collection
 		"decks": {},  # TODO (Phase 3): Deck Configuration
 		"stats": {"matches_played": 0, "wins": 0, "losses": 0, "total_rounds": 0, "best_gold": 0},
-		"wallet": {"coins": 600},  # Aether Coins: persistent Shop currency (see ShopSystem)
+		"wallet": {"coins": 600, "fragments": 0},  # Aether Coins + Card Fragments (Gacha duplicates): persistent Shop currencies (see ShopSystem)
 		"shop": {"pity": 0, "pulls": 0},
 	}
 
@@ -91,6 +92,16 @@ func set_setting(key: String, value: Variant, persist: bool = true) -> void:
 func apply_settings() -> void:
 	var v: float = clampf(float(data["settings"].get("master_volume", 0.8)), 0.0, 1.0)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(v, 0.0001)))
+	_apply_fullscreen(bool(data["settings"].get("fullscreen", false)))
+
+
+## Default OFF. Skipped in headless runs (tests).
+func _apply_fullscreen(on: bool) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var want := DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED
+	if DisplayServer.window_get_mode() != want:
+		DisplayServer.window_set_mode(want)
 
 
 func is_continent_unlocked(id: String) -> bool:
@@ -109,7 +120,62 @@ func unlock_continent(id: String) -> void:
 			data["unlocked_factions"].append(f["id"])
 
 
-## Winning a match on a continent unlocks the next one in the list (Story Campaign is a TODO).
+## Journey progress. Only the first continent is open at the start. Winning a Journey match on a continent with each of ITS
+## 4 factions masters it, and every mastered continent earns one pick: the player chooses which locked continent to open.
+func journey_won_factions(continent_id: String) -> Array:
+	var out: Array = []
+	var won: Array = (data.get("journey_wins", {}) as Dictionary).get(continent_id, [])
+	for f in GameData.get_continent(continent_id).get("factions", []):
+		if won.has(f["id"]):
+			out.append(f["id"])
+	return out
+
+
+func journey_faction_total(continent_id: String) -> int:
+	var n := 0
+	for f in GameData.get_continent(continent_id).get("factions", []):
+		if String(f.get("champion", "")) != "":
+			n += 1
+	return n
+
+
+## Mastered: won on this continent with every one of its factions.
+func is_journey_cleared(id: String) -> bool:
+	var total := journey_faction_total(id)
+	return total > 0 and journey_won_factions(id).size() >= total
+
+
+## Continent picks the player has earned and not spent yet (mastered continents minus continents opened after the first).
+func journey_picks_available() -> int:
+	var mastered := 0
+	for c in GameData.continents:
+		if is_continent_unlocked(String(c["id"])) and is_journey_cleared(String(c["id"])):
+			mastered += 1
+	return maxi(0, mastered - maxi(0, (data["unlocked_continents"] as Array).size() - 1))
+
+
+## Spends one pick to open a locked continent (and its factions). False when no pick is left or the continent cannot be opened.
+func choose_continent(id: String) -> bool:
+	var c := GameData.get_continent(id)
+	if c.is_empty() or not c.get("playable", false) or is_continent_unlocked(id) or journey_picks_available() < 1:
+		return false
+	unlock_continent(id)
+	save_game()
+	return true
+
+
+## The Journey goal: the first open continent that is not mastered yet (the last open one when all are mastered).
+func journey_frontier() -> String:
+	var last := ""
+	for c in GameData.continents:
+		var id := String(c["id"])
+		if c.get("playable", false) and is_continent_unlocked(id):
+			last = id
+			if not is_journey_cleared(id):
+				return id
+	return last if last != "" else String(GameData.continents[0]["id"])
+
+
 ## Aether Coins (Shop currency).
 func coins() -> int:
 	return int(data["wallet"].get("coins", 0))
@@ -124,6 +190,23 @@ func spend_coins(n: int) -> bool:
 	if n < 0 or coins() < n:
 		return false
 	data["wallet"]["coins"] = coins() - n
+	return true
+
+
+## Card Fragments: what a Gacha duplicate turns into. Exchanged for a locked Support card (ShopSystem.exchange).
+func fragments() -> int:
+	return int(data["wallet"].get("fragments", 0))
+
+
+func add_fragments(n: int) -> void:
+	data["wallet"]["fragments"] = maxi(0, fragments() + n)
+
+
+## Pays `n` fragments; false (and nothing paid) when the player has less.
+func spend_fragments(n: int) -> bool:
+	if n < 0 or fragments() < n:
+		return false
+	data["wallet"]["fragments"] = fragments() - n
 	return true
 
 
@@ -149,7 +232,7 @@ func unlock_next_card() -> String:
 
 
 ## Returns the id of the card unlocked by this result ("" if none).
-func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "") -> String:
+func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "") -> String:
 	var s: Dictionary = data["stats"]
 	s["matches_played"] += 1
 	s["total_rounds"] += rounds
@@ -158,10 +241,12 @@ func record_match(won: bool, rounds: int, final_gold: int, continent_id: String 
 	else:
 		s["losses"] += 1
 	s["best_gold"] = maxi(int(s["best_gold"]), final_gold)
-	if won and continent_id != "":
-		for i in range(GameData.continents.size() - 1):
-			if GameData.continents[i]["id"] == continent_id:
-				unlock_continent(GameData.continents[i + 1]["id"])
+	if won and journey and continent_id != "" and faction_id != "":  # Journey only: it counts the faction that won (see journey_picks_available)
+		var wins: Dictionary = data["journey_wins"]
+		var won_with: Array = wins.get(continent_id, [])
+		if not won_with.has(faction_id):
+			won_with.append(faction_id)
+		wins[continent_id] = won_with
 	last_reward = ShopSystem.WIN_REWARD if won else ShopSystem.LOSS_REWARD
 	add_coins(last_reward)
 	var card := unlock_next_card() if won else ""
@@ -198,6 +283,31 @@ func owned_count(card_id: String) -> int:
 	return int(data["collection"].get(card_id, 0))
 
 
+## True when the faction can be played: its continent was unlocked in Journey (the starting factions are always open).
+func can_use_faction(faction_id: String) -> bool:
+	var f := GameData.find_faction(faction_id)
+	return not f.is_empty() and String(f.get("champion", "")) != "" and is_faction_unlocked(faction_id)
+
+
+## The King chosen in the Deck. A King of a locked faction (older saves) falls back to the first faction that is open.
+func player_champion_id() -> String:
+	var main: Dictionary = data["decks"].get("main", {})
+	var id := String(main.get("champion", "champion_solvaris"))
+	var ch := GameData.get_champion(id)
+	if not ch.is_empty() and can_use_faction(String(ch.get("faction", ""))):
+		return id
+	for c in GameData.continents:
+		for f in c.get("factions", []):
+			if can_use_faction(String(f["id"])):
+				return String(f["champion"])
+	return "champion_solvaris"
+
+
+## The faction the player fights for in every match: the faction of the Deck's King. New Match has no faction choice.
+func player_faction_id() -> String:
+	return String(GameData.get_champion(player_champion_id()).get("faction", "solvaris"))
+
+
 ## The player's deck for a continent. King and Support cards are shared by every continent; the 15 unit types are saved per
 ## continent ("units_by_continent"). No saved list (or an invalid one) = the default units of the King's faction.
 func get_deck(continent_id: String = "") -> Deck:
@@ -207,6 +317,7 @@ func get_deck(continent_id: String = "") -> Deck:
 	var deck := Deck.from_dict({"champion": main.get("champion", "champion_solvaris"), "supports": main.get("supports", []),
 		"continent": cid, "units": ubc.get(cid, [])})
 	deck.sanitize_units()
+	deck.champion_id = player_champion_id()  # never a King of a locked faction
 	return deck
 
 

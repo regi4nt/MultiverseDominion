@@ -4,7 +4,7 @@ extends RefCounted
 ## Side 0 starts on rows 4-7, side 1 on rows 0-3. No manual unit control.
 ##
 ## Unit behaviour: target priority by role, attack range (Chebyshev distance), movement
-## (BFS, up to `move` cells per tick), skills, faction synergy bonus, Support cards.
+## (BFS, up to `move` cells per tick), skills, faction + role synergy bonuses, Support cards.
 ## The Champion (King) enters ONLY when every regular unit of its side has fallen (Last Stand),
 ## casting its active skill on entry. A side loses when its Champion falls.
 
@@ -23,6 +23,11 @@ const IMPLEMENTED_SUPPORTS: Array[String] = [
 	"temp_capacity", "free_reroll"]
 ## Support effects that act during preparation (see BattlePrep.apply_hand); marked as used at setup.
 const PREP_SUPPORTS: Array[String] = ["temp_capacity", "free_reroll"]
+## Role Synergy: 2+ units of one role = +8%, 4+ = +20%, 6+ = +35% of the stat that role is about (only for units of that role).
+## Tank / Support: HP. Assassin / Mage / Marksman: ATK. Fighter / Controller: HP and ATK at ROLE_BOTH_FACTOR of the tier.
+const ROLE_TIERS: Array = [[6, 0.35], [4, 0.20], [2, 0.08]]
+const ROLE_FOCUS := {"Tank": "hp", "Support": "hp", "Assassin": "atk", "Mage": "atk", "Marksman": "atk", "Fighter": "both", "Controller": "both"}
+const ROLE_BOTH_FACTOR := 0.6
 
 var rng := RandomNumberGenerator.new()
 var tick: int = 0
@@ -31,6 +36,9 @@ var grid: Dictionary = {}  # Vector2i -> BattleUnit
 var kings: Array = [null, null]
 var king_data: Array = ["", ""]
 var king_entered: Array = [false, false]
+var side_passive: Array = [{}, {}]  # battle passive of each side's King (data/king_passives.json), active from the start on any continent
+var king_skill_used: Array = [false, false]
+var manual_king: Array = [false, false]  # true = that side's King skill is cast by hand (human); false = on entry (AI / tests)
 var king_entry_tick: Array = [-1, -1]
 var regulars_alive_at_entry: Array = [-1, -1]  # test hook: must always be 0
 var hands: Array = [[], []]
@@ -60,9 +68,11 @@ const BUFF_INTERVAL := 8
 func setup(cfg: Dictionary) -> void:
 	rng.seed = int(cfg.get("seed", 1))
 	ai_supports = cfg.get("ai_supports", [false, true])
+	manual_king = cfg.get("manual_king", [false, false])
 	for side in range(2):
 		var sc: Dictionary = cfg["sides"][side]
 		king_data[side] = String(sc.get("champion", ""))
+		side_passive[side] = GameData.king_passives.get(king_data[side], {})
 		hands[side] = (sc.get("supports", []) as Array).duplicate()
 		for sid in hands[side]:
 			if PREP_SUPPORTS.has(String(CardDatabase.get_support(String(sid)).get("effect", ""))):
@@ -71,9 +81,16 @@ func setup(cfg: Dictionary) -> void:
 		var synergy := _synergy(sc["units"], side_fac)
 		for fac in synergy:
 			_log("Side %d faction synergy: %s +%d%%" % [side, String(fac).capitalize(), int(float(synergy[fac]) * 100.0)])
+		var roles := role_counts(sc["units"])
+		for r in roles:
+			var rb := role_bonus(String(r), int(roles[r]))
+			if float(rb["tier"]) > 0.0:
+				_log("Side %d role synergy: %s x%d +%d%% %s" % [side, r, roles[r], int(round(maxf(float(rb["hp"]), float(rb["atk"])) * 100.0)), {"hp": "HP", "atk": "ATK", "both": "HP/ATK"}[String(ROLE_FOCUS.get(r, "both"))]])
 		for e in sc["units"]:
 			var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
-			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)))
+			var role := String(CardDatabase.get_unit(e["card_id"]).get("role", ""))
+			var rbn := role_bonus(role, int(roles.get(role, 0)))
+			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), float(rbn["hp"]), float(rbn["atk"]))
 	for u in units:  # Queen of Machina: the side starts with shields
 		if u.extra == "opening_shield":
 			for a in units_of(u.side):
@@ -82,9 +99,47 @@ func setup(cfg: Dictionary) -> void:
 	_check_king_entries()
 
 
+## Role Synergy bonus for `count` units of `role`: {"hp": fraction, "atk": fraction, "tier": fraction} (all 0.0 below 2 units).
+static func role_bonus(role: String, count: int) -> Dictionary:
+	var v := 0.0
+	for t in ROLE_TIERS:
+		if count >= int(t[0]):
+			v = float(t[1])
+			break
+	var focus := String(ROLE_FOCUS.get(role, "both"))
+	var f := ROLE_BOTH_FACTOR if focus == "both" else 1.0
+	return {"hp": v * f if focus != "atk" else 0.0, "atk": v * f if focus != "hp" else 0.0, "tier": v}
+
+
+## Units needed for the next Role Synergy tier (0 = already at the top tier).
+static func role_next_tier(count: int) -> int:
+	var nxt := 0
+	for t in ROLE_TIERS:
+		if count < int(t[0]):
+			nxt = int(t[0])
+	return nxt
+
+
+## Number of regular units per role in a side's unit list.
+static func role_counts(list: Array) -> Dictionary:
+	var counts := {}
+	for e in list:
+		var r := String(CardDatabase.get_unit(e["card_id"]).get("role", ""))
+		if r != "":
+			counts[r] = int(counts.get(r, 0)) + 1
+	return counts
+
+
 ## The faction a side fights for = the faction of its Champion.
 func _side_faction(side: int) -> String:
 	return String(GameData.get_champion(String(king_data[side])).get("faction", ""))
+
+
+## Home-continent rule: card buffs (and Faction Synergy) apply only if the side's faction belongs to the continent
+## being played. A side without a Champion keeps them (no faction to be foreign).
+func _home_bonus(side: int) -> bool:
+	var fac := _side_faction(side)
+	return fac == "" or GameData.is_home_faction(fac, CardDatabase.active_continent)
 
 
 ## Faction Synergy: 2+ units of one faction = +5%, 4+ = +15%, 6+ = +30% HP and ATK.
@@ -93,8 +148,8 @@ func _synergy(list: Array, side_fac: String = "") -> Dictionary:
 	var counts := {}
 	for e in list:
 		var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
-		if fac == "":
-			continue
+		if fac == "" or not GameData.is_home_faction(fac, CardDatabase.active_continent):
+			continue  # a faction playing outside its home continent gets no Faction Synergy
 		counts[fac] = int(counts.get(fac, 0)) + 1
 	var out := {}
 	for fac in counts:
@@ -108,7 +163,7 @@ func _synergy(list: Array, side_fac: String = "") -> Dictionary:
 	return out
 
 
-func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: float) -> BattleUnit:
+func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: float, role_hp: float = 0.0, role_atk: float = 0.0) -> BattleUnit:
 	var card := CardDatabase.get_unit(card_id)
 	var st := CardDatabase.unit_stats(card_id, stars)
 	var u := BattleUnit.new()
@@ -121,15 +176,22 @@ func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: 
 	u.role = card["role"]
 	u.faction = CardDatabase.effective_faction(card, _side_faction(side))
 	u.stars = stars
-	u.max_hp = int(round(float(st["hp"]) * (1.0 + bonus)))
+	var sp: Dictionary = side_passive[side]
+	var sp_hp := float(sp.get("value", 0.0)) if sp.get("type", "") == "team_hp" else 0.0
+	var sp_atk := float(sp.get("value", 0.0)) if sp.get("type", "") == "team_atk" else 0.0
+	u.max_hp = int(round(float(st["hp"]) * (1.0 + bonus) * (1.0 + role_hp) * (1.0 + sp_hp)))
 	u.hp = u.max_hp
-	u.base_atk = int(round(float(st["atk"]) * (1.0 + bonus) * WorldMods.atk_mult))
+	if sp.get("type", "") == "team_shield":
+		u.shield += int(round(u.max_hp * float(sp["value"])))
+	u.base_atk = int(round(float(st["atk"]) * (1.0 + bonus) * (1.0 + role_atk) * (1.0 + sp_atk) * WorldMods.atk_mult))
 	u.atk_range = int(card["range"])
 	u.move = int(card["move"])
 	u.skill_id = CardDatabase.skill_mechanic(card)  # themed continent skills map to a base mechanic
 	u.cell = cell
 	u.params = card["skill"].get("params", {})  # per-continent numbers of the skill (defaults = the Aetherion values)
 	var bf := CardDatabase.get_buff(card_id)  # the card's buff of its continent (data/card_buffs.json)
+	if not _home_bonus(side):
+		bf = {}  # a foreign faction on this continent fights without the continent card buffs
 	u.extra = String(bf.get("type", ""))
 	u.extra_value = float(bf.get("value", 0.0))
 	u.next_skill_tick = _skill_interval(u)
@@ -478,6 +540,9 @@ func _damage(t: BattleUnit, amount: int) -> int:
 		if a.side == t.side and a.alive and a.extra == "guard" and _dist(a.cell, t.cell) <= 2:
 			dmg *= 1.0 - a.extra_value
 			break
+	var tp: Dictionary = side_passive[t.side]
+	if tp.get("type", "") == "team_armor":
+		dmg *= 1.0 - float(tp["value"])  # King passive of the target's side
 	if t.reduce_until > tick:
 		dmg *= 0.5
 	var d := int(round(dmg))
@@ -619,14 +684,23 @@ func _enter_king(side: int) -> void:
 	u.chess = "king"
 	u.role = "Fighter"
 	u.faction = String(ch["faction"])
-	u.max_hp = int(round(float(ch["hp"]) * float(GameData.b("champion_hp_mult"))))
+	var kp: Dictionary = side_passive[side]
+	var kp_hp := float(kp.get("value", 0.0)) if kp.get("type", "") == "king_hp" else 0.0
+	var kp_atk := float(kp.get("value", 0.0)) if kp.get("type", "") == "king_atk" else 0.0
+	u.max_hp = int(round(float(ch["hp"]) * float(GameData.b("champion_hp_mult")) * (1.0 + kp_hp)))
 	u.hp = u.max_hp
-	u.base_atk = int(round(float(ch["atk"]) * WorldMods.atk_mult))
+	u.base_atk = int(round(float(ch["atk"]) * (1.0 + kp_atk) * WorldMods.atk_mult))
 	u.atk_range = 1
 	u.move = 2
 	u.skill_id = String(ch.get("skill_id", ""))
 	u.skill_value = float(ch.get("active_value", 0.0))
 	u.cell = _free_cell_near(Vector2i(3, 7) if side == 0 else Vector2i(4, 0))
+	var kb := CardDatabase.king_buff(king_data[side])  # home-continent King buff (data/king_buffs.json)
+	u.extra = String(kb.get("type", ""))
+	u.extra_value = float(kb.get("value", 0.0))
+	_init_buff(u)
+	if u.buff_next_tick != 0:
+		u.buff_next_tick = tick + BUFF_INTERVAL
 	units.append(u)
 	grid[u.cell] = u
 	kings[side] = u
@@ -634,6 +708,18 @@ func _enter_king(side: int) -> void:
 	king_entry_tick[side] = tick
 	regulars_alive_at_entry[side] = regulars_alive(side)
 	_log("LAST STAND! %s enters the arena (side %d)." % [u.display_name, side])
+	events.append({"type": "fx", "cells": [u.cell]})
+	if manual_king[side]:
+		_log("%s waits for the King skill (%s)." % [u.display_name, String(ch.get("active_name", "skill"))])
+	else:
+		_cast_king_skill(side)  # AI / auto sides cast it on entry
+
+
+## King active skill, used once. Human sides cast it by hand (use_king_skill); AI sides cast it on entry.
+func _cast_king_skill(side: int) -> void:
+	var u: BattleUnit = kings[side]
+	king_skill_used[side] = true
+	_log("King skill: %s (side %d)." % [String(GameData.get_champion(king_data[side]).get("active_name", u.skill_id)), side])
 	events.append({"type": "fx", "cells": [u.cell]})
 	var v := u.skill_value
 	var foes := units_of(1 - side)
@@ -685,6 +771,26 @@ func _enter_king(side: int) -> void:
 			_heal(u, int(round(u.max_hp * v)))
 			u.buff_mult = 1.25
 			u.buff_until = tick + 16
+
+
+## True while the side's King is in the arena and its active skill is still unused.
+func can_use_king_skill(side: int) -> bool:
+	return not finished and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive
+
+
+## Manual King skill. Returns "" on success or the reason it failed.
+func use_king_skill(side: int) -> String:
+	if finished:
+		return "The battle is over."
+	if not king_entered[side]:
+		return "The King enters only in Last Stand."
+	if king_skill_used[side]:
+		return "The King skill was already used."
+	if not (kings[side] as BattleUnit).alive:
+		return "The King has fallen."
+	_cast_king_skill(side)
+	return ""
+
 
 func _check_end() -> void:
 	var lost := [false, false]

@@ -85,6 +85,14 @@ static func _shop_loop(prep: BattlePrep, difficulty: String, rng: RandomNumberGe
 				continue
 			var id := prep.offers[i]
 			var score := rng.randf() * 10.0
+			if BattlePrep.is_support_id(id):  # Support cards rank below units; "easy" AIs rarely buy them
+				if difficulty == "easy" and rng.randf() < 0.7:
+					continue
+				score += float(rarity_weight.get(CardDatabase.get_support(id).get("rarity", "common"), 0.0)) - 15.0
+				if score > best_score:
+					best_score = score
+					best = i
+				continue
 			if difficulty != "easy":
 				score += float(rarity_weight.get(CardDatabase.get_unit(id).get("rarity", "common"), 0.0))
 				score += float(prep.roster.count_of(id)) * 40.0  # go for star upgrades
@@ -112,10 +120,8 @@ static func build_enemy(difficulty: String, level: int, rng: RandomNumberGenerat
 static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: int) -> Dictionary:
 	var ratios: Dictionary = GameData.b("ai_battle_budget_ratio")
 	var budget := int(float(p.gold) * float(ratios.get(p.difficulty, 0.35)))
-	var prep := BattlePrep.new(p.deck, rng, p.gold, budget, p.level, p.roster, p.battle_deck)
+	var prep := BattlePrep.new(p.deck, rng, p.gold, budget, p.level, p.roster, p.battle_deck, p.hand)
 	prep.price_mult = p.battle_price_mult()
-	var hand := pick_hand(p.deck, rng, 3)
-	prep.apply_hand(hand)
 	if p.difficulty != "easy":
 		var total_cost := 0
 		for u in p.roster.units:
@@ -128,7 +134,7 @@ static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: in
 	p.gold = prep.gold
 	p.level = prep.level
 	p.capacity = prep.capacity()
-	return prep.to_side_cfg(p.champion_id, hand)
+	return prep.to_side_cfg(p.champion_id, p.hand)
 
 
 static func pick_champion(rng: RandomNumberGenerator, exclude: String = "") -> String:

@@ -9,6 +9,8 @@ var champions: Dictionary = {}
 var events: Array = []
 var cards: Dictionary = {}
 var card_buffs: Dictionary = {}  # continent id -> card id -> buff {name, type, value, desc}
+var king_buffs: Dictionary = {}  # champion id -> buff {name, type, value, desc}; only active on the King's home continent
+var king_passives: Dictionary = {}  # champion id -> battle passive {name, type, value, desc}; works on every continent
 var special_dice: Array = []
 
 
@@ -19,6 +21,8 @@ func _ready() -> void:
 	events = _load_json("res://data/events.json").get("events", [])
 	cards = _load_json("res://data/cards.json")
 	card_buffs = _load_json("res://data/card_buffs.json")
+	king_buffs = _load_json("res://data/king_buffs.json")
+	king_passives = _load_json("res://data/king_passives.json")
 	special_dice = _load_json("res://data/special_dice.json").get("dice", [])
 
 
@@ -46,6 +50,21 @@ func get_faction(continent_id: String, faction_id: String) -> Dictionary:
 	for f in get_continent(continent_id).get("factions", []):
 		if f["id"] == faction_id:
 			return f
+	return {}
+
+
+## Home-continent rule: a faction may be played on any continent (outside Journey), but its faction bonuses
+## (Champion passive + Faction Synergy) only apply on the continent the faction belongs to.
+func is_home_faction(faction_id: String, continent_id: String) -> bool:
+	return faction_id != "" and not get_faction(continent_id, faction_id).is_empty()
+
+
+## A faction of ANY continent (the player's faction comes from the Deck and can belong to another continent than the match).
+func find_faction(faction_id: String) -> Dictionary:
+	for c in continents:
+		for f in c.get("factions", []):
+			if f["id"] == faction_id:
+				return f
 	return {}
 
 

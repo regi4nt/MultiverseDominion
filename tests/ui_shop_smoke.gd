@@ -32,7 +32,7 @@ func _ready() -> void:
 		push_error("10 pulls should show 10 cards")
 	shop._show_tab("cards")
 	await get_tree().process_frame
-	var n := shop._buy_grid.get_child_count()
+	var n: int = shop._buy_grid.get_child_count()
 	if n == 0 or n != ShopSystem.locked_supports().size():
 		fails += 1
 		push_error("the Buy tab should list every locked card (%d)" % n)
@@ -46,6 +46,24 @@ func _ready() -> void:
 	if SaveManager.owned_count(id) != 1 or SaveManager.coins() >= coins:
 		fails += 1
 		push_error("buying should unlock the card and cost coins")
+	# --- exchange with fragments
+	var id2 := String(ShopSystem.locked_supports()[0]["id"])
+	shop._on_card(id2)
+	var price2 := ShopSystem.fragment_price(CardDatabase.get_support(id2))
+	SaveManager.data["wallet"]["fragments"] = price2 - 1
+	shop._refresh()
+	if not shop._frag_btn.disabled:
+		fails += 1
+		push_error("Exchange must be disabled without enough fragments")
+	SaveManager.add_fragments(1)
+	shop._refresh()
+	if shop._frag_btn.disabled:
+		fails += 1
+	shop._on_exchange()
+	await get_tree().process_frame
+	if SaveManager.owned_count(id2) != 1 or SaveManager.fragments() != 0:
+		fails += 1
+		push_error("exchanging should unlock the card and cost its fragments")
 	shop._buy_filter = "Magic"
 	shop._rebuild_buy()
 	if shop._buy_grid.get_child_count() != ShopSystem.locked_supports("Magic").size():

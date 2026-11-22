@@ -1,0 +1,170 @@
+{
+	"champion_solvaris": {
+		"name": "Crown of Dawn",
+		"type": "aura_atk",
+		"value": 0.1,
+		"desc": "Adjacent allies gain +10% ATK."
+	},
+	"champion_nocthyr": {
+		"name": "Nightfall Veil",
+		"type": "evade",
+		"value": 3,
+		"desc": "Every 3rd hit taken is avoided."
+	},
+	"champion_valdoria": {
+		"name": "Ironbound Oath",
+		"type": "armor",
+		"value": 0.15,
+		"desc": "Takes 15% less damage."
+	},
+	"champion_elarion": {
+		"name": "Starlit Opening",
+		"type": "opener",
+		"value": 0.5,
+		"desc": "The first attack deals +50% damage."
+	},
+	"champion_astralis": {
+		"name": "Starfall Mark",
+		"type": "execute",
+		"value": 0.3,
+		"desc": "Deals +30% damage to enemies below 30% HP."
+	},
+	"champion_ignivar": {
+		"name": "Emberbrand",
+		"type": "burn",
+		"value": 0.3,
+		"desc": "Attacks burn the target for 30% of ATK every 4 ticks for 12 ticks."
+	},
+	"champion_cryndel": {
+		"name": "Glacial Touch",
+		"type": "chill",
+		"value": 6,
+		"desc": "Attacks slow the target for 6 ticks."
+	},
+	"champion_umbrael": {
+		"name": "Hollow Hunger",
+		"type": "lifesteal",
+		"value": 0.2,
+		"desc": "Heals itself for 20% of the damage dealt."
+	},
+	"champion_ferrum": {
+		"name": "Goliath Plating",
+		"type": "ward",
+		"value": 0.3,
+		"desc": "Enters with a shield worth 30% of max HP."
+	},
+	"champion_voltrix": {
+		"name": "Arc Discharge",
+		"type": "stun_proc",
+		"value": 4,
+		"desc": "Every 4th attack stuns the target for 1 tick."
+	},
+	"champion_chronex": {
+		"name": "Time Dilation",
+		"type": "swift",
+		"value": 1,
+		"desc": "+1 movement."
+	},
+	"champion_nexaris": {
+		"name": "Arbiter Protocol",
+		"type": "guard",
+		"value": 0.12,
+		"desc": "Allies within 2 cells (including itself) take 12% less damage."
+	},
+	"champion_verdantia": {
+		"name": "Verdant Bloom",
+		"type": "regen",
+		"value": 0.05,
+		"desc": "Every 8 ticks heals all allies for 5% max HP."
+	},
+	"champion_besthara": {
+		"name": "Pack Hunt",
+		"type": "frenzy",
+		"value": 0.08,
+		"desc": "Gains +8% ATK for each enemy defeated (max 5 times)."
+	},
+	"champion_floralis": {
+		"name": "Bloom Renewal",
+		"type": "mend_self",
+		"value": 0.05,
+		"desc": "Heals itself for 5% max HP every 8 ticks."
+	},
+	"champion_terragorn": {
+		"name": "Stone Bark",
+		"type": "thorns",
+		"value": 0.2,
+		"desc": "Reflects 20% of the damage taken back at the attacker."
+	},
+	"champion_drakhan": {
+		"name": "Dragonfire Fury",
+		"type": "rage",
+		"value": 0.4,
+		"desc": "Gains +40% ATK while below 50% HP."
+	},
+	"champion_inferna": {
+		"name": "Hellfire Embrace",
+		"type": "splash",
+		"value": 0.4,
+		"desc": "Attacks also deal 40% damage to enemies adjacent to the target."
+	},
+	"champion_bloodfang": {
+		"name": "Crimson Thirst",
+		"type": "lifesteal",
+		"value": 0.25,
+		"desc": "Heals itself for 25% of the damage dealt."
+	},
+	"champion_warborn": {
+		"name": "Warborn Resolve",
+		"type": "armor",
+		"value": 0.12,
+		"desc": "Takes 12% less damage."
+	},
+	"champion_abyssal": {
+		"name": "Tidal Shackles",
+		"type": "chill",
+		"value": 5,
+		"desc": "Attacks slow the target for 5 ticks."
+	},
+	"champion_pelagia": {
+		"name": "Tidemother's Blessing",
+		"type": "regen",
+		"value": 0.06,
+		"desc": "Every 8 ticks heals all allies for 6% max HP."
+	},
+	"champion_tempestra": {
+		"name": "Thunderstrike",
+		"type": "stun_proc",
+		"value": 3,
+		"desc": "Every 3rd attack stuns the target for 1 tick."
+	},
+	"champion_corsaria": {
+		"name": "Boarding Strike",
+		"type": "opener",
+		"value": 0.6,
+		"desc": "The first attack deals +60% damage."
+	},
+	"champion_solstice": {
+		"name": "Solar Corona",
+		"type": "aura_atk",
+		"value": 0.12,
+		"desc": "Adjacent allies gain +12% ATK."
+	},
+	"champion_paradox": {
+		"name": "Phase Shift",
+		"type": "evade",
+		"value": 2,
+		"desc": "Every 2nd hit taken is avoided."
+	},
+	"champion_eternis": {
+		"name": "Eternal Renewal",
+		"type": "mend_self",
+		"value": 0.06,
+		"desc": "Heals itself for 6% max HP every 8 ticks."
+	},
+	"champion_oblivion": {
+		"name": "Harbinger's Mark",
+		"type": "execute",
+		"value": 0.35,
+		"desc": "Deals +35% damage to enemies below 30% HP."
+	}
+}

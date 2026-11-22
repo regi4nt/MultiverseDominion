@@ -26,18 +26,18 @@ func _ready() -> void:
 	if coll._collection_view.visible or not coll._deck_view.visible:
 		fails += 1
 	var db: Control = coll  # the deck editor is the second tab of the same screen
-	if db.deck.unit_ids.size() != 15 or db._unit_slots_box.get_child_count() != 15 or db._support_slots_box.get_child_count() != 15:
+	if db.deck.unit_ids.size() != 15 or db.deck.support_ids.size() != 15 or not db._pool_tabs["units"].text.contains("15 / 15") or not db._pool_tabs["supports"].text.contains("15 / 15"):
 		fails += 1
-		push_error("the editor shows 15 unit slots and 15 support slots, filled with the default deck")
+		push_error("the editor tabs show 15 / 15 units and 15 / 15 supports, filled with the default deck")
 	if db._save_btn.disabled:
 		fails += 1
 	# --- unit slots: free one -> invalid, refill with a piece of ANOTHER faction of the same continent -> valid, mixed factions
 	var first_faction := String(CardDatabase.get_unit(db.deck.unit_ids[db.deck.unit_ids.size() - 1])["faction"])
-	db._remove_unit(db.deck.unit_ids.size() - 1)
+	db._toggle_unit(db.deck.unit_ids[db.deck.unit_ids.size() - 1])
 	await get_tree().process_frame
-	if not db._save_btn.disabled or db.deck.unit_ids.size() != 14 or db._unit_slots_box.get_child_count() != 15:
+	if not db._save_btn.disabled or db.deck.unit_ids.size() != 14 or not db._pool_tabs["units"].text.contains("14 / 15"):
 		fails += 1
-		push_error("14 unit cards must disable Save and keep 15 slots on screen")
+		push_error("14 unit cards must disable Save and show 14 / 15 on the Units tab")
 	var other_id := ""
 	for u in CardDatabase.all_units():
 		if String(u["chess"]) != "pawn" and String(u["faction"]) != first_faction:
@@ -56,11 +56,11 @@ func _ready() -> void:
 	if db.deck.unit_ids.size() > 15:
 		fails += 1
 		push_error("never more than 15 unit cards")
-	# --- supports (slots)
-	db._remove_support(0)
+	# --- supports
+	db._toggle_support(db.deck.support_ids[0])
 	await get_tree().process_frame
 	print("after removing one support: size=", db.deck.support_ids.size(), " save disabled=", db._save_btn.disabled)
-	if not db._save_btn.disabled or db._support_slots_box.get_child_count() != 15:
+	if not db._save_btn.disabled or not db._pool_tabs["supports"].text.contains("14 / 15"):
 		fails += 1
 	db._toggle_support("sup_summon_recruits")
 	SaveManager.data["collection"]["sup_spawn_familiar"] = 1  # unlock a card only to test the 15 cap
@@ -71,6 +71,7 @@ func _ready() -> void:
 	if db.deck.support_ids.size() != 15:
 		fails += 1
 	# --- King: any King of any continent
+	SaveManager.unlock_continent("arcanum")  # the King / faction of a locked continent cannot be picked
 	db._set_pool_tab("king")
 	db._set_king("champion_astralis")
 	await get_tree().process_frame

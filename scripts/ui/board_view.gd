@@ -38,6 +38,7 @@ var _pinch_dist: float = 0.0
 var _vel: Vector2 = Vector2.ZERO  # smoothed drag velocity (focus units / s) for the release glide
 var _speed_btn: Button
 var _zoom_btns: Array[Button] = []
+var controls: VBoxContainer  # the +/-/Fit row and the Speed button; see take_controls()
 
 
 func _ready() -> void:
@@ -48,7 +49,8 @@ func _ready() -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
 	add_child(col)
-	col.anchor_left = 0.1  # inside the board's empty centre, left of the dice: covers no tile, text or pawn at zoom 1
+	controls = col
+	col.anchor_left = 0.1  # fallback position (inside the board); the Territory Board moves it to the bottom-left of the screen
 	col.anchor_right = 0.1
 	col.anchor_top = 0.55
 	col.anchor_bottom = 0.55
@@ -78,6 +80,13 @@ func _ready() -> void:
 	col.add_child(_speed_btn)
 	_update_speed_label()
 	resized.connect(queue_redraw)
+
+
+## Hands the +/-/Fit/Speed buttons to the screen so it can place them (bottom-left corner); they stay wired to this view.
+func take_controls() -> VBoxContainer:
+	if controls.get_parent() == self:
+		remove_child(controls)
+	return controls
 
 
 func _cycle_speed() -> void:

@@ -32,7 +32,7 @@ static func _should_reroll(c: MatchController, p: PlayerState) -> bool:
 	var target: BoardTile = c.tiles[posmod(p.position + c.last_dice.x + c.last_dice.y, BoardBuilder.TILES_TOTAL)]
 	if target.type == BoardTile.Type.CORNER and target.corner_kind == "rift":
 		return true
-	if target.type == BoardTile.Type.TERRITORY and target.owner_id >= 0 and target.owner_id != p.id:
+	if target.type == BoardTile.Type.TERRITORY and target.owner_id >= 0 and target.owner_id != p.id and not c.is_ally(target.owner_id, p.id):
 		var limit := 0.5 if p.difficulty == "normal" else 0.3
 		return float(EconomySystem.rent_of(target, c.tiles)) > float(p.gold) * limit
 	return false
@@ -78,7 +78,7 @@ static func _wants_to_buy(c: MatchController, p: PlayerState, t: BoardTile, pric
 			reserve -= 120
 		var rival_max := 0
 		for o in c.players:
-			if o.id != p.id:
+			if o.id != p.id and not c.is_ally(p.id, o.id):
 				rival_max = maxi(rival_max, EconomySystem.region_count(c.tiles, t.region, o.id))
 		if rival_max >= 5:
 			reserve -= 80
@@ -116,6 +116,8 @@ static func _tile_value(c: MatchController, p: PlayerState, t: BoardTile) -> flo
 		BoardTile.Type.TERRITORY:
 			if t.owner_id == -1:
 				return float(t.price) * 0.4 if p.gold > t.price + 150 else 0.0
+			if c.is_ally(t.owner_id, p.id):
+				return 0.0  # a teammate's land is free to visit
 			if t.owner_id != p.id:
 				return -float(EconomySystem.rent_of(t, c.tiles))
 		BoardTile.Type.TAX:
@@ -172,10 +174,13 @@ static func _auction_choice(c: MatchController, p: PlayerState) -> String:
 	var next_bid := c.auction_next_bid()
 	if p.gold < next_bid:
 		return "pass"
+	var lead := int(c.pending["leader"])
+	if lead >= 0 and c.is_ally(p.id, lead):
+		return "pass"  # never outbid a teammate
 	var mine := EconomySystem.region_count(c.tiles, t.region, p.id)
 	var rival := 0
 	for o in c.players:
-		if o.id != p.id:
+		if o.id != p.id and not c.is_ally(p.id, o.id):
 			rival = maxi(rival, EconomySystem.region_count(c.tiles, t.region, o.id))
 	var value := float(t.price) * (0.85 + 0.12 * float(mine) + (0.15 if rival >= 5 else 0.0))
 	var reserve := 150
