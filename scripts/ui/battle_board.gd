@@ -127,12 +127,17 @@ func _build_ui() -> void:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 6)
 	root.add_child(left)
+	var center := VBoxContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center.size_flags_stretch_ratio = 2.6  # 16:9 -> the board gets its full height; extra width goes to the side columns
+	center.add_theme_constant_override("separation", 6)
+	root.add_child(center)
 	var arc := AspectRatioContainer.new()
 	arc.ratio = 1.0
 	arc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	arc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	arc.size_flags_stretch_ratio = 2.6  # 16:9 -> the board gets its full height; extra width goes to the side columns
-	root.add_child(arc)
+	center.add_child(arc)
 	grid = BattleGridView.new()
 	arc.add_child(grid)
 
@@ -174,18 +179,18 @@ func _build_ui() -> void:
 	reroll_btn = UiTheme.make_button("Reroll", 46)
 	reroll_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reroll_btn.pressed.connect(_on_reroll)
-	prep_panel.add_child(reroll_btn)  # directly below the selected-unit text
 	hand_label = UiTheme.make_label("", 14, UiTheme.COL_MUTED)
 	hand_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	prep_panel.add_child(hand_label)
 	hand_box = VBoxContainer.new()
 	hand_box.add_theme_constant_override("separation", 2)
 	prep_panel.add_child(hand_box)
-	bench_grid = GridContainer.new()
-	bench_grid.columns = 4
+	bench_grid = GridContainer.new()  # the preparation bench sits directly below the board
+	bench_grid.columns = int(GameData.b("prep_slots"))
 	bench_grid.add_theme_constant_override("h_separation", 4)
 	bench_grid.add_theme_constant_override("v_separation", 3)
-	prep_panel.add_child(bench_grid)
+	bench_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.add_child(bench_grid)
 	var push := Control.new()  # pushes Auto Deploy + Level Up to the bottom
 	push.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	prep_panel.add_child(push)
@@ -206,6 +211,7 @@ func _build_ui() -> void:
 	shop_box = VBoxContainer.new()
 	shop_box.add_theme_constant_override("separation", 3)
 	prep_left.add_child(shop_box)
+	prep_left.add_child(reroll_btn)  # directly below the unit offers
 	prep_actions = VBoxContainer.new()
 	prep_actions.add_theme_constant_override("separation", 6)
 	left.add_child(prep_actions)
@@ -341,7 +347,8 @@ func _refresh_prep() -> void:
 	var bench := prep.bench_units()
 	for i in range(int(GameData.b("prep_slots"))):
 		var b := UiTheme.make_button("", 48)
-		b.custom_minimum_size = Vector2(62, 48)
+		b.custom_minimum_size = Vector2(40, 44)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.clip_text = true
 		b.add_theme_font_size_override("font_size", 13)
 		if i < bench.size():
@@ -532,6 +539,7 @@ func _on_start_battle() -> void:
 	_set_tip(TutorialGuide.BATTLE["fight"])
 	prep_panel.visible = false
 	prep_left.visible = false
+	bench_grid.visible = false
 	prep_actions.visible = false
 	battle_panel.visible = true
 	battle_left.visible = true
