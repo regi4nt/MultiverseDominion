@@ -1,0 +1,507 @@
+{
+	"units": [
+		{
+			"id": "pawn_royal_guard",
+			"name": "Royal Guard",
+			"chess": "pawn",
+			"faction": "solvaris",
+			"role": "Tank",
+			"rarity": "common",
+			"hp": 90,
+			"atk": 8,
+			"range": 1,
+			"move": 1,
+			"skill": {
+				"id": "shield_wall",
+				"name": "Shield Wall",
+				"desc": "Takes 20% less damage while an ally is adjacent."
+			},
+			"slot": 0
+		},
+		{
+			"id": "pawn_sun_squire",
+			"name": "Sun Squire",
+			"chess": "pawn",
+			"faction": "solvaris",
+			"role": "Fighter",
+			"rarity": "common",
+			"hp": 70,
+			"atk": 11,
+			"range": 1,
+			"move": 1,
+			"skill": {
+				"id": "radiant_strike",
+				"name": "Radiant Strike",
+				"desc": "Every 3rd attack deals +50% damage."
+			},
+			"slot": 0
+		},
+		{
+			"id": "pawn_dusk_cutpurse",
+			"name": "Dusk Cutpurse",
+			"chess": "pawn",
+			"faction": "nocthyr",
+			"role": "Assassin",
+			"rarity": "common",
+			"hp": 55,
+			"atk": 14,
+			"range": 1,
+			"move": 1,
+			"skill": {
+				"id": "backstab",
+				"name": "Backstab",
+				"desc": "The first attack deals double damage."
+			},
+			"slot": 1
+		},
+		{
+			"id": "pawn_shade_archer",
+			"name": "Shade Archer",
+			"chess": "pawn",
+			"faction": "nocthyr",
+			"role": "Marksman",
+			"rarity": "common",
+			"hp": 50,
+			"atk": 12,
+			"range": 4,
+			"move": 1,
+			"skill": {
+				"id": "shadow_arrow",
+				"name": "Shadow Arrow",
+				"desc": "All attacks deal +20% damage."
+			},
+			"slot": 1
+		},
+		{
+			"id": "pawn_iron_pikeman",
+			"name": "Iron Pikeman",
+			"chess": "pawn",
+			"faction": "valdoria",
+			"role": "Fighter",
+			"rarity": "common",
+			"hp": 80,
+			"atk": 10,
+			"range": 1,
+			"move": 1,
+			"skill": {
+				"id": "brace",
+				"name": "Brace",
+				"desc": "Gains +30% ATK after being hit twice."
+			},
+			"slot": 2
+		},
+		{
+			"id": "pawn_banner_cadet",
+			"name": "Banner Cadet",
+			"chess": "pawn",
+			"faction": "valdoria",
+			"role": "Support",
+			"rarity": "common",
+			"hp": 60,
+			"atk": 6,
+			"range": 2,
+			"move": 1,
+			"skill": {
+				"id": "rally_banner",
+				"name": "Rally Banner",
+				"desc": "Heals the lowest-HP ally for 15 every 8 ticks."
+			},
+			"slot": 2
+		},
+		{
+			"id": "pawn_starling_initiate",
+			"name": "Starling Initiate",
+			"chess": "pawn",
+			"faction": "elarion",
+			"role": "Mage",
+			"rarity": "common",
+			"hp": 50,
+			"atk": 13,
+			"range": 3,
+			"move": 1,
+			"skill": {
+				"id": "star_bolt",
+				"name": "Star Bolt",
+				"desc": "Bolt splashes 25% damage to enemies adjacent to the target."
+			},
+			"slot": 3
+		},
+		{
+			"id": "pawn_moon_acolyte",
+			"name": "Moon Acolyte",
+			"chess": "pawn",
+			"faction": "elarion",
+			"role": "Controller",
+			"rarity": "common",
+			"hp": 55,
+			"atk": 7,
+			"range": 3,
+			"move": 1,
+			"skill": {
+				"id": "moon_chill",
+				"name": "Moon Chill",
+				"desc": "Slows the target for 6 ticks (it acts every other tick)."
+			},
+			"slot": 3
+		},
+		{
+			"id": "rook_citadel_warden",
+			"name": "Citadel Warden",
+			"chess": "rook",
+			"faction": "valdoria",
+			"role": "Tank",
+			"rarity": "rare",
+			"hp": 220,
+			"atk": 12,
+			"range": 1,
+			"move": 2,
+			"skill": {
+				"id": "bulwark",
+				"name": "Bulwark",
+				"desc": "On its first action, taunts adjacent enemies for 6 ticks."
+			},
+			"slot": 2
+		},
+		{
+			"id": "rook_siege_tower",
+			"name": "Siege Tower",
+			"chess": "rook",
+			"faction": "solvaris",
+			"role": "Marksman",
+			"rarity": "rare",
+			"hp": 180,
+			"atk": 16,
+			"range": 2,
+			"move": 2,
+			"skill": {
+				"id": "ballista_volley",
+				"name": "Ballista Volley",
+				"desc": "Every 12 ticks hits the 3 nearest enemies."
+			},
+			"slot": 0
+		},
+		{
+			"id": "knight_dawnlancer",
+			"name": "Dawnlancer Knight",
+			"chess": "knight",
+			"faction": "solvaris",
+			"role": "Fighter",
+			"rarity": "rare",
+			"hp": 150,
+			"atk": 18,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "charge",
+				"name": "Charge",
+				"desc": "On its first action, leaps next to the furthest enemy and stuns it for 2 ticks."
+			},
+			"slot": 0
+		},
+		{
+			"id": "knight_nightfall_rider",
+			"name": "Nightfall Rider",
+			"chess": "knight",
+			"faction": "nocthyr",
+			"role": "Assassin",
+			"rarity": "rare",
+			"hp": 120,
+			"atk": 22,
+			"range": 1,
+			"move": 3,
+			"skill": {
+				"id": "night_gallop",
+				"name": "Night Gallop",
+				"desc": "On its first action, teleports next to the weakest enemy."
+			},
+			"slot": 1
+		},
+		{
+			"id": "bishop_elarion_seer",
+			"name": "Elarion Seer",
+			"chess": "bishop",
+			"faction": "elarion",
+			"role": "Mage",
+			"rarity": "rare",
+			"hp": 100,
+			"atk": 20,
+			"range": 4,
+			"move": 2,
+			"skill": {
+				"id": "arcane_barrage",
+				"name": "Arcane Barrage",
+				"desc": "Every 6th attack also hits enemies within 2 cells of the target for 50%."
+			},
+			"slot": 3
+		},
+		{
+			"id": "bishop_valdoria_chaplain",
+			"name": "Valdoria Chaplain",
+			"chess": "bishop",
+			"faction": "valdoria",
+			"role": "Support",
+			"rarity": "rare",
+			"hp": 110,
+			"atk": 10,
+			"range": 3,
+			"move": 2,
+			"skill": {
+				"id": "blessed_mend",
+				"name": "Blessed Mend",
+				"desc": "Heals all allies for 10% max HP every 10 ticks."
+			},
+			"slot": 2
+		},
+		{
+			"id": "queen_aurelia",
+			"name": "Empress Aurelia",
+			"chess": "queen",
+			"faction": "solvaris",
+			"role": "Fighter",
+			"rarity": "epic",
+			"hp": 260,
+			"atk": 26,
+			"range": 2,
+			"move": 4,
+			"skill": {
+				"id": "sovereign_decree",
+				"name": "Sovereign Decree",
+				"desc": "Allies gain +15% ATK while she lives."
+			},
+			"slot": 0
+		}
+	],
+	"supports": [
+		{
+			"id": "sup_summon_recruits",
+			"name": "Summon Recruits",
+			"category": "Creation",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "summon_pawns",
+			"value": 2,
+			"description": "Create 2 Pawns in your deployment area.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_forge_bastion",
+			"name": "Forge Bastion",
+			"category": "Creation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "create_wall",
+			"value": 1,
+			"description": "Create a barrier tile that blocks movement.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_spawn_familiar",
+			"name": "Spawn Familiar",
+			"category": "Creation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "summon_familiar",
+			"value": 1,
+			"description": "Create a free Mage familiar.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_promotion",
+			"name": "Promotion",
+			"category": "Transformation",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "promote_pawn",
+			"value": 1,
+			"description": "Transform a Pawn into a Knight for this battle.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_polymorph",
+			"name": "Polymorph",
+			"category": "Transformation",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "polymorph_enemy",
+			"value": 1,
+			"description": "Turn an enemy unit into a weak creature for 4 seconds.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_ascension",
+			"name": "Ascension",
+			"category": "Transformation",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "ascend_unit",
+			"value": 1,
+			"description": "Grant one unit +1 star for this battle.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_fireball",
+			"name": "Fireball",
+			"category": "Magic",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "area_damage",
+			"value": 80,
+			"description": "Deal 80 damage in a 3x3 area.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_arcane_heal",
+			"name": "Arcane Heal",
+			"category": "Magic",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "heal_all",
+			"value": 25,
+			"description": "Heal all allies for 25% max HP.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_frost_nova",
+			"name": "Frost Nova",
+			"category": "Magic",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "freeze_area",
+			"value": 2,
+			"description": "Freeze enemies in a 3x3 area for 2 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_crown_valor",
+			"name": "Crown of Valor",
+			"category": "Artifact",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "buff_atk",
+			"value": 20,
+			"description": "Equip a unit: +20% ATK.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_aegis_shield",
+			"name": "Aegis Shield",
+			"category": "Artifact",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "buff_hp",
+			"value": 25,
+			"description": "Equip a unit: +25% HP.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_windboots",
+			"name": "Windboots",
+			"category": "Artifact",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "buff_move",
+			"value": 1,
+			"description": "Equip a unit: +1 Movement.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_battle_cry",
+			"name": "Battle Cry",
+			"category": "Skill",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "team_atk",
+			"value": 10,
+			"description": "All allies gain +10% ATK for 6 seconds.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_focus",
+			"name": "Focus",
+			"category": "Skill",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "instant_skill",
+			"value": 1,
+			"description": "One unit casts its skill immediately.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_rally",
+			"name": "Rally",
+			"category": "Skill",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "team_speed",
+			"value": 15,
+			"description": "All allies gain +15% attack speed for 6 seconds.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_light_blessing",
+			"name": "Blessing of Light",
+			"category": "Blessing",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "shield_all",
+			"value": 30,
+			"description": "All allies gain a 30-point shield.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_fortunes_favor",
+			"name": "Fortune's Favor",
+			"category": "Blessing",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "gold_on_win",
+			"value": 50,
+			"description": "Gain 50 Dominion Gold if you win this duel.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_guardian_angel",
+			"name": "Guardian Angel",
+			"category": "Blessing",
+			"rarity": "epic",
+			"uses": 1,
+			"effect": "revive_once",
+			"value": 1,
+			"description": "Revive the first fallen unit with 50% HP.",
+			"owned_default": false
+		},
+		{
+			"id": "sup_mercenary_pact",
+			"name": "Mercenary Pact",
+			"category": "Contract",
+			"rarity": "rare",
+			"uses": 1,
+			"effect": "temp_capacity",
+			"value": 3,
+			"description": "+3 deployment capacity for this battle.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_blood_oath",
+			"name": "Blood Oath",
+			"category": "Contract",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "lifesteal_pact",
+			"value": 15,
+			"description": "Allies heal 15% of damage dealt; you lose 20 Gold.",
+			"owned_default": true
+		},
+		{
+			"id": "sup_merchant_contract",
+			"name": "Merchant Contract",
+			"category": "Contract",
+			"rarity": "common",
+			"uses": 1,
+			"effect": "free_reroll",
+			"value": 1,
+			"description": "Your next Battle Shop reroll is free.",
+			"owned_default": true
+		}
+	]
+}

@@ -1,0 +1,9 @@
+.godot/
+*.translation
+*.apk
+*.aab
+
+# Gradle build template: installed by tools/install_android_template.sh (about 200 MB, do not commit)
+android/build/
+android/.build_version
+build/

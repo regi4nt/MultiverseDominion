@@ -1,0 +1,519 @@
+{
+	"continents": [
+		{
+			"id": "aetherion",
+			"name": "AETHERION",
+			"theme": "Kingdom, Royalty, Medieval Fantasy",
+			"playable": true,
+			"color": "#d4af37",
+			"modifier": {
+				"id": "royal_tithe",
+				"name": "Royal Tithe",
+				"description": "Passing START grants +50 extra Dominion Gold.",
+				"start_bonus_extra": 50
+			},
+			"regions": [
+				{
+					"name": "Crown Reach",
+					"suffix": "Reach",
+					"color": "#c9a227"
+				},
+				{
+					"name": "Sunmarch",
+					"suffix": "March",
+					"color": "#d9693a"
+				},
+				{
+					"name": "Emerald Vale",
+					"suffix": "Vale",
+					"color": "#3f9d6b"
+				},
+				{
+					"name": "Dusk Keep",
+					"suffix": "Keep",
+					"color": "#7a4fc2"
+				}
+			],
+			"territory_prefixes": [
+				"Gilded",
+				"Silver",
+				"Ivory",
+				"Royal",
+				"Ancient",
+				"Valiant",
+				"Lion's",
+				"Dawn",
+				"Heron",
+				"Oaken"
+			],
+			"factions": [
+				{
+					"id": "solvaris",
+					"name": "Solvaris",
+					"champion": "champion_solvaris",
+					"color": "#e8c547"
+				},
+				{
+					"id": "nocthyr",
+					"name": "Nocthyr",
+					"champion": "champion_nocthyr",
+					"color": "#6a4fb5"
+				},
+				{
+					"id": "valdoria",
+					"name": "Valdoria",
+					"champion": "champion_valdoria",
+					"color": "#c0392b"
+				},
+				{
+					"id": "elarion",
+					"name": "Elarion",
+					"champion": "champion_elarion",
+					"color": "#3fa7d6"
+				}
+			]
+		},
+		{
+			"id": "arcanum",
+			"name": "ARCANUM",
+			"theme": "Magic, Spell, Arcane",
+			"playable": true,
+			"color": "#8a5cf0",
+			"modifier": {
+				"id": "arcane_conduits",
+				"name": "Arcane Conduits",
+				"description": "Two portals per region are active at a time (8 in total).",
+				"portals_per_region": 2
+			},
+			"factions": [
+				{
+					"id": "astralis",
+					"name": "Astralis",
+					"champion": "champion_astralis",
+					"color": "#8a5cf0"
+				},
+				{
+					"id": "ignivar",
+					"name": "Ignivar",
+					"champion": "champion_ignivar",
+					"color": "#e0663a"
+				},
+				{
+					"id": "cryndel",
+					"name": "Cryndel",
+					"champion": "champion_cryndel",
+					"color": "#4fb3d9"
+				},
+				{
+					"id": "umbrael",
+					"name": "Umbrael",
+					"champion": "champion_umbrael",
+					"color": "#5a4a8a"
+				}
+			],
+			"regions": [
+				{
+					"name": "Spellwright Spire",
+					"suffix": "Spire",
+					"color": "#8a5cf0"
+				},
+				{
+					"name": "Ember Sanctum",
+					"suffix": "Sanctum",
+					"color": "#e0663a"
+				},
+				{
+					"name": "Frost Athenaeum",
+					"suffix": "Athenaeum",
+					"color": "#4fb3d9"
+				},
+				{
+					"name": "Umbral Vault",
+					"suffix": "Vault",
+					"color": "#5a4a8a"
+				}
+			],
+			"territory_prefixes": [
+				"Arcane",
+				"Mystic",
+				"Runic",
+				"Ethereal",
+				"Glimmering",
+				"Astral",
+				"Hexed",
+				"Sigil",
+				"Veiled",
+				"Eldritch"
+			]
+		},
+		{
+			"id": "machina",
+			"name": "MACHINA",
+			"theme": "Technology, Industrial, Steampunk",
+			"playable": true,
+			"color": "#c98a3c",
+			"modifier": {
+				"id": "industrial_age",
+				"name": "Industrial Age",
+				"description": "Territory rent +25%, Battle Shop prices -20%.",
+				"rent_mult": 1.25,
+				"unit_price_mult": 0.8
+			},
+			"factions": [
+				{
+					"id": "ferrum",
+					"name": "Ferrum",
+					"champion": "champion_ferrum",
+					"color": "#c98a3c"
+				},
+				{
+					"id": "voltrix",
+					"name": "Voltrix",
+					"champion": "champion_voltrix",
+					"color": "#f0d23a"
+				},
+				{
+					"id": "chronex",
+					"name": "Chronex",
+					"champion": "champion_chronex",
+					"color": "#5a8fd6"
+				},
+				{
+					"id": "nexaris",
+					"name": "Nexaris",
+					"champion": "champion_nexaris",
+					"color": "#6dd6b5"
+				}
+			],
+			"regions": [
+				{
+					"name": "Gearworks",
+					"suffix": "Works",
+					"color": "#c98a3c"
+				},
+				{
+					"name": "Voltage Yard",
+					"suffix": "Yard",
+					"color": "#f0d23a"
+				},
+				{
+					"name": "Chrono Foundry",
+					"suffix": "Foundry",
+					"color": "#5a8fd6"
+				},
+				{
+					"name": "Nexus Grid",
+					"suffix": "Grid",
+					"color": "#6dd6b5"
+				}
+			],
+			"territory_prefixes": [
+				"Brass",
+				"Copper",
+				"Piston",
+				"Cogwheel",
+				"Steam",
+				"Iron",
+				"Rivet",
+				"Turbine",
+				"Dynamo",
+				"Clockwork"
+			]
+		},
+		{
+			"id": "sylvaris",
+			"name": "SYLVARIS",
+			"theme": "Nature, Life, Creation",
+			"playable": true,
+			"color": "#4fb06d",
+			"modifier": {
+				"id": "bountiful_harvest",
+				"name": "Bountiful Harvest",
+				"description": "At the end of each round every territory you own yields 6 G.",
+				"harvest_per_land": 6
+			},
+			"factions": [
+				{
+					"id": "verdantia",
+					"name": "Verdantia",
+					"champion": "champion_verdantia",
+					"color": "#3f9d6b"
+				},
+				{
+					"id": "besthara",
+					"name": "Besthara",
+					"champion": "champion_besthara",
+					"color": "#e08fb5"
+				},
+				{
+					"id": "floralis",
+					"name": "Floralis",
+					"champion": "champion_floralis",
+					"color": "#a67c4a"
+				},
+				{
+					"id": "terragorn",
+					"name": "Terragorn",
+					"champion": "champion_terragorn",
+					"color": "#8a6a3a"
+				}
+			],
+			"regions": [
+				{
+					"name": "Verdant Canopy",
+					"suffix": "Canopy",
+					"color": "#3f9d6b"
+				},
+				{
+					"name": "Bloom Meadow",
+					"suffix": "Meadow",
+					"color": "#e08fb5"
+				},
+				{
+					"name": "Beast Hollow",
+					"suffix": "Hollow",
+					"color": "#a67c4a"
+				},
+				{
+					"name": "Terra Roots",
+					"suffix": "Roots",
+					"color": "#8a6a3a"
+				}
+			],
+			"territory_prefixes": [
+				"Mossy",
+				"Thorn",
+				"Dewy",
+				"Oaken",
+				"Fern",
+				"Willow",
+				"Wild",
+				"Sunleaf",
+				"Briar",
+				"Amber"
+			]
+		},
+		{
+			"id": "drakmor",
+			"name": "DRAKMOR",
+			"theme": "War, Dragon, Demon, Combat",
+			"playable": true,
+			"color": "#d1432f",
+			"modifier": {
+				"id": "war_fever",
+				"name": "War Fever",
+				"description": "All battle units deal +15% damage; duel winners earn 60 G.",
+				"atk_mult": 1.15,
+				"duel_win_gold": 60
+			},
+			"factions": [
+				{
+					"id": "drakhan",
+					"name": "Drakhan",
+					"champion": "champion_drakhan",
+					"color": "#d1432f"
+				},
+				{
+					"id": "inferna",
+					"name": "Inferna",
+					"champion": "champion_inferna",
+					"color": "#ff7a2f"
+				},
+				{
+					"id": "bloodfang",
+					"name": "Bloodfang",
+					"champion": "champion_bloodfang",
+					"color": "#8a1f2f"
+				},
+				{
+					"id": "warborn",
+					"name": "Warborn",
+					"champion": "champion_warborn",
+					"color": "#7a7a8a"
+				}
+			],
+			"regions": [
+				{
+					"name": "Dragonspine",
+					"suffix": "Spine",
+					"color": "#d1432f"
+				},
+				{
+					"name": "Hellforge",
+					"suffix": "Forge",
+					"color": "#ff7a2f"
+				},
+				{
+					"name": "Bloodfang Pits",
+					"suffix": "Pits",
+					"color": "#8a1f2f"
+				},
+				{
+					"name": "Warborn Bastion",
+					"suffix": "Bastion",
+					"color": "#7a7a8a"
+				}
+			],
+			"territory_prefixes": [
+				"Scorched",
+				"Ashen",
+				"Crimson",
+				"Infernal",
+				"Warbound",
+				"Fang",
+				"Cinder",
+				"Obsidian",
+				"Wrath",
+				"Dread"
+			]
+		},
+		{
+			"id": "thalassia",
+			"name": "THALASSIA",
+			"theme": "Ocean, Island, Storm, Exploration",
+			"playable": true,
+			"color": "#2f8fd6",
+			"modifier": {
+				"id": "sea_trade",
+				"name": "Sea Trade",
+				"description": "Tax tiles cost half, and Reroll Tokens cost only 40 G at the Shop.",
+				"tax_mult": 0.5,
+				"shop_reroll_price": 40
+			},
+			"factions": [
+				{
+					"id": "abyssal",
+					"name": "Abyssal",
+					"champion": "champion_abyssal",
+					"color": "#4a6fd6"
+				},
+				{
+					"id": "pelagia",
+					"name": "Pelagia",
+					"champion": "champion_pelagia",
+					"color": "#e0865a"
+				},
+				{
+					"id": "tempestra",
+					"name": "Tempestra",
+					"champion": "champion_tempestra",
+					"color": "#2a3f7a"
+				},
+				{
+					"id": "corsaria",
+					"name": "Corsaria",
+					"champion": "champion_corsaria",
+					"color": "#3fb6a8"
+				}
+			],
+			"regions": [
+				{
+					"name": "Tempest Strait",
+					"suffix": "Strait",
+					"color": "#4a6fd6"
+				},
+				{
+					"name": "Coral Atoll",
+					"suffix": "Atoll",
+					"color": "#e0865a"
+				},
+				{
+					"name": "Abyss Trench",
+					"suffix": "Trench",
+					"color": "#2a3f7a"
+				},
+				{
+					"name": "Corsair Cove",
+					"suffix": "Cove",
+					"color": "#3fb6a8"
+				}
+			],
+			"territory_prefixes": [
+				"Salt",
+				"Coral",
+				"Gale",
+				"Tidal",
+				"Pearl",
+				"Siren",
+				"Kraken",
+				"Driftwood",
+				"Squall",
+				"Anchor"
+			]
+		},
+		{
+			"id": "eclipsia",
+			"name": "ECLIPSIA",
+			"theme": "Multiverse, Cosmic, Time, Reality",
+			"playable": true,
+			"color": "#b266ff",
+			"modifier": {
+				"id": "time_fold",
+				"name": "Time Fold",
+				"description": "Passing START grants a Reroll Token; doubles allow up to 3 bonus rolls.",
+				"start_token": 1,
+				"bonus_rolls_extra": 1
+			},
+			"factions": [
+				{
+					"id": "solstice",
+					"name": "Solstice",
+					"champion": "champion_solstice",
+					"color": "#f0c040"
+				},
+				{
+					"id": "paradox",
+					"name": "Paradox",
+					"champion": "champion_paradox",
+					"color": "#b266ff"
+				},
+				{
+					"id": "eternis",
+					"name": "Eternis",
+					"champion": "champion_eternis",
+					"color": "#6a8fd6"
+				},
+				{
+					"id": "oblivion",
+					"name": "Oblivion",
+					"champion": "champion_oblivion",
+					"color": "#7a7a9a"
+				}
+			],
+			"regions": [
+				{
+					"name": "Solstice Dial",
+					"suffix": "Dial",
+					"color": "#f0c040"
+				},
+				{
+					"name": "Paradox Loop",
+					"suffix": "Loop",
+					"color": "#b266ff"
+				},
+				{
+					"name": "Eternal Hour",
+					"suffix": "Hour",
+					"color": "#6a8fd6"
+				},
+				{
+					"name": "Oblivion Rim",
+					"suffix": "Rim",
+					"color": "#5a5a7a"
+				}
+			],
+			"territory_prefixes": [
+				"Cosmic",
+				"Temporal",
+				"Fractured",
+				"Starlit",
+				"Echoing",
+				"Void",
+				"Nebula",
+				"Rift",
+				"Chrono",
+				"Infinite"
+			]
+		}
+	]
+}

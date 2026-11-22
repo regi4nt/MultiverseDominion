@@ -1,0 +1,67 @@
+{
+	"events": [
+		{
+			"id": "treasure",
+			"title": "Hidden Treasure",
+			"description": "You find a buried chest.",
+			"effect": "gain_gold",
+			"value": 100
+		},
+		{
+			"id": "royal_levy",
+			"title": "Royal Levy",
+			"description": "Collectors visit your camp.",
+			"effect": "lose_gold",
+			"value": 60
+		},
+		{
+			"id": "tailwind",
+			"title": "Tailwind",
+			"description": "A favorable wind carries you forward.",
+			"effect": "move_forward",
+			"value": 3
+		},
+		{
+			"id": "storm",
+			"title": "Sudden Storm",
+			"description": "You are pushed back.",
+			"effect": "move_back",
+			"value": 2
+		},
+		{
+			"id": "blessing",
+			"title": "Blessing of Fortune",
+			"description": "You receive a Reroll Token.",
+			"effect": "reroll_token",
+			"value": 1
+		},
+		{
+			"id": "festival",
+			"title": "Grand Festival",
+			"description": "Every rival gifts you tribute.",
+			"effect": "collect_from_all",
+			"value": 20
+		},
+		{
+			"id": "bandits",
+			"title": "Bandit Ambush",
+			"description": "Bandits rob your caravan.",
+			"effect": "lose_gold",
+			"value": 80
+		},
+		{
+			"id": "time_surge",
+			"title": "Time Surge",
+			"description": "You take an extra roll.",
+			"effect": "extra_roll",
+			"value": 0
+		},
+		{
+			"id": "special_die",
+			"title": "Special Die",
+			"description": "You discover a special die.",
+			"effect": "special_die",
+			"value": 1
+		}
+	]
+}

@@ -1,0 +1,36 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="Multiverse Dominion"
+config/description="Conquer the Land. Command the Army. Shape the Fate."
+run/main_scene="res://scenes/main_menu/main_menu.tscn"
+config/quit_on_go_back=false
+run/low_processor_mode=true
+run/max_fps=60
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+GameData="*res://scripts/managers/game_data.gd"
+SaveManager="*res://scripts/managers/save_manager.gd"
+GameSession="*res://scripts/managers/game_session.gd"
+AppNav="*res://scripts/managers/app_nav.gd"
+Sfx="*res://scripts/managers/sfx.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=0
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.043, 0.063, 0.125, 1)
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true

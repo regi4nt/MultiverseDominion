@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7"
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        run: |
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+      - name: "Logic tests (rules, battle, cards, AI games, save and resume, tutorial, audio)"
+        run: GODOT=godot tools/run_tests.sh logic
+      - name: "UI tests (headless scenes)"
+        run: GODOT=godot tools/run_tests.sh ui
+      - name: "Performance and leak test (informational, shared runners can be slow)"
+        continue-on-error: true
+        run: godot --headless --path . res://tests/perf_test.tscn
+
+  visual:
+    # Layout audit on 7 phone/tablet aspect ratios + tutorial UI, with a real (software) renderer.
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot and a virtual display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglu1-mesa
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+      - name: Import
+        run: godot --headless --path . --import || true
+      - name: Layout audit (strict) and screenshots
+        run: xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-driver opengl3 --audio-driver Dummy res://tests/layout_test.tscn -- strict shots
+      - name: Tutorial UI
+        run: xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-driver opengl3 --audio-driver Dummy res://tests/ui_tutorial_smoke.tscn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: /tmp/shots
+          if-no-files-found: ignore

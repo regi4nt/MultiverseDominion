@@ -1,0 +1,60 @@
+{
+	"dice": [
+		{
+			"id": "swift",
+			"name": "Swift Die",
+			"kind": "move",
+			"desc": "Your next move is boosted by the face value.",
+			"faces": [
+				1,
+				1,
+				2,
+				2,
+				3,
+				-1
+			]
+		},
+		{
+			"id": "fortune",
+			"name": "Fortune Die",
+			"kind": "gold",
+			"desc": "Gain gold equal to the face.",
+			"faces": [
+				20,
+				30,
+				40,
+				50,
+				75,
+				100
+			]
+		},
+		{
+			"id": "warp",
+			"name": "Warp Die",
+			"kind": "teleport",
+			"desc": "Teleport instead of rolling.",
+			"faces": [
+				"portal",
+				"portal",
+				"portal",
+				"territory",
+				"territory",
+				"start"
+			]
+		},
+		{
+			"id": "order",
+			"name": "Order Die",
+			"kind": "order",
+			"desc": "Bends the turn order.",
+			"faces": [
+				"extra_roll",
+				"skip_next",
+				"skip_next",
+				"token",
+				"token",
+				"gold"
+			]
+		}
+	]
+}

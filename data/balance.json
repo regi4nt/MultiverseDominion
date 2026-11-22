@@ -1,0 +1,76 @@
+{
+	"start_gold": 1500,
+	"start_life": 3,
+	"start_level": 3,
+	"capacity_per_level": 3,
+	"max_level": 10,
+	"start_bonus": 200,
+	"sanctuary_bonus": 50,
+	"territory_base_price": 60,
+	"territory_price_step": 12,
+	"rent_rate": 0.4,
+	"majority_threshold": 6,
+	"majority_rent_mult": 1.5,
+	"dominion_rent_mult": 2.5,
+	"sell_ratio": 0.5,
+	"auction_discount": 0.7,
+	"tax_flat": 100,
+	"heal_price": 300,
+	"reroll_price": 80,
+	"bailout_gold": 150,
+	"max_rounds": 30,
+	"max_bonus_rolls": 2,
+	"refuse_duel_penalty": 150,
+	"unit_copies": 9,
+	"deck_total": 151,
+	"deck_support": 15,
+	"star_copies": [
+		1,
+		3,
+		9
+	],
+	"star_hp_mult": [
+		1.0,
+		1.8,
+		3.2
+	],
+	"star_atk_mult": [
+		1.0,
+		1.6,
+		2.6
+	],
+	"max_capacity": 30,
+	"shop_size": 5,
+	"prep_slots": 10,
+	"unit_price": {
+		"common": 30,
+		"rare": 70,
+		"epic": 150,
+		"legendary": 300
+	},
+	"battle_reroll_price": 20,
+	"level_up_base": 40,
+	"champion_hp_mult": 3.0,
+	"practice_gold": 500,
+	"victory_gold": 100,
+	"enemy_budget": {
+		"easy": 250,
+		"normal": 450,
+		"hard": 700
+	},
+	"duel_reward_ratio": 0.75,
+	"defender_loses_life": true,
+	"battle_budget_ratio": 0.5,
+	"ai_battle_budget_ratio": {
+		"easy": 0.1,
+		"normal": 0.2,
+		"hard": 0.3
+	},
+	"starter_units": 3,
+	"ai_owner_duel_ratio": 0.8,
+	"ai_visitor_accept_ratio": 0.6,
+	"special_die_price": 120,
+	"max_special_dice": 3,
+	"auction_start_ratio": 0.4,
+	"auction_step_ratio": 0.1
+}

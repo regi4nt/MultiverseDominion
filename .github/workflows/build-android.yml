@@ -1,0 +1,134 @@
+name: Build Android (APK + AAB)
+
+on:
+  push:
+    tags: ["v*"]          # git tag v0.7.1 && git push --tags  -> builds and attaches APK/AAB to the Release
+  workflow_dispatch:       # or run it by hand from the Actions tab
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7"
+  GODOT_FULL: "4.7.stable"
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Godot 4.7's Gradle template targets API 36 (Google Play requirement) with build-tools 36.1.0.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools build-tools;36.1.0 platforms;android-36"
+
+      - name: Install Godot
+        run: |
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      - name: Cache the Android export templates
+        id: templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates/${{ env.GODOT_FULL }}
+          key: godot-android-templates-${{ env.GODOT_FULL }}
+
+      - name: Download the Android export templates (only the Android files are kept)
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_FULL}"
+          unzip -q -j templates.tpz "templates/android_*" "templates/version.txt" -d "$HOME/.local/share/godot/export_templates/${GODOT_FULL}"
+          rm templates.tpz
+          ls -la "$HOME/.local/share/godot/export_templates/${GODOT_FULL}"
+
+      - name: Configure Godot for Android (SDK, JDK, debug keystore)
+        run: |
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore "$HOME/debug.keystore" \
+            -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-${GODOT_VERSION}.tres" <<SETTINGS
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/debug_keystore = "$HOME/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          SETTINGS
+          sed -i 's/^[[:space:]]*//' "$HOME/.config/godot/editor_settings-${GODOT_VERSION}.tres"
+          cat "$HOME/.config/godot/editor_settings-${GODOT_VERSION}.tres"
+
+      - name: Import the project and run the tests first (a broken game is not exported)
+        run: |
+          godot --headless --path . --import || true
+          GODOT=godot tools/run_tests.sh logic
+
+      - name: Install the Android Gradle build template
+        run: tools/install_android_template.sh "${GODOT_FULL}"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ env.GODOT_FULL }}-${{ hashFiles('export_presets.cfg') }}
+          restore-keys: gradle-${{ env.GODOT_FULL }}-
+
+      - name: Export debug APK (prebuilt template, quick, for testing on a phone)
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-debug "Android" build/MultiverseDominion-debug.apk
+
+      - name: Export debug AAB (Gradle build; proves the Play Store pipeline works)
+        run: godot --headless --path . --export-debug "Android AAB (Play Store)" build/MultiverseDominion-debug.aab
+
+      # Signed release builds. Add these repository secrets (Settings -> Secrets and variables -> Actions):
+      #   RELEASE_KEYSTORE_BASE64    base64 of your upload keystore    (base64 -w0 upload.keystore)
+      #   RELEASE_KEYSTORE_USER      key alias
+      #   RELEASE_KEYSTORE_PASSWORD  keystore + key password (they must be equal for Godot)
+      - name: Export signed release AAB and APK (only if the secrets exist)
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KS_USER: ${{ secrets.RELEASE_KEYSTORE_USER }}
+          KS_PASS: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KS_B64" ]; then echo "No release keystore secret: skipping the signed builds."; exit 0; fi
+          echo "$KS_B64" | base64 --decode > "$HOME/release.keystore"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$HOME/release.keystore"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$KS_USER"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$KS_PASS"
+          godot --headless --path . --export-release "Android AAB (Play Store)" build/MultiverseDominion-release.aab
+          godot --headless --path . --export-release "Android" build/MultiverseDominion-release.apk
+
+      - name: List the results
+        run: ls -la build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MultiverseDominion-android
+          path: |
+            build/*.apk
+            build/*.aab
+          if-no-files-found: error
+
+      - name: Attach the builds to the GitHub Release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/*.apk
+            build/*.aab
