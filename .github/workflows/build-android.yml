@@ -55,8 +55,9 @@ jobs:
 
       - name: Configure Godot for Android (SDK, JDK, debug keystore)
         run: |
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore "$HOME/debug.keystore" \
-            -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          # One fixed debug keystore (tools/debug.keystore, public password "android") so every build has the SAME signature
+          # and installs over the previous one. A fresh keystore per run makes Android say "App not installed".
+          cp tools/debug.keystore "$HOME/debug.keystore"
           mkdir -p "$HOME/.config/godot"
           cat > "$HOME/.config/godot/editor_settings-${GODOT_VERSION}.tres" <<SETTINGS
           [gd_resource type="EditorSettings" format=3]
