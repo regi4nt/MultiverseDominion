@@ -1,7 +1,7 @@
 class_name UpdateCheck
 extends Node
 ## Checks the latest GitHub Release and tells the main menu when a newer APK exists.
-## Android cannot install an APK silently, so "update" = open the APK download; the user taps the downloaded file.
+## Android cannot install an APK silently: the game downloads it itself (UpdateInstaller) and opens the installer; the player confirms once.
 ## Release asset: MultiverseDominion.apk. Version = ProjectSettings application/config/version (set by CI).
 
 signal update_available(version: String, apk_url: String, notes: String)
@@ -119,14 +119,17 @@ static func show_dialog(parent: Node, info: Dictionary, can_skip: bool) -> void:
 	var dlg := UiDialog.new()
 	dlg.title = "Update available"
 	var notes := clean_notes(String(info.get("notes", "")))
-	dlg.dialog_text = "Version %s is available (you have %s).%s\n\nDownload it, then open the downloaded file to install.\nIf Android asks, allow installing from this source." % [
-		version, current_version(), ("\n\n" + notes) if notes != "" else ""]
-	dlg.ok_button_text = "Download"
+	var in_app := OS.get_name() == "Android"
+	dlg.dialog_text = "Version %s is available (you have %s).%s\n\n%s" % [
+		version, current_version(), ("\n\n" + notes) if notes != "" else "",
+		"It downloads inside the game, then Android asks you to confirm the install.\nIf Android asks, allow installing from this app." if in_app else "Download it, then open the downloaded file to install."]
+	dlg.ok_button_text = "Update now" if in_app else "Download"
 	dlg.cancel_button_text = "Later"
 	dlg.confirmed.connect(func():
-		# Direct APK link first; if the phone cannot open it, fall back to the release page.
-		if OS.shell_open(String(info.get("apk_url", ""))) != OK:
-			OS.shell_open(String(info.get("page_url", PAGE % REPO))))
+		if in_app:
+			start_in_app_update(parent, info)
+		else:
+			open_in_browser(info))
 	if can_skip:
 		dlg.add_button("Skip this version", false, "skip")
 		dlg.custom_action.connect(func(action: StringName):
@@ -138,6 +141,68 @@ static func show_dialog(parent: Node, info: Dictionary, can_skip: bool) -> void:
 	dlg.custom_action.connect(func(_a: StringName): dlg.queue_free())
 	parent.add_child(dlg)
 	dlg.popup_centered(Vector2i(600, 380))
+
+
+## Fallback: the direct APK link first; if the phone cannot open it, the release page.
+static func open_in_browser(info: Dictionary) -> void:
+	if OS.shell_open(String(info.get("apk_url", ""))) != OK:
+		OS.shell_open(String(info.get("page_url", PAGE % REPO)))
+
+
+## In-game update: a progress dialog while the APK downloads, then Android's installer opens. Any failure
+## (offline, refused install) offers the browser download instead, so the player is never stuck.
+static func start_in_app_update(parent: Node, info: Dictionary) -> void:
+	var inst := UpdateInstaller.new()
+	parent.add_child(inst)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	var lbl := UiTheme.make_label("Starting download...", 18)
+	box.add_child(lbl)
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(0, 28)
+	bar.min_value = 0.0
+	bar.max_value = 100.0
+	bar.show_percentage = false
+	box.add_child(bar)
+	var dlg := UiDialog.new()
+	dlg.title = "Updating to %s" % String(info.get("version", ""))
+	dlg.body_node = box
+	dlg.ok_button_text = "Hide"  # the download keeps going in the background
+	dlg.cancel_button_text = "Cancel"
+	dlg.dismiss_on_backdrop = false
+	dlg.show_cancel = true
+	parent.add_child(dlg)
+	dlg.popup_centered(Vector2i(600, 0))
+	inst.progress.connect(func(done: int, total: int):
+		if total > 0:
+			bar.value = 100.0 * float(done) / float(total)
+			lbl.text = "Downloading... %.1f / %.1f MB" % [done / 1048576.0, total / 1048576.0]
+		else:
+			lbl.text = "Downloading... %.1f MB" % (done / 1048576.0))
+	dlg.canceled.connect(func():
+		inst.cancel()
+		inst.queue_free()
+		dlg.queue_free())
+	inst.finished.connect(func(ok: bool, error: String):
+		if is_instance_valid(dlg):
+			dlg.hide()
+			dlg.queue_free()
+		if ok and inst.install():
+			inst.queue_free()
+			return
+		inst.queue_free()
+		var fb := UiDialog.new()
+		fb.title = "Could not update in the game"
+		fb.tone = "warn"
+		fb.dialog_text = "%s\n\nOpen the download in your browser instead?" % (error if not ok else "Android did not open the installer.")
+		fb.ok_button_text = "Open browser"
+		fb.cancel_button_text = "Later"
+		fb.confirmed.connect(func(): open_in_browser(info))
+		fb.confirmed.connect(fb.queue_free)
+		fb.canceled.connect(fb.queue_free)
+		parent.add_child(fb)
+		fb.popup_centered(Vector2i(600, 0)))
+	inst.start(String(info.get("apk_url", "")))
 
 
 func check() -> void:
