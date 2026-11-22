@@ -1,12 +1,12 @@
 extends Control
-## Territory Board screen: board in the middle (dice + actions in its centre), players left, log right.
+## Territory Board screen: board in the middle (dice + actions in its centre), log left, players right.
 ## All game rules live in MatchController; this script only displays and forwards input.
 
 var ctrl: MatchController
 var board_view: BoardView
+var _centre: PanelContainer
 var round_label: Label
 var turn_label: Label
-var dice_label: Label
 var player_box: VBoxContainer
 var action_box: HFlowContainer
 var tile_info: Label
@@ -69,7 +69,7 @@ func _build_ui() -> void:
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
 
-	# Three columns, Monopoly style: players and info | the board in the middle with the dice and actions | log.
+	# Three columns, Monopoly style: log | the board in the middle with the dice and actions | players and info (sides swapped).
 	var left := VBoxContainer.new()
 	left.custom_minimum_size = Vector2(230, 0)
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -83,7 +83,7 @@ func _build_ui() -> void:
 	arc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	arc.size_flags_stretch_ratio = 2.6  # 16:9 -> the board gets its full height; extra width goes to the side columns
 	root.add_child(arc)
-	var holder := Control.new()  # square holder: the board fills it, the action panel floats in the board's centre
+	var holder := Control.new()  # square holder: the board fills it
 	arc.add_child(holder)
 	board_view = BoardView.new()
 	board_view.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -95,6 +95,9 @@ func _build_ui() -> void:
 	right.size_flags_stretch_ratio = 1.0
 	right.add_theme_constant_override("separation", 8)
 	root.add_child(right)
+	# Sides swapped: the `right` column is shown on the LEFT and the `left` column on the RIGHT (order: right | board | left).
+	root.move_child(right, 0)
+	root.move_child(left, root.get_child_count() - 1)
 
 	# --- left column
 	var head := HBoxContainer.new()
@@ -120,12 +123,6 @@ func _build_ui() -> void:
 	player_box.add_theme_constant_override("separation", 8)
 	players_panel.add_child(player_box)
 
-	dice_label = UiTheme.make_label("Dice: -", 18, UiTheme.COL_MUTED)
-	dice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var dice_panel := PanelContainer.new()
-	dice_panel.add_child(dice_label)
-	left.add_child(dice_panel)
-
 	_hint_panel = PanelContainer.new()  # Tutorial coach (hidden in normal matches)
 	_hint_panel.visible = false
 	_hint_panel.add_theme_stylebox_override("panel", UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 2, 10))
@@ -139,27 +136,6 @@ func _build_ui() -> void:
 	var hide_btn := UiTheme.make_button("OK", 52)
 	hide_btn.pressed.connect(func(): _hint_panel.visible = false)
 	hv.add_child(hide_btn)
-
-	# --- centre of the board: whose turn it is + the action buttons (Roll Dice, Buy, Tax / Duel, ...)
-	var centre := PanelContainer.new()
-	centre.anchor_left = 0.15
-	centre.anchor_right = 0.85
-	centre.anchor_top = 0.64
-	centre.anchor_bottom = 0.90
-	centre.grow_vertical = Control.GROW_DIRECTION_END
-	centre.add_theme_stylebox_override("panel", UiTheme.make_box(Color(UiTheme.COL_PANEL, 0.96), UiTheme.COL_GOLD_DIM, 2, 10))
-	holder.add_child(centre)
-	var cv := VBoxContainer.new()
-	cv.add_theme_constant_override("separation", 6)
-	centre.add_child(cv)
-	turn_label = UiTheme.make_label("", 22)
-	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cv.add_child(turn_label)
-	action_box = HFlowContainer.new()
-	action_box.alignment = FlowContainer.ALIGNMENT_CENTER
-	action_box.add_theme_constant_override("h_separation", 8)
-	action_box.add_theme_constant_override("v_separation", 8)
-	cv.add_child(action_box)
 
 	# --- right column
 	var info_panel := PanelContainer.new()
@@ -176,6 +152,24 @@ func _build_ui() -> void:
 	log_view.scroll_following = true
 	log_view.add_theme_font_size_override("normal_font_size", 15)
 	log_panel.add_child(log_view)
+
+	# --- bottom of the screen's LEFT column (below the log): whose turn it is + the action buttons
+	# (Roll Dice, Reroll, Move, End Turn, Buy, Tax / Duel, ...). It never floats over the board: only the dice ANIMATION
+	# is drawn inside the map (BoardView).
+	_centre = PanelContainer.new()
+	_centre.add_theme_stylebox_override("panel", UiTheme.make_box(Color(UiTheme.COL_PANEL, 0.96), UiTheme.COL_GOLD_DIM, 2, 10))
+	right.add_child(_centre)  # `right` is the column shown on the left (sides swapped, see above)
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override("separation", 6)
+	_centre.add_child(cv)
+	turn_label = UiTheme.make_label("", 20)
+	turn_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cv.add_child(turn_label)
+	action_box = HFlowContainer.new()
+	action_box.alignment = FlowContainer.ALIGNMENT_BEGIN
+	action_box.add_theme_constant_override("h_separation", 8)
+	action_box.add_theme_constant_override("v_separation", 8)
+	cv.add_child(action_box)
 
 
 # ------------------------------------------------------------------ signals
@@ -204,9 +198,8 @@ func _on_log(text: String) -> void:
 	log_view.add_text(text + "\n")
 
 
-func _on_dice(d1: int, d2: int) -> void:
-	Sfx.play("dice")
-	dice_label.text = "Dice: %d + %d = %d%s" % [d1, d2, d1 + d2, "  (DOUBLE)" if d1 == d2 else ""]
+func _on_dice(_d1: int, _d2: int) -> void:
+	Sfx.play("dice")  # the result is shown by the dice animation in the middle of the board (no text line)
 
 
 func _on_moved(pid: int, _from: int, to_i: int, _warped: bool) -> void:
@@ -303,7 +296,7 @@ func _rebuild_actions() -> void:
 		if prompt_text != "":
 			var prompt := UiTheme.make_label(prompt_text, 16, UiTheme.COL_GOLD)
 			prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			prompt.custom_minimum_size.x = 470
+			prompt.custom_minimum_size.x = 230
 			action_box.add_child(prompt)
 		for opt in ctrl.get_decision_options():
 			_add_action(opt["label"], ctrl.decide.bind(opt["id"]), not opt["enabled"])

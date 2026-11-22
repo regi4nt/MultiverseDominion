@@ -5,12 +5,18 @@ extends Node
 ## Release asset: MultiverseDominion.apk. Version = ProjectSettings application/config/version (set by CI).
 
 signal update_available(version: String, apk_url: String, notes: String)
+## Always fires once per check(): status = "available" | "current" | "error" (offline, rate limit, no release yet).
+## Lets the caller retry later after an error (the menu) or tell the player what happened (Settings).
+signal check_finished(status: String, info: Dictionary)
 
 const REPO := "regi4nt/MultiverseDominion"
 const API := "https://api.github.com/repos/%s/releases/latest"
 const PAGE := "https://github.com/%s/releases/latest"
+const APK_NAME := "MultiverseDominion.apk"
+const NOTES_MAX := 360
 
 var _http: HTTPRequest
+var _done: bool = false
 
 
 static func current_version() -> String:
@@ -42,17 +48,96 @@ static func is_newer(remote: String, local: String) -> bool:
 
 
 ## Picks the data we need out of a GitHub "latest release" JSON. Returns {} when there is no usable APK.
+## Prefers the asset named exactly MultiverseDominion.apk (so a stray extra .apk can never be picked).
 static func parse_release(rel: Variant) -> Dictionary:
 	if not (rel is Dictionary):
 		return {}
 	var url := ""
+	var fallback := ""
 	for asset in rel.get("assets", []):
-		if asset is Dictionary and str(asset.get("name", "")).ends_with(".apk"):
-			url = str(asset.get("browser_download_url", ""))
+		if not (asset is Dictionary):
+			continue
+		var asset_name := str(asset.get("name", ""))
+		if not asset_name.ends_with(".apk"):
+			continue
+		var u := str(asset.get("browser_download_url", ""))
+		if u == "":
+			continue
+		if asset_name == APK_NAME:
+			url = u
 			break
-	if url == "" or str(rel.get("tag_name", "")) == "":
+		if fallback == "":
+			fallback = u
+	if url == "":
+		url = fallback
+	var tag = rel.get("tag_name", "")
+	if url == "" or tag == null or str(tag) == "":
 		return {}
-	return {"version": str(rel["tag_name"]).trim_prefix("v"), "apk_url": url, "notes": str(rel.get("body", ""))}
+	var body = rel.get("body", "")  # JSON null (a release without notes) must not become the text "<null>"
+	var page = rel.get("html_url", "")
+	return {
+		"version": str(tag).trim_prefix("v"),
+		"apk_url": url,
+		"notes": "" if body == null else str(body),
+		"page_url": (PAGE % REPO) if (page == null or str(page) == "") else str(page),
+	}
+
+
+## GitHub's auto-generated notes ("## What's Changed", "* Fix x by @user in https://...", "**Full Changelog**: ...")
+## turned into a few readable lines, cut at a line boundary instead of in the middle of a word.
+static func clean_notes(body: String, max_chars: int = NOTES_MAX) -> String:
+	var lines: Array[String] = []
+	for raw in body.replace("\r", "").split("\n"):
+		var l := raw.strip_edges()
+		if l == "" or l.begins_with("#") or l.to_lower().begins_with("**full changelog") or l.to_lower().begins_with("full changelog"):
+			continue
+		if l.begins_with("* ") or l.begins_with("- "):
+			l = "- " + l.substr(2)
+		var by := l.find(" by @")
+		if by > 0:
+			l = l.substr(0, by)
+		lines.append(l)
+	var out := ""
+	for l in lines:
+		var next: String = l if out == "" else out + "\n" + l
+		if next.length() > max_chars:
+			out += "\n..." if out != "" else l.left(max_chars) + "..."
+			break
+		out = next
+	return out
+
+
+## "Skip this version": remembered in the save so the automatic check stays quiet until a NEWER version appears.
+static func is_skipped(version: String) -> bool:
+	var sk = SaveManager.get_setting("skipped_update")
+	return sk != null and str(sk) == version
+
+
+## The update dialog, shared by the main menu (automatic) and Settings (manual). `can_skip` adds "Skip this version".
+static func show_dialog(parent: Node, info: Dictionary, can_skip: bool) -> void:
+	var version := String(info.get("version", ""))
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Update available"
+	var notes := clean_notes(String(info.get("notes", "")))
+	dlg.dialog_text = "Version %s is available (you have %s).%s\n\nDownload it, then open the downloaded file to install.\nIf Android asks, allow installing from this source." % [
+		version, current_version(), ("\n\n" + notes) if notes != "" else ""]
+	dlg.ok_button_text = "Download"
+	dlg.cancel_button_text = "Later"
+	dlg.confirmed.connect(func():
+		# Direct APK link first; if the phone cannot open it, fall back to the release page.
+		if OS.shell_open(String(info.get("apk_url", ""))) != OK:
+			OS.shell_open(String(info.get("page_url", PAGE % REPO))))
+	if can_skip:
+		dlg.add_button("Skip this version", false, "skip")
+		dlg.custom_action.connect(func(action: StringName):
+			if action == &"skip":
+				SaveManager.set_setting("skipped_update", version)
+				dlg.hide())
+	dlg.canceled.connect(dlg.queue_free)
+	dlg.confirmed.connect(dlg.queue_free)
+	dlg.custom_action.connect(func(_a: StringName): dlg.queue_free())
+	parent.add_child(dlg)
+	dlg.popup_centered(Vector2i(600, 380))
 
 
 func check() -> void:
@@ -61,14 +146,37 @@ func check() -> void:
 	add_child(_http)
 	_http.request_completed.connect(_on_done)
 	if _http.request(API % REPO, PackedStringArray(["Accept: application/vnd.github+json", "User-Agent: MultiverseDominion"])) != OK:
-		queue_free()
+		_finish("error", {})
 
 
 func _on_done(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	if result == HTTPRequest.RESULT_SUCCESS and code == 200:
-		var j := JSON.new()
-		if j.parse(body.get_string_from_utf8()) == OK:
-			var rel := parse_release(j.data)
-			if not rel.is_empty() and is_newer(rel["version"], current_version()):
-				update_available.emit(rel["version"], rel["apk_url"], rel["notes"])
-	queue_free()  # any failure (offline, rate limit, no release yet) is silent
+	if result != HTTPRequest.RESULT_SUCCESS:
+		_finish("error", {})  # offline / timeout
+		return
+	if code == 404:
+		_finish("current", {})  # no release published yet: nothing to update to
+		return
+	if code != 200:
+		_finish("error", {})  # 403 / 429 rate limit, 5xx
+		return
+	var j := JSON.new()
+	if j.parse(body.get_string_from_utf8()) != OK:
+		_finish("error", {})
+		return
+	var rel := parse_release(j.data)
+	if rel.is_empty():
+		_finish("current", {})  # a release without an APK is not an update
+	elif is_newer(rel["version"], current_version()):
+		_finish("available", rel)
+	else:
+		_finish("current", rel)
+
+
+func _finish(status: String, info: Dictionary) -> void:
+	if _done:
+		return
+	_done = true
+	if status == "available":
+		update_available.emit(info["version"], info["apk_url"], info["notes"])
+	check_finished.emit(status, info)
+	queue_free()

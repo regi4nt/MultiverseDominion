@@ -85,4 +85,7 @@ Catatan: mode `--headless` memakai server teks dummy yang MENGGELEMBUNGKAN tingg
 - Saat menu utama dibuka (Android, sekali per start; bisa dimatikan di Settings) game memeriksa Release terbaru. Jika versinya lebih baru,
   muncul dialog; "Download" membuka unduhan APK di browser, lalu pengguna membuka file itu untuk memasang. Android tidak mengizinkan
   pasang senyap tanpa Play Store atau plugin khusus. Perlu izin INTERNET (sudah diaktifkan di preset).
+- Dialog update punya tiga pilihan: **Download**, **Later** (muncul lagi saat start berikutnya) dan **Skip this version** (diam sampai ada versi yang lebih baru).
+  Jika start tanpa internet / kena rate limit GitHub, pengecekan diulang saat menu utama dibuka lagi (bukan menunggu start berikutnya).
+- Settings -> **Check for updates now**: cek manual yang selalu memberi jawaban (terbaru / ada update / gagal) dan mengabaikan "skip".
 - Repo yang dicek: konstanta `REPO` di `scripts/systems/update_check.gd`.

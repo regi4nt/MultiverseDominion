@@ -28,12 +28,16 @@ var _press_pos: Vector2 = Vector2.ZERO
 var _pressing: bool = false
 var _dragged: bool = false
 var _pan_tw: Tween
+var _roll_tw: Tween
+var _roll_t: float = 1.0  # dice tumble progress 0..1 (1 = settled on the real result)
+var _roll_seed: int = 0
 var _inertia_tw: Tween
 var _user_cam: bool = false  # the player moved the camera: the pawn-follow camera must not fight the finger
 var _touches: Dictionary = {}  # finger index -> position (to tell a pinch from a one-finger pan)
 var _pinch_dist: float = 0.0
 var _vel: Vector2 = Vector2.ZERO  # smoothed drag velocity (focus units / s) for the release glide
 var _speed_btn: Button
+var _zoom_btns: Array[Button] = []
 
 
 func _ready() -> void:
@@ -63,6 +67,7 @@ func _ready() -> void:
 		b.modulate = Color(1, 1, 1, 0.85)
 		b.pressed.connect(_on_zoom_button.bind(float(spec[1])))
 		bar.add_child(b)
+		_zoom_btns.append(b)
 	_speed_btn = Button.new()
 	_speed_btn.custom_minimum_size = Vector2(124, 52)
 	_speed_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -87,7 +92,19 @@ func _update_speed_label() -> void:
 
 
 ## Zooms so the board point under `pos` (view space) stays under the finger / cursor.
+## Zooming is only possible while the dice are NOT tumbling (the +/-/Fit buttons are disabled meanwhile).
+func _zoom_locked() -> bool:
+	return _roll_t < 1.0
+
+
+func _update_zoom_lock() -> void:
+	for b in _zoom_btns:
+		b.disabled = _zoom_locked()
+
+
 func _zoom_at(factor: float, pos: Vector2) -> void:
+	if _zoom_locked():
+		return
 	_layout()
 	var old_s := minf(size.x, size.y) * zoom
 	var anchor := (pos - _origin) / old_s
@@ -104,6 +121,8 @@ func _kill_camera_tweens() -> void:
 
 
 func _on_zoom_button(factor: float) -> void:
+	if _zoom_locked():
+		return
 	_kill_camera_tweens()
 	if factor == 0.0:
 		_user_cam = false
@@ -148,11 +167,40 @@ func bind(c: MatchController) -> void:
 		_visual_pos[p.id] = float(p.position)
 	ctrl.tiles_changed.connect(queue_redraw)
 	ctrl.players_changed.connect(queue_redraw)
-	ctrl.dice_rolled.connect(func(_a: int, _b: int): queue_redraw())
+	ctrl.dice_rolled.connect(_on_dice_rolled)
 	ctrl.player_moved.connect(_on_player_moved)
 	var cur := ctrl.current_player()
 	if cur != null:
 		focus_tile(cur.position)
+	queue_redraw()
+
+
+## The dice tumble in the middle of the board (the Roll button itself lives in the left panel): they bounce, spin and
+## flick through random faces, then settle on the real result. Rolling again (Reroll Token) simply restarts it.
+func _on_dice_rolled(_a: int, _b: int) -> void:
+	if _roll_tw != null and _roll_tw.is_valid():
+		_roll_tw.kill()
+	if not is_inside_tree():
+		_roll_t = 1.0
+		_update_zoom_lock()
+		queue_redraw()
+		return
+	_roll_seed = randi()
+	_roll_t = 0.0
+	_update_zoom_lock()
+	_roll_tw = create_tween()
+	_roll_tw.tween_method(_set_roll, 0.0, 1.0, 0.65 / speed_mult)
+	_roll_tw.finished.connect(_finish_roll)
+
+
+func _finish_roll() -> void:
+	_roll_t = 1.0
+	_update_zoom_lock()
+	queue_redraw()
+
+
+func _set_roll(t: float) -> void:
+	_roll_t = t
 	queue_redraw()
 
 
@@ -494,14 +542,29 @@ func _draw_center(font: Font) -> void:
 			var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 			draw_string(font, Vector2(x - w, y), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, p.color.lightened(0.25))
 			x -= w + _cell * 0.9
-	# Dice with pips
+	# Dice with pips (tumbling while _roll_t < 1)
 	if ctrl.last_dice.x > 0:
+		var rolling := _roll_t < 1.0
+		var decay := 1.0 - _roll_t
 		for i in range(2):
 			var v := ctrl.last_dice.x if i == 0 else ctrl.last_dice.y
 			var d := _cell * 3.0
 			var dr := Rect2(inner.position + Vector2(inner.size.x * 0.5 - _cell * 3.3 + i * _cell * 3.6, _cell * 11.6), Vector2(d, d))
-			_rr(dr, Color("f1ead4"), d * 0.2, Color("b8962e"), 2.0, _cell * 0.4)
-			_draw_pips(dr, v)
+			if not rolling:
+				_rr(dr, Color("f1ead4"), d * 0.2, Color("b8962e"), 2.0, _cell * 0.4)
+				_draw_pips(dr, v)
+				continue
+			v = 1 + posmod(int(_roll_t * 16.0) * 5 + i * 3 + _roll_seed, 6)  # a new random face ~16 times, never the same twice in a row
+			var bounce := absf(sin(_roll_t * PI * 3.0)) * decay  # three hops that die out
+			var sway := sin(_roll_t * 21.0 + float(i) * 2.1) * decay * 0.35
+			var spin := decay * decay * TAU * (1.0 + 0.5 * float(i)) * (1.0 if i == 0 else -1.0)
+			# a soft ground shadow that shrinks while the die is in the air
+			draw_circle(dr.get_center() + Vector2(0, d * 0.55), d * (0.5 - 0.15 * bounce), Color(0, 0, 0, 0.28 * (1.0 - 0.6 * bounce)))
+			draw_set_transform(dr.get_center() + Vector2(sway * _cell, -bounce * _cell * 1.1), spin, Vector2.ONE * (1.0 + 0.12 * bounce))
+			var local := Rect2(Vector2(-d, -d) * 0.5, Vector2(d, d))
+			_rr(local, Color("f1ead4"), d * 0.2, Color("b8962e"), 2.0, _cell * 0.4)
+			_draw_pips(local, v)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_pips(dr: Rect2, v: int) -> void:

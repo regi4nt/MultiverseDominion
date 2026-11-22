@@ -148,5 +148,5 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi landscape
 - Keseimbangan: eliminasi total jarang (3-4%); game biasanya diputuskan net worth di ronde 30. Diukur per benua dengan `tools/balance_report`.
 
 ## Peta Territory: zoom dan kamera
-Layar Territory dan Battle tiga kolom ala Monopoly (Battle: shop + bench di kiri, papan 8x8 di tengah, tombol + kartu Support di kanan, log di kiri saat bertarung). Territory: papan di tengah (Roll Dice dan aksi di tengah papan), pemain di kiri, log di kanan. Papan tampil utuh (zoom 1x) dan kamera mengikuti pion saat di-zoom. Geser dengan drag, cubit atau roda mouse untuk zoom,
-tombol + / - / Fit (kanan bawah) untuk zoom manual atau melihat seluruh papan. Ketuk petak untuk info. Kode: `scripts/ui/board_view.gd`.
+Layar Territory dan Battle tiga kolom ala Monopoly (Battle: tombol + kartu Support di kiri, papan 8x8 di tengah, shop + bench di kanan, log di kanan saat bertarung). Territory: papan di tengah, log di kiri (aksi di bawah log; tombol dadu di dalam papan), pemain di kanan. Papan tampil utuh (zoom 1x) dan kamera mengikuti pion saat di-zoom. Geser dengan drag, cubit atau roda mouse untuk zoom,
+tombol + / - / Fit dan Speed (kiri tengah papan); tombol dadu (Roll Dice, Reroll, special dice) di pojok kiri bawah di dalam papan, aksi lain (Move, End Turn, Buy) di kiri bawah layar di bawah log untuk zoom manual atau melihat seluruh papan. Ketuk petak untuk info. Kode: `scripts/ui/board_view.gd`.

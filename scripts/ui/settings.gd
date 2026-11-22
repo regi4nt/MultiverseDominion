@@ -45,6 +45,26 @@ func _ready() -> void:
 		upd_btn.text = "Check for updates at start: ON" if on else "Check for updates at start: OFF")
 	box.add_child(upd_btn)
 
+	# Manual check: ignores "skip this version" and always tells the player what happened.
+	var chk_btn := UiTheme.make_button("Check for updates now  (v%s)" % UpdateCheck.current_version(), 52)
+	chk_btn.pressed.connect(func():
+		chk_btn.disabled = true
+		chk_btn.text = "Checking..."
+		var uc := UpdateCheck.new()
+		add_child(uc)
+		uc.check_finished.connect(func(status: String, info: Dictionary):
+			chk_btn.disabled = false
+			match status:
+				"available":
+					chk_btn.text = "Update available: v%s" % info["version"]
+					UpdateCheck.show_dialog(self, info, false)
+				"current":
+					chk_btn.text = "You are up to date (v%s)" % UpdateCheck.current_version()
+				_:
+					chk_btn.text = "Could not check (offline?). Tap to retry")
+		uc.check())
+	box.add_child(chk_btn)
+
 	box.add_child(UiTheme.make_label("Default AI difficulty"))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)

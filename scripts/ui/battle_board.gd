@@ -113,7 +113,7 @@ func _build_ui() -> void:
 	var root := HBoxContainer.new()
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
-	# Three columns, like the Territory Board: shop and army | the board in the middle | actions / support cards.
+	# Three columns, like the Territory Board: actions / support cards | the board in the middle | shop and army (sides swapped).
 	var left := VBoxContainer.new()
 	left.custom_minimum_size = Vector2(230, 0)
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -133,6 +133,9 @@ func _build_ui() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 6)
 	root.add_child(right)
+	# Sides swapped: the `right` column is shown on the LEFT and the `left` column on the RIGHT (order: right | board | left).
+	root.move_child(right, 0)
+	root.move_child(left, root.get_child_count() - 1)
 	var head := HBoxContainer.new()
 	left.add_child(head)
 	status_label = UiTheme.make_label("", 17, UiTheme.COL_GOLD)
