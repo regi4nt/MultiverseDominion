@@ -21,7 +21,7 @@ func default_data() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"profile": {"name": "Player", "level": 1, "xp": 0, "tutorial_done": false},
-		"settings": {"master_volume": 0.8, "default_difficulty": "normal", "sfx": true},
+		"settings": {"master_volume": 0.8, "default_difficulty": "normal", "sfx": true, "check_updates": true},
 		"campaign": {"progress": 0},  # TODO (Phase 6): Story Campaign
 		"unlocked_continents": ["aetherion"],
 		"unlocked_factions": ["solvaris", "nocthyr", "valdoria", "elarion"],

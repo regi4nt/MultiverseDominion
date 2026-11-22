@@ -31,6 +31,15 @@ func _ready() -> void:
 			Sfx.play("coin"))
 	box.add_child(sfx_btn)
 
+	var upd_btn := UiTheme.make_toggle("", ButtonGroup.new(), 52)
+	var upd_on: bool = SaveManager.get_setting("check_updates") != false
+	upd_btn.button_pressed = upd_on
+	upd_btn.text = "Check for updates at start: ON" if upd_on else "Check for updates at start: OFF"
+	upd_btn.toggled.connect(func(on: bool):
+		SaveManager.set_setting("check_updates", on)
+		upd_btn.text = "Check for updates at start: ON" if on else "Check for updates at start: OFF")
+	box.add_child(upd_btn)
+
 	box.add_child(UiTheme.make_label("Default AI difficulty"))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)

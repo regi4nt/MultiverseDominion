@@ -7,7 +7,7 @@ dan template Gradle Godot 4.7 memang menargetkan API 36 (minSdk 24 = Android 7.0
 ## Apa yang sudah terbukti dan apa yang belum
 | Terbukti di lingkungan pengembangan saya | Belum terbukti |
 |---|---|
-| **APK sungguhan dibangun** dengan Godot 4.7 (55 MB): paket `com.multiversedominion.game`, v0.7.0, **minSdk 24, targetSdk 36**, landscape, **nol izin**, arm64-v8a + armeabi-v7a, bertanda tangan (v2/v3), ikon adaptif | APK dijalankan di perangkat Android nyata |
+| **APK sungguhan dibangun** dengan Godot 4.7 (55 MB): paket `com.multiversedominion.game`, v0.7.0, **minSdk 24, targetSdk 36**, landscape, **hanya izin INTERNET (cek update)**, arm64-v8a + armeabi-v7a, bertanda tangan (v2/v3), ikon adaptif | APK dijalankan di perangkat Android nyata |
 | Preset AAB (Gradle) valid: Godot menerima template 4.7, SDK, JDK 17, keystore, lalu menyusun proyek Android dan **memanggil Gradle** | Kompilasi Gradle sampai `.aab` selesai (jaringan lingkungan saya memblokir `services.gradle.org` dan repositori Maven) |
 | Workflow GitHub: YAML valid, `actionlint` bersih, setiap blok shell dijalankan lokal dan hasilnya benar | Workflow dijalankan di server GitHub |
 | Seluruh tes (logika, UI, tata letak 7 rasio layar, tutorial, performa) lulus di Godot 4.7 | Performa/sentuhan/suara di ponsel nyata |
@@ -77,3 +77,12 @@ xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-driver opengl3
   res://tests/layout_test.tscn -- strict shots      # screenshot ke /tmp/shots
 ```
 Catatan: mode `--headless` memakai server teks dummy yang MENGGELEMBUNGKAN tinggi teks (~2x): jangan percaya audit tata letak di mode itu.
+
+## Rilis otomatis dan update di dalam aplikasi
+- Tiap push ke `main` -> workflow `Build Android` menjalankan tes, membangun APK/AAB, lalu membuat GitHub Release `v0.7.<nomor run>`
+  berisi `MultiverseDominion.apk` dan `.aab`. `versionCode` = nomor run, jadi tiap build valid sebagai update build sebelumnya.
+- Semua build harus memakai tanda tangan yang sama (`tools/debug.keystore`, atau keystore rilis bila secret diisi; ganti tanda tangan = uninstall sekali).
+- Saat menu utama dibuka (Android, sekali per start; bisa dimatikan di Settings) game memeriksa Release terbaru. Jika versinya lebih baru,
+  muncul dialog; "Download" membuka unduhan APK di browser, lalu pengguna membuka file itu untuk memasang. Android tidak mengizinkan
+  pasang senyap tanpa Play Store atau plugin khusus. Perlu izin INTERNET (sudah diaktifkan di preset).
+- Repo yang dicek: konstanta `REPO` di `scripts/systems/update_check.gd`.

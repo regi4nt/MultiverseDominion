@@ -1,9 +1,15 @@
 name: Build Android (APK + AAB)
 
+# Every push to main: test, build, and publish a GitHub Release (v0.7.<run number>) with MultiverseDominion.apk / .aab.
+# The game checks the latest Release at start and offers the new APK (see scripts/systems/update_check.gd).
 on:
   push:
-    tags: ["v*"]          # git tag v0.7.1 && git push --tags  -> builds and attaches APK/AAB to the Release
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
   workflow_dispatch:       # or run it by hand from the Actions tab
+
+permissions:
+  contents: write          # needed to create the tag and the Release
 
 concurrency:
   group: android-${{ github.ref }}
@@ -19,6 +25,16 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
+      # Version: 0.7.<run number>. versionCode = run number, so each build is a valid update of the previous one.
+      - name: Set the version
+        run: |
+          VERSION="0.7.${{ github.run_number }}"
+          CODE="${{ github.run_number }}"
+          sed -i "s/^version\/code=.*/version\/code=${CODE}/; s/^version\/name=.*/version\/name=\"${VERSION}\"/" export_presets.cfg
+          sed -i "s/^config\/version=.*/config\/version=\"${VERSION}\"/" project.godot
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          grep -n "version" export_presets.cfg project.godot
 
       - uses: actions/setup-java@v4
         with:
@@ -126,10 +142,21 @@ jobs:
             build/*.aab
           if-no-files-found: error
 
-      - name: Attach the builds to the GitHub Release (tag builds only)
-        if: startsWith(github.ref, 'refs/tags/v')
+      # The in-app updater looks for the asset ending in .apk. All builds must share one signature, so use the
+      # release APK only if you have set the release keystore secrets (switching later needs one uninstall).
+      - name: Pick the files to publish
+        run: |
+          if [ -f build/MultiverseDominion-release.apk ]; then cp build/MultiverseDominion-release.apk build/MultiverseDominion.apk; else cp build/MultiverseDominion-debug.apk build/MultiverseDominion.apk; fi
+          if [ -f build/MultiverseDominion-release.aab ]; then cp build/MultiverseDominion-release.aab build/MultiverseDominion.aab; else cp build/MultiverseDominion-debug.aab build/MultiverseDominion.aab; fi
+
+      - name: Publish the GitHub Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
+          name: Multiverse Dominion ${{ env.VERSION }}
+          generate_release_notes: true
+          make_latest: true
           files: |
-            build/*.apk
-            build/*.aab
+            build/MultiverseDominion.apk
+            build/MultiverseDominion.aab

@@ -76,6 +76,25 @@ func _ready() -> void:
 	_quit_dialog.dialog_text = "Quit Multiverse Dominion?"
 	_quit_dialog.confirmed.connect(func(): get_tree().quit())
 	add_child(_quit_dialog)
+	left.add_child(UiTheme.make_label("v" + UpdateCheck.current_version(), 18, UiTheme.COL_MUTED))
+	if SaveManager.get_setting("check_updates") != false and not GameSession.update_checked and OS.get_name() == "Android":
+		GameSession.update_checked = true
+		var uc := UpdateCheck.new()
+		add_child(uc)
+		uc.update_available.connect(_on_update_available)
+		uc.check()
+
+
+func _on_update_available(version: String, apk_url: String, notes: String) -> void:
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Update available"
+	dlg.dialog_text = "Version %s is available (you have %s).\nDownload it now? Open the downloaded file to install.\n\n%s" % [
+		version, UpdateCheck.current_version(), notes.left(300)]
+	dlg.ok_button_text = "Download"
+	dlg.cancel_button_text = "Later"
+	dlg.confirmed.connect(func(): OS.shell_open(apk_url))
+	add_child(dlg)
+	dlg.popup_centered(Vector2i(560, 320))
 
 
 func _show_profile() -> void:

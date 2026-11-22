@@ -6,6 +6,7 @@ var continent_id: String = "aetherion"
 var faction_id: String = "solvaris"
 var difficulty: String = "normal"
 var ai_count: int = 3
+var update_checked: bool = false  # the update check runs once per app start
 var resume_match: bool = false  # Main Menu "Continue Match" -> Territory Board loads user://match.json
 
 

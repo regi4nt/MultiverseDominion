@@ -89,7 +89,7 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 - Performa (desktop; ponsel kelas bawah ~5-10x lebih lambat): tick battle terburuk 1.3 ms (timer 250 ms), satu game AI penuh 76 ms,
   satu duel AI instan <= 13 ms, memori logika ~18 MB, 0 kebocoran setelah 40 game dan 75 siklus buat/hapus scene.
   `low_processor_mode` aktif (hemat baterai), max FPS 60, renderer GL Compatibility.
-- Ekspor: `export_presets.cfg` (arm64-v8a + armeabi-v7a, tanpa permission, tests/tools dikecualikan); paket data 218 KB (95 file)
+- Ekspor: `export_presets.cfg` (arm64-v8a + armeabi-v7a, permission INTERNET saja (cek update), tests/tools dikecualikan); paket data 218 KB (95 file)
   berjalan dari luar folder proyek tanpa error.
 
 ## Konten (Phase 6)
