@@ -91,6 +91,7 @@ func _reset_root() -> void:
 func _show_hub() -> void:
 	_view = "hub"
 	_reset_root()
+	_root.add_theme_constant_override("separation", 6)  # tighter: the tallest mode card + header must fit 720 px (layout_test)
 	_root.add_child(UiTheme.make_label("NEW MATCH", 40, UiTheme.COL_GOLD))
 	_root.add_child(UiTheme.make_divider())
 
@@ -167,7 +168,7 @@ func _fill_cards() -> void:
 func _offline_cards() -> Array:
 	return [
 		{"id": "journey", "icon": "knight", "title": "JOURNEY", "sub": "Story  ·  1 vs 1",
-			"desc": "Climb the trophy road in 1 vs 1 matches: a win earns trophies, a defeat loses some. Enough trophies open the next continent and its unit cards in the Shop.",
+			"desc": "Climb the trophy road in 1 vs 1 matches: wins earn trophies, defeats lose some. Trophies open new continents and their unit cards.",
 			"chips": ["1 vs 1", "Trophy road"], "status": _journey_status()},
 		{"id": "arena", "icon": "king", "title": "ARENA", "sub": "Free match",
 			"desc": "Play a free match against AI on any unlocked continent. Nothing to unlock, just fight for the crown.",

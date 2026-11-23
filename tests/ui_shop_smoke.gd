@@ -14,9 +14,10 @@ func _ready() -> void:
 	var names: Array[String] = []
 	for b in menu.find_children("*", "Button", true, false):
 		names.append((b as Button).text)
-	if not names.has("Shop") or not names.has("Profile") or names.find("Shop") > names.find("Profile"):
+	# The profile is a card (not a button) on the home screen: Shop must sit under Card Hub and above Settings.
+	if not names.has("Shop") or names.find("Shop") < names.find("Card Hub") or names.find("Shop") > names.find("Settings"):
 		fails += 1
-		push_error("Shop must be a menu entry placed above Profile (%s)" % str(names))
+		push_error("Shop must be a menu entry between Card Hub and Settings (%s)" % str(names))
 	menu.queue_free()
 	await get_tree().process_frame
 
