@@ -179,9 +179,9 @@ func _ready() -> void:
 	check(rosters_ok, "every faction roster = 7 pieces + its King; every continent lists 4 Kings for the Collection")
 	check(CardDatabase.validate_all_continents().is_empty(), "all continents: slots, balanced stats, mechanics, buffs (%s)" % str(CardDatabase.validate_all_continents()))
 	CardDatabase.set_continent("machina")
-	var wall: Dictionary = CardDatabase.faction_pieces("ferrum")[0]
-	check(wall["name"] == "Ironclad Rampart" and CardDatabase.skill_mechanic(wall) == "bulwark", "Ferrum's tank Rook is themed but uses the Bulwark mechanic")
-	var vwall: Dictionary = CardDatabase.faction_pieces("voltrix")[0]
+	var wall: Dictionary = _piece_of_role("ferrum", "Tank")
+	check(wall["role"] == "Tank" and wall["skill"].has("name") and CardDatabase.skill_mechanic(wall) == "bulwark", "Ferrum's Tank piece is themed but uses the Bulwark mechanic")
+	var vwall: Dictionary = _piece_of_role("voltrix", "Tank")
 	check(wall["hp"] != vwall["hp"] or wall["atk"] != vwall["atk"] or str(wall["skill"].get("params", {})) != str(vwall["skill"].get("params", {})), "factions of one continent differ in the same slot")
 	check(CardDatabase.get_unit("queen_aurelia")["faction"] == "solvaris" and not CardDatabase.in_active_set("queen_aurelia"), "a card of another continent still resolves (old saves) but is not in the active set")
 	var em := BattleEngine.new()
@@ -190,13 +190,19 @@ func _ready() -> void:
 		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(1, 2)}], "champion": "champion_voltrix", "supports": []}]})
 	check(em.units[0].skill_id == "bulwark", "engine runs the base mechanic of a themed skill (%s)" % em.units[0].skill_id)
 	# Every faction's pieces of one slot: the same mechanic with different numbers
-	for slot in range(6):
+	for role in ["Tank", "Marksman", "Fighter", "Assassin", "Mage", "Support"]:
 		var seen := {}
 		for cid in GameData.continents.map(func(c): return c["id"]):
 			CardDatabase.set_continent(cid)
 			for f in GameData.get_continent(cid)["factions"]:
-				seen[str(CardDatabase.faction_pieces(f["id"])[slot]["skill"].get("params", {}))] = true
-		check(seen.size() >= 4, "piece slot %d: skill numbers vary between factions (%d variants)" % [slot, seen.size()])
+				seen[str(_piece_of_role(f["id"], role)["skill"].get("params", {}))] = true
+		check(seen.size() >= 4, "role %s: skill numbers vary between factions (%d variants)" % [role, seen.size()])
+	var arrangements := {}  # every faction deals the 7 roles to its 7 pieces differently
+	for cid in GameData.continents.map(func(c): return c["id"]):
+		CardDatabase.set_continent(cid)
+		for f in GameData.get_continent(cid)["factions"]:
+			arrangements[str(CardDatabase.faction_pieces(f["id"]).map(func(u): return u["role"]))] = true
+	check(arrangements.size() == 28, "the 28 factions have 28 different role arrangements (%d)" % arrangements.size())
 	# Every unit card has a buff on every continent (unique name per card; the Pawns differ per continent)
 	var queen_types := {}
 	for cid in GameData.continents.map(func(c): return c["id"]):
@@ -207,7 +213,7 @@ func _ready() -> void:
 		for f in GameData.get_continent(cid)["factions"]:
 			var qc: Dictionary = CardDatabase.faction_pieces(f["id"])[6]
 			queen_types[String(CardDatabase.get_buff(qc["id"])["type"])] = true
-			check(CardDatabase.skill_mechanic(qc) == "sovereign_decree", "%s: the Queen keeps the +15%% ATK aura" % f["id"])
+			check(CardDatabase.skill_mechanic(_piece_of_role(f["id"], "Controller")) == "dominion_bind", "%s: its Controller carries the crowd-control skill (Dominion Bind)" % f["id"])
 	check(queen_types.size() >= 7, "the Queens use at least 7 different buff effects (%s)" % str(queen_types.keys()))
 	var pawn_buffs := {}
 	for cid in GameData.continents.map(func(c): return c["id"]):
@@ -226,6 +232,33 @@ func _ready() -> void:
 	eg._damage(near, 50)
 	eg._damage(far, 50)
 	check(near_hp - near.hp < far_hp - far.hp, "Queen's guard: an ally next to her takes less damage (%d vs %d)" % [near_hp - near.hp, far_hp - far.hp])
+	# Controller: Dominion Bind stuns the highest-ATK enemies on its interval (no more team ATK aura)
+	CardDatabase.set_continent("aetherion")
+	var ctl_id: String = String(_piece_of_role("solvaris", "Controller")["id"])
+	var ec := BattleEngine.new()
+	ec.setup({"seed": 1, "ai_supports": [false, false], "sides": [
+		{"units": [{"card_id": ctl_id, "stars": 1, "cell": Vector2i(0, 7)}, {"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(1, 7)}], "champion": "champion_solvaris", "supports": []},
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(7, 0)}, {"card_id": "pawn_iron_pikeman", "stars": 1, "cell": Vector2i(6, 0)}, {"card_id": "pawn_dusk_cutpurse", "stars": 1, "cell": Vector2i(5, 0)}], "champion": "champion_nocthyr", "supports": []}]})
+	var ctl_ally: BattleUnit = ec.units_of(0)[1]
+	var ctl_ally_atk := ec.atk_now(ctl_ally)
+	check(ctl_ally_atk == ctl_ally.base_atk, "Controller no longer grants allies +15%% ATK (%d vs base %d)" % [ctl_ally_atk, ctl_ally.base_atk])
+	var ctl: BattleUnit = ec.units_of(0)[0]
+	var bind_iv: int = int(ctl.params.get("interval", 12))
+	var bind_n: int = int(ctl.params.get("targets", 2))
+	var foes: Array = ec.units_of(1)
+	var top: Array = foes.duplicate()
+	top.sort_custom(func(a: BattleUnit, b: BattleUnit) -> bool: return ec.atk_now(a) > ec.atk_now(b) if ec.atk_now(a) != ec.atk_now(b) else a.uid < b.uid)
+	while ec.tick < bind_iv - 1:
+		ec.step()
+	check(foes.all(func(e: BattleUnit) -> bool: return e.stun_until <= ec.tick), "Dominion Bind: nobody is stunned before its interval (%d ticks)" % bind_iv)
+	ec.step()
+	var stunned := 0
+	for e in foes:
+		if e.stun_until > ec.tick:
+			stunned += 1
+	check(stunned == bind_n, "Dominion Bind: stuns exactly %d enemies at tick %d (%d)" % [bind_n, bind_iv, stunned])
+	for i in range(bind_n):
+		check(top[i].stun_until > ec.tick, "Dominion Bind: %s (highest ATK #%d) is among the stunned" % [top[i].display_name, i + 1])
 	# Aetherion buffs in battle: armor, evade, thorns, ward, last rites
 	CardDatabase.set_continent("aetherion")
 	var eb := BattleEngine.new()
@@ -308,6 +341,14 @@ func _ready() -> void:
 
 	print("CARD TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(failures)
+
+
+## The piece of a faction (active continent) that holds the given role.
+func _piece_of_role(faction_id: String, role: String) -> Dictionary:
+	for u in CardDatabase.faction_pieces(faction_id):
+		if u["role"] == role:
+			return u
+	return {}
 
 
 ## A piece (Rook / Bishop / Queen ...) of any continent whose buff has the given effect type.

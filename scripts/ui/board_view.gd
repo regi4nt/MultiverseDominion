@@ -9,6 +9,8 @@ signal speed_changed(mult: float)  # the Speed button: AI turns and pawn hops ru
 var ctrl: MatchController
 var selected_index: int = -1
 
+var _skin: Dictionary = {}  # territory section of the continent's MapSkin (palette + motif pattern), see _terr()
+var _skin_id: String = "?"
 var _visual_pos: Dictionary = {}  # player_id -> float tile position (animated)
 var _busy: int = 0
 var _cell: float = 10.0
@@ -60,29 +62,29 @@ func _ready() -> void:
 	col.anchor_top = 0.55
 	col.anchor_bottom = 0.55
 	col.offset_left = 0.0
-	col.offset_right = 180.0
+	col.offset_right = 270.0
 	col.offset_top = 0.0
-	col.offset_bottom = 110.0
+	col.offset_bottom = 60.0
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 6)
 	col.add_child(bar)
 	for spec in [["+", 1.35], ["-", 1.0 / 1.35], ["Fit", 0.0]]:
 		var b := Button.new()
 		b.text = spec[0]
-		b.custom_minimum_size = Vector2(56, 52)
+		b.custom_minimum_size = Vector2(42, 52)
 		b.focus_mode = Control.FOCUS_NONE
 		b.modulate = Color(1, 1, 1, 0.85)
 		b.pressed.connect(_on_zoom_button.bind(float(spec[1])))
 		bar.add_child(b)
 		_zoom_btns.append(b)
 	_speed_btn = Button.new()
-	_speed_btn.custom_minimum_size = Vector2(124, 52)
+	_speed_btn.custom_minimum_size = Vector2(100, 52)
 	_speed_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_speed_btn.focus_mode = Control.FOCUS_NONE
 	_speed_btn.modulate = Color(1, 1, 1, 0.85)
 	_speed_btn.tooltip_text = "Game speed: AI turns and pawn movement"
 	_speed_btn.pressed.connect(_cycle_speed)
-	col.add_child(_speed_btn)
+	bar.add_child(_speed_btn)  # one row: + - Fit Speed
 	_update_speed_label()
 	resized.connect(queue_redraw)
 
@@ -377,16 +379,20 @@ func _select_at(pos: Vector2) -> void:
 
 
 func _tile_color(t: BoardTile) -> Color:
+	var sk := _terr()
+	var c := Color.GRAY
 	match t.type:
-		BoardTile.Type.CORNER: return Color("3a2a6b")
-		BoardTile.Type.TERRITORY: return Color("1a2342")
-		BoardTile.Type.PORTAL: return Color("1b1f3a")
-		BoardTile.Type.SHOP: return Color("1f4a4a")
-		BoardTile.Type.EVENT: return Color("4a3a1f")
-		BoardTile.Type.AUCTION: return Color("5a2f4a")
-		BoardTile.Type.TAX: return Color("5a2323")
-		BoardTile.Type.SPECIAL: return Color("2f3f6a")
-	return Color.GRAY
+		BoardTile.Type.CORNER: c = Color("3a2a6b")
+		BoardTile.Type.TERRITORY: return sk["tile"] if t.index % 2 == 0 else sk["tile_alt"]
+		BoardTile.Type.PORTAL: c = Color("1b1f3a")
+		BoardTile.Type.SHOP: c = Color("1f4a4a")
+		BoardTile.Type.EVENT: c = Color("4a3a1f")
+		BoardTile.Type.AUCTION: c = Color("5a2f4a")
+		BoardTile.Type.TAX: c = Color("5a2323")
+		BoardTile.Type.SPECIAL: c = Color("2f3f6a")
+		BoardTile.Type.BANK: c = Color("1f4a2f")
+		BoardTile.Type.CASINO: c = Color("5a1a2a")
+	return c.lerp(sk["tint"], float(sk["tint_amt"]))  # service tiles keep their meaning (colour family) but wear the continent's tint
 
 
 ## Which vector icon a tile shows ("" = none). Icons are drawn with _draw_icon (no textures, no font).
@@ -399,6 +405,8 @@ func _icon_kind(t: BoardTile) -> String:
 		BoardTile.Type.AUCTION: return "auction"
 		BoardTile.Type.TAX: return "tax"
 		BoardTile.Type.SPECIAL: return "special"
+		BoardTile.Type.BANK: return "bank"
+		BoardTile.Type.CASINO: return "casino"
 	return ""
 
 
@@ -409,6 +417,8 @@ func _icon_color(kind: String) -> Color:
 		"auction": return Color("f59cc8")
 		"tax": return Color("ff8f86")
 		"special": return Color("b4c4ff")
+		"bank": return Color("8df0a0")
+		"casino": return Color("ff6b7a")
 		"start": return Color("e9d27a")
 		"sanctuary": return Color("9ff0b4")
 		"rift": return Color("c9a2ff")
@@ -451,6 +461,14 @@ func _draw_icon(kind: String, c: Vector2, u: float, col: Color) -> void:
 				var rr := u * (1.1 if k % 2 == 0 else 0.38)
 				pts.append(c + Vector2(cos(a), sin(a)) * rr)
 			draw_colored_polygon(pts, col)
+		"bank":  # rising chart line with an arrowhead
+			draw_polyline(PackedVector2Array([c + Vector2(-0.95, 0.7) * u, c + Vector2(-0.3, 0.05) * u, c + Vector2(0.15, 0.4) * u, c + Vector2(0.85, -0.55) * u]), col, w)
+			draw_colored_polygon(PackedVector2Array([c + Vector2(1.05, -0.8) * u, c + Vector2(0.4, -0.7) * u, c + Vector2(0.95, -0.12) * u]), col)
+			draw_line(c + Vector2(-1.0, 0.98) * u, c + Vector2(1.0, 0.98) * u, Color(col, 0.6), maxf(1.0, w * 0.6))
+		"casino":  # die with three pips on a diagonal
+			draw_rect(Rect2(c + Vector2(-0.95, -0.95) * u, Vector2(1.9, 1.9) * u), col)
+			for d in [Vector2(-0.5, -0.5), Vector2(0, 0), Vector2(0.5, 0.5)]:
+				draw_circle(c + d * u, u * 0.2, Color(0, 0, 0, 0.7))
 		"start":  # flag
 			draw_line(c + Vector2(-0.55, -0.95) * u, c + Vector2(-0.55, 1.0) * u, col, w)
 			draw_colored_polygon(PackedVector2Array([c + Vector2(-0.55, -0.95) * u, c + Vector2(0.95, -0.4) * u, c + Vector2(-0.55, 0.15) * u]), col)
@@ -484,10 +502,20 @@ func _rr(r: Rect2, fill: Color, radius: float, border: Color = Color(0, 0, 0, 0)
 	draw_style_box(_sb, r)
 
 
+## Territory section of this continent's MapSkin (cached; the original look while no match is attached).
+func _terr() -> Dictionary:
+	var cid := String(ctrl.continent.get("id", "")) if ctrl != null else ""
+	if _skin.is_empty() or cid != _skin_id:
+		_skin_id = cid
+		_skin = MapSkin.get_skin(cid)["territory"]
+	return _skin
+
+
 func _draw() -> void:
 	_layout()
+	var sk := _terr()
 	var s := _cell * BoardBuilder.GRID
-	_rr(Rect2(_origin, Vector2(s, s)), Color("0a0f21"), _cell * 0.6, Color("4a4126"), 2.0, _cell * 0.5)
+	_rr(Rect2(_origin, Vector2(s, s)), sk["frame_bg"], _cell * 0.6, sk["frame"], 2.0, _cell * 0.5)
 	if ctrl == null:
 		return
 	var font := ThemeDB.fallback_font
@@ -501,7 +529,8 @@ func _draw() -> void:
 func _draw_tile(t: BoardTile, _font: Font) -> void:
 	var gap := maxf(1.5, _cell * 0.07)
 	var r := tile_rect(t.index).grow(-gap)
-	var rad := _cell * 0.2
+	var sk := _terr()
+	var rad := _cell * float(sk["radius"])
 	var base := _tile_color(t)
 	var border := base.lightened(0.22)
 	var bw := 1.0
@@ -515,6 +544,8 @@ func _draw_tile(t: BoardTile, _font: Font) -> void:
 		_sb.set_corner_radius_all(0)
 		var band := Rect2(r.position + Vector2(bw, bw), Vector2(r.size.x - bw * 2.0, maxf(3.0, r.size.y * 0.26)))
 		draw_rect(band, BoardBuilder.region_color(ctrl.continent, t.region))
+		var body := Rect2(r.position + Vector2(0.0, band.size.y + bw), Vector2(r.size.x, r.size.y - band.size.y - bw))
+		MapSkin.draw_motif(self, String(sk["pattern"]), body, MapSkin.motif_color(sk), t.index)  # the continent's own pattern on the ground
 		if t.owner_id >= 0:
 			var c: Color = ctrl.players[t.owner_id].color
 			draw_circle(r.get_center() + Vector2(0, r.size.y * 0.12), _cell * 0.12, c.lightened(0.3))
@@ -551,12 +582,15 @@ func _draw_level_marks(t: BoardTile, r: Rect2) -> void:
 
 func _draw_center(font: Font) -> void:
 	var inner := Rect2(_origin + Vector2(_cell * 2, _cell * 2), Vector2(_cell * 22, _cell * 22))
-	_rr(inner, Color(0.075, 0.1, 0.2, 0.96), _cell * 0.9, Color("3d3822"), 2.0)
+	var sk := _terr()
+	var plate: Color = Color(sk["center_bg"], 0.96)
+	_rr(inner, plate, _cell * 0.9, sk["center_border"], 2.0)
+	MapSkin.draw_watermark(self, String(ctrl.continent.get("id", "")), Rect2(inner.get_center() - Vector2(_cell * 8.5, _cell * 8.5), Vector2(_cell * 17.0, _cell * 17.0)), sk, plate)
 	var title := String(ctrl.continent.get("name", "")).to_upper()
 	var ty := inner.position.y + _cell * 3.2
 	draw_string_outline(font, Vector2(inner.position.x, ty), title, HORIZONTAL_ALIGNMENT_CENTER, inner.size.x, int(_cell * 1.6), 8, Color(0, 0, 0, 0.7))
-	draw_string(font, Vector2(inner.position.x, ty), title, HORIZONTAL_ALIGNMENT_CENTER, inner.size.x, int(_cell * 1.6), UiTheme.COL_GOLD)
-	draw_rect(Rect2(inner.position.x + inner.size.x * 0.3, ty + _cell * 0.6, inner.size.x * 0.4, 2.0), UiTheme.COL_GOLD_DIM)
+	draw_string(font, Vector2(inner.position.x, ty), title, HORIZONTAL_ALIGNMENT_CENTER, inner.size.x, int(_cell * 1.6), sk["title"])
+	draw_rect(Rect2(inner.position.x + inner.size.x * 0.3, ty + _cell * 0.6, inner.size.x * 0.4, 2.0), sk["title_dim"])
 	var names := BoardBuilder.DEFAULT_REGION_NAMES
 	var fs := int(_cell * 0.66)
 	for r in range(4):

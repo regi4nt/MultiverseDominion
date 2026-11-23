@@ -12,13 +12,17 @@ var action_box: HFlowContainer
 var log_view: RichTextLabel
 var tick: Timer
 var _leave_dialog: UiDialog
+var _wager_paid: int = 0  # coins paid out by the Arena wager at the end of the match
 var _stats_saved := false
 var _duel_node: Control = null
+var _hub_node: Control = null  # the Card Hub overlay (Collection / Deck / Info) while it is open
+var _hub_prev_continent: String = ""
 var _guide: TutorialGuide = null
 var _new_card: String = ""
 var _journey_lines: Array[String] = []  # Journey progress shown on the result screen
 var _hint_panel: PanelContainer
 var _hint_label: Label
+var _backdrop: TextureRect
 var _pan_key: String = ""  # "round:player" of the last turn the camera was moved for
 
 
@@ -34,13 +38,17 @@ func _ready() -> void:
 	if ctrl == null:
 		ctrl = MatchController.new()
 		ctrl.setup(GameSession.to_match_config())
+		GameSession.wager = 0  # the stake now belongs to the match (Play Again starts without a wager)
 	ctrl.log_added.connect(_on_log)
+	ctrl.monster_event.connect(_on_monster_event)
+	ctrl.deposit_event.connect(_on_deposit_event)
 	ctrl.state_changed.connect(_on_state_changed)
 	ctrl.players_changed.connect(_refresh_players)
 	ctrl.dice_rolled.connect(_on_dice)
 	ctrl.player_moved.connect(_on_moved)
 	ctrl.game_over.connect(_on_game_over)
 	board_view.bind(ctrl)
+	_backdrop.texture = UiTheme.backdrop_texture(String(ctrl.continent.get("id", "")))  # the continent's own sky
 	board_view.speed_changed.connect(_on_speed_changed)
 	board_view.tile_pressed.connect(func(i: int): board_view.info_text = ctrl.describe_tile(i))
 	for line in ctrl.recent_log:  # lines logged before the UI was connected (match start / resumed match)
@@ -63,7 +71,8 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	add_child(UiTheme.make_background())
+	_backdrop = UiTheme.make_background()  # re-skinned for the continent once the match exists
+	add_child(_backdrop)
 	var margin := UiTheme.make_margin(12)
 	add_child(margin)
 	var root := HBoxContainer.new()
@@ -110,6 +119,9 @@ func _build_ui() -> void:
 	menu.custom_minimum_size.x = 96
 	menu.pressed.connect(func(): _leave_dialog.popup_centered(Vector2i(460, 160)))
 	head.add_child(menu)
+	var hub_btn := UiTheme.make_button(GameSession.CARD_HUB_NAME, 48)  # Collection / Deck / Info without leaving the match
+	hub_btn.pressed.connect(_open_hub)
+	left.add_child(hub_btn)
 	_leave_dialog = UiDialog.new()
 	_leave_dialog.title = "Leave match?"
 	_leave_dialog.dialog_text = "Leave to the main menu? The match is saved at the start of each of your turns and can be continued."
@@ -118,12 +130,15 @@ func _build_ui() -> void:
 	_leave_dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
 	add_child(_leave_dialog)
 
-	var players_panel := PanelContainer.new()
-	players_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-	left.add_child(players_panel)
+	# The player cards live in a scroll area that takes the free height: when the floating action panel (bottom-right) grows,
+	# the cards scroll instead of sliding under it.
+	var players_scroll := UiTheme.make_scroll()
+	players_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left.add_child(players_scroll)
 	player_box = VBoxContainer.new()
+	player_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	player_box.add_theme_constant_override("separation", 8)
-	players_panel.add_child(player_box)
+	players_scroll.add_child(player_box)
 
 	_hint_panel = PanelContainer.new()  # Tutorial coach (hidden in normal matches)
 	_hint_panel.visible = false
@@ -148,25 +163,26 @@ func _build_ui() -> void:
 	log_view.add_theme_font_size_override("normal_font_size", 15)
 	log_panel.add_child(log_view)
 
-	# --- bottom-RIGHT corner of the screen: whose turn it is + the action buttons (Roll Dice, Reroll, Move, End Turn, Buy, Tax / Duel, ...).
-	# It floats over the corner of the side column (a spacer below keeps that column's content clear of it); the board itself stays
+	# --- bottom-LEFT corner of the screen: whose turn it is + the action buttons (Roll Dice, Reroll, Move, End Turn, Buy, Tax / Duel, ...).
+	# It floats over the corner of the log column (a spacer below keeps the log clear of it); the board itself stays
 	# uncovered: only the dice ANIMATION is drawn inside the map (BoardView).
 	var corner_gap := Control.new()
-	corner_gap.custom_minimum_size = Vector2(0, 190)
-	left.add_child(corner_gap)  # `left` is the column shown on the right
+	corner_gap.custom_minimum_size = Vector2(0, 120)  # follows the real height of the action panel (see _centre.resized below)
+	right.add_child(corner_gap)  # `right` is the column shown on the left (the log)
 	_centre = PanelContainer.new()
 	_centre.add_theme_stylebox_override("panel", UiTheme.make_box(Color(UiTheme.COL_PANEL, 0.96), UiTheme.COL_GOLD_DIM, 2, 10))
 	add_child(_centre)
-	_centre.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_centre.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_centre.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_centre.grow_horizontal = Control.GROW_DIRECTION_END
 	_centre.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_centre.offset_right = -12
+	_centre.offset_left = 12
 	_centre.offset_bottom = -12
-	_centre.offset_left = -12
+	_centre.offset_right = 12
 	_centre.offset_top = -12
 	var cv := VBoxContainer.new()
 	cv.add_theme_constant_override("separation", 6)
 	_centre.add_child(cv)
+	_centre.resized.connect(func(): corner_gap.custom_minimum_size.y = _centre.size.y + 8.0)
 	turn_label = UiTheme.make_label("", 20)
 	turn_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	turn_label.custom_minimum_size.x = 230
@@ -177,26 +193,26 @@ func _build_ui() -> void:
 	action_box.add_theme_constant_override("v_separation", 8)
 	cv.add_child(action_box)
 
-	# --- bottom-LEFT corner of the screen: zoom (+, -, Fit) and Speed, taken over from the board view.
+	# --- bottom-RIGHT corner of the screen: zoom (+, -, Fit) and Speed, taken over from the board view.
 	var map_controls := board_view.take_controls()
 	var left_gap := Control.new()
-	left_gap.custom_minimum_size = Vector2(0, 118)
-	right.add_child(left_gap)  # `right` is the column shown on the left
+	left_gap.custom_minimum_size = Vector2(0, 64)
+	left.add_child(left_gap)  # `left` is the column shown on the right (players)
 	add_child(map_controls)
-	map_controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	map_controls.grow_horizontal = Control.GROW_DIRECTION_END
+	map_controls.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	map_controls.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	map_controls.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	map_controls.offset_left = 12
+	map_controls.offset_right = -12
 	map_controls.offset_bottom = -12
-	map_controls.offset_right = 12
+	map_controls.offset_left = -12
 	map_controls.offset_top = -12
 
 
 # ------------------------------------------------------------------ signals
 
 func _on_tick() -> void:
-	if ctrl.state == MatchController.State.GAME_OVER or board_view.is_busy() or _duel_node != null:
-		return
+	if ctrl.state == MatchController.State.GAME_OVER or board_view.is_busy() or _duel_node != null or _hub_node != null:
+		return  # the match waits while a duel or the Card Hub is open
 	var p := ctrl.current_player()
 	if ctrl.state == MatchController.State.AWAIT_DUEL:
 		if not ctrl.is_human_duel():
@@ -211,11 +227,54 @@ func _on_tick() -> void:
 
 
 func _on_log(text: String) -> void:
-	if text.contains(" buys ") or text.contains("Victory Reward") or text.contains("passes the Dominion Gate"):
+	if text.contains(" buys ") or text.contains("Victory Reward") or text.contains("passes the Dominion Gate") or text.begins_with("Hidden treasure!") or text.begins_with("Hidden mine!"):
 		Sfx.play("coin")
 	elif text.contains("loses 1 Life") or text.contains("BANKRUPT"):
 		Sfx.play("error")
 	log_view.add_text(text + "\n")
+
+
+## A human ruler fought a hidden monster: show the outcome (the lair itself is never marked on the map).
+func _on_monster_event(pid: int, result: String, monster_id: String) -> void:
+	if result == "fled" or pid < 0 or pid >= ctrl.players.size() or ctrl.players[pid].is_ai:
+		return
+	var dlg := UiDialog.new()
+	if result == "won":
+		Sfx.play("victory")
+		dlg.title = "Monster defeated!"
+		dlg.dialog_text = "You won a Monster card.\n%s\n\nIt will fight beside your King when he enters Last Stand in a Duel. You can hold only one Monster card." % MonsterSystem.summary(monster_id, true)
+		dlg.tone = "info"
+	else:
+		Sfx.play("defeat")
+		dlg.title = "Beaten by the monster"
+		dlg.dialog_text = "The %s was too strong and you lost %d G. It stays in its lair - come back with a bigger army." % [GameData.get_monster(monster_id).get("name", "monster"), int(GameData.b("monster_defeat_gold"))]
+		dlg.tone = "warn"
+	dlg.show_cancel = false
+	add_child(dlg)
+	dlg.confirmed.connect(dlg.queue_free)
+	dlg.canceled.connect(dlg.queue_free)
+	dlg.popup_centered(Vector2i(520, 0))
+
+
+## A human ruler found a hidden treasure or mine (the spot itself is never marked on the map).
+func _on_deposit_event(pid: int, kind: String, deposit_id: String) -> void:
+	if pid < 0 or pid >= ctrl.players.size() or ctrl.players[pid].is_ai:
+		return
+	var d := GameData.get_deposit(deposit_id)
+	var dlg := UiDialog.new()
+	Sfx.play("victory")
+	if kind == "treasure":
+		dlg.title = "Hidden treasure!"
+		dlg.dialog_text = "%s\n\n%s\n\nIt is yours, and it is gone for everyone else." % [d.get("lore", ""), DepositSystem.summary(deposit_id)]
+	else:
+		dlg.title = "Hidden mine found!"
+		dlg.dialog_text = "%s\n\n%s\n\nThe mine is yours: it pays at the end of every round until it runs dry." % [d.get("lore", ""), DepositSystem.summary(deposit_id)]
+	dlg.tone = "info"
+	dlg.show_cancel = false
+	add_child(dlg)
+	dlg.confirmed.connect(dlg.queue_free)
+	dlg.canceled.connect(dlg.queue_free)
+	dlg.popup_centered(Vector2i(520, 0))
 
 
 func _on_dice(_d1: int, _d2: int) -> void:
@@ -296,6 +355,18 @@ func _refresh_players() -> void:
 			sl.tooltip_text = "Life | Land owned | RR = reroll tokens | SD = special dice"
 			sl.clip_text = true
 			col.add_child(sl)
+			if p.monster_id != "":  # Monster card: fights beside this ruler's King in Duels
+				var mon := GameData.get_monster(p.monster_id)
+				var mon_l := UiTheme.make_label("Monster: %s" % mon.get("name", "?"), 13, UiTheme.COL_GOLD)
+				mon_l.clip_text = true
+				mon_l.tooltip_text = "Monster card - joins the King in Last Stand.\n" + MonsterSystem.summary(p.monster_id, true)
+				col.add_child(mon_l)
+			var mines := DepositSystem.mines_of(ctrl.deposits, p.id)
+			if not mines.is_empty():  # hidden mines found by this ruler: income every round
+				var mine_l := UiTheme.make_label("Mines: %d  (+%d G / round)" % [mines.size(), DepositSystem.income_of(ctrl.deposits, p.id)], 13, UiTheme.COL_GOLD)
+				mine_l.clip_text = true
+				mine_l.tooltip_text = "\n".join(mines.map(func(e): return "%s (%d rounds left)" % [DepositSystem.summary(String(e["id"])), int(e["left"])]))
+				col.add_child(mine_l)
 			if not p.is_ai:  # the player's active Commander mission
 				var ml := UiTheme.make_label("Mission: " + CommanderSystem.mission_text(p), 13, UiTheme.COL_GOLD)
 				ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -370,8 +441,36 @@ func _autosave() -> void:
 		SaveManager.save_match(ctrl)
 
 
+## Card Hub as an overlay: the match is not saved or reloaded, it just pauses. The hub may switch the active continent
+## (Deck tab), so the continent of the match is restored when it closes. A deck saved there applies to the next match.
+func _open_hub() -> void:
+	if _hub_node != null or _duel_node != null or ctrl.state == MatchController.State.GAME_OVER:
+		return
+	_hub_prev_continent = CardDatabase.active_continent
+	var hub: Control = load("res://scenes/card_collection/card_collection.tscn").instantiate()
+	hub.embedded_close = _close_hub
+	var wrap := Control.new()
+	wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(wrap)
+	wrap.add_child(hub)
+	hub.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hub_node = wrap
+
+
+func _close_hub() -> void:
+	if _hub_node == null:
+		return
+	CardDatabase.set_continent(_hub_prev_continent)
+	_hub_node.queue_free()
+	_hub_node = null
+
+
 ## Android Back button. A duel cannot be abandoned.
 func on_back_requested() -> void:
+	if _hub_node != null:
+		_close_hub()
+		return
 	if _duel_node != null or ctrl.state == MatchController.State.GAME_OVER:
 		return
 	_leave_dialog.popup_centered(Vector2i(520, 200))
@@ -388,7 +487,11 @@ func _on_game_over(_winner: int) -> void:
 		_stats_saved = true
 		var cid := String(ctrl.continent["id"])
 		var mastered_before := SaveManager.is_journey_cleared(cid)
-		_new_card = SaveManager.record_match(human_won, ctrl.round_number, ctrl.players[0].gold, cid, ctrl.journey, String(ctrl.players[0].faction_id))
+		if ctrl.wager > 0 and not ctrl.wager_settled:  # Arena wager: paid at the start, settled once
+			ctrl.wager_settled = true
+			_wager_paid = SaveManager.settle_wager(ctrl.wager, "win" if human_won else "loss", ctrl.wager_odds)
+		_new_card = SaveManager.record_match(human_won, ctrl.round_number, ctrl.players[0].gold, cid, ctrl.journey, String(ctrl.players[0].faction_id),
+			ShopSystem.random_bonus(cid) if ctrl.random_map and not ctrl.journey else {})
 		if ctrl.journey:
 			var cname := String(ctrl.continent.get("name", cid))
 			_journey_lines.append("%s: %d / %d factions won" % [cname, SaveManager.journey_won_factions(cid).size(), SaveManager.journey_faction_total(cid)])
@@ -422,7 +525,12 @@ func _on_game_over(_winner: int) -> void:
 	if _new_card != "":
 		v.add_child(UiTheme.make_label("New card unlocked: %s" % CardDatabase.get_support(_new_card)["name"], 20, UiTheme.COL_GOLD))
 	if _stats_saved:
-		v.add_child(UiTheme.make_label("+%d Aether Coins" % SaveManager.last_reward, 20, UiTheme.COL_GOLD))
+		v.add_child(UiTheme.make_label("+%d Aether Coins%s" % [SaveManager.last_reward, ("  (random map: %s)" % SaveManager.last_bonus_text) if SaveManager.last_bonus_text != "" else ""], 20, UiTheme.COL_GOLD))
+		if ctrl.wager > 0:
+			if _wager_paid > 0:
+				v.add_child(UiTheme.make_label("Wager won: +%d coins (stake %d, x%s)" % [_wager_paid, ctrl.wager, str(snappedf(ctrl.wager_odds, 0.01))], 20, UiTheme.COL_GOLD))
+			else:
+				v.add_child(UiTheme.make_label("Wager lost: -%d coins" % ctrl.wager, 20, UiTheme.COL_DANGER))
 	var again := UiTheme.make_button("Play Again", 56)
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	v.add_child(again)

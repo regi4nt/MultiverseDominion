@@ -220,6 +220,7 @@ func unlock_card(card_id: String) -> bool:
 
 ## Coins earned by the last record_match (shown on the result screen).
 var last_reward: int = 0
+var last_bonus_text: String = ""  # Arena random-map bonus paid with the last win ("" = none)
 
 
 ## Every victory unlocks the next locked Support card. Returns its id ("" when everything is unlocked).
@@ -232,7 +233,7 @@ func unlock_next_card() -> String:
 
 
 ## Returns the id of the card unlocked by this result ("" if none).
-func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "") -> String:
+func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "", reward_bonus: Dictionary = {}) -> String:
 	var s: Dictionary = data["stats"]
 	s["matches_played"] += 1
 	s["total_rounds"] += rounds
@@ -248,10 +249,51 @@ func record_match(won: bool, rounds: int, final_gold: int, continent_id: String 
 			won_with.append(faction_id)
 		wins[continent_id] = won_with
 	last_reward = ShopSystem.WIN_REWARD if won else ShopSystem.LOSS_REWARD
+	last_bonus_text = ""
+	if won and not reward_bonus.is_empty():  # Arena random map: the drawn continent's own bonus
+		last_reward += int(round(ShopSystem.WIN_REWARD * float(reward_bonus.get("coins_pct", 0)) / 100.0)) + int(reward_bonus.get("coins_flat", 0))
+		add_fragments(int(reward_bonus.get("fragments", 0)))
+		last_bonus_text = String(reward_bonus.get("text", ""))
 	add_coins(last_reward)
 	var card := unlock_next_card() if won else ""
 	save_game()
 	return card
+
+
+## Pays the stake of a wager (coins are taken at the start of the match). false = not enough coins, nothing paid.
+func place_wager(stake: int) -> bool:
+	if stake <= 0:
+		return true
+	if not spend_coins(stake):
+		return false
+	save_game()
+	return true
+
+
+## Settles a wager: outcome "win" pays stake x odds (stake included), "draw" returns the stake, "loss" pays nothing.
+## Returns the coins paid out.
+func settle_wager(stake: int, outcome: String, odds: float) -> int:
+	if stake <= 0:
+		return 0
+	var paid := 0
+	match outcome:
+		"win":
+			paid = ShopSystem.wager_payout(stake, odds)
+		"draw":
+			paid = stake
+	if paid > 0:
+		add_coins(paid)
+	save_game()
+	return paid
+
+
+## Battle Chess (offline auto battle): pays Aether Coins only - no stats, no Journey progress, no card unlock.
+## Returns the coins paid.
+func record_practice(won: bool) -> int:
+	var reward := ShopSystem.PRACTICE_WIN_REWARD if won else ShopSystem.PRACTICE_LOSS_REWARD
+	add_coins(reward)
+	save_game()
+	return reward
 
 
 ## Fills the starter collection (all unit cards of every continent x 9, 15 default Support cards) and main deck.
@@ -315,8 +357,9 @@ func get_deck(continent_id: String = "") -> Deck:
 	var main: Dictionary = data["decks"].get("main", {})
 	var ubc: Dictionary = main.get("units_by_continent", {})
 	var deck := Deck.from_dict({"champion": main.get("champion", "champion_solvaris"), "supports": main.get("supports", []),
-		"continent": cid, "units": ubc.get(cid, [])})
+		"continent": cid, "units": ubc.get(cid, []), "lineup": (main.get("lineups_by_continent", {}) as Dictionary).get(cid, [])})
 	deck.sanitize_units()
+	deck.lineup = deck.valid_lineup()
 	deck.champion_id = player_champion_id()  # never a King of a locked faction
 	return deck
 
@@ -325,7 +368,18 @@ func set_deck(deck: Deck) -> void:
 	var main: Dictionary = data["decks"].get("main", {})
 	var ubc: Dictionary = main.get("units_by_continent", {})
 	ubc[deck.deck_continent()] = deck.unit_ids.duplicate() if deck.unit_ids.size() == Deck.UNIT_SLOTS else []
-	data["decks"]["main"] = {"champion": deck.champion_id, "supports": deck.support_ids.duplicate(), "units_by_continent": ubc}
+	data["decks"]["main"] = {"champion": deck.champion_id, "supports": deck.support_ids.duplicate(), "units_by_continent": ubc,
+		"lineups_by_continent": main.get("lineups_by_continent", {})}  # the lineup is saved separately (set_lineup)
+	save_game()
+
+
+## Saves the custom lineup (unit type -> cell on the deployment area) of a continent's deck. Empty = back to the default formation.
+func set_lineup(continent_id: String, entries: Array) -> void:
+	var main: Dictionary = data["decks"].get("main", {})
+	var lbc: Dictionary = main.get("lineups_by_continent", {})
+	lbc[continent_id] = entries.duplicate(true)
+	main["lineups_by_continent"] = lbc
+	data["decks"]["main"] = main
 	save_game()
 
 

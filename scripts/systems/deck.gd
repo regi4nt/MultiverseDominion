@@ -12,6 +12,9 @@ var champion_id: String = "champion_solvaris"
 var support_ids: Array[String] = []
 var continent_id: String = ""  # continent whose unit cards `unit_ids` come from ("" = the active continent)
 var unit_ids: Array[String] = []  # the 15 chosen unit types; empty = default of the King's faction
+## Custom lineup (Lineup tab): where each unit type stands on the deployment area; Auto Deploy follows it.
+## Entries: {"id": unit card id, "x": column 0..7, "y": row 4..7}. Empty = the default AI formation.
+var lineup: Array = []
 
 
 static func create_default() -> Deck:
@@ -103,8 +106,25 @@ func validate(collection: Dictionary = {}) -> Array[String]:
 	return errors
 
 
+## Lineup entries that are still usable: the unit type is in this deck, the cell is on the deployment area, one unit per cell.
+func valid_lineup() -> Array:
+	var types := effective_unit_ids()
+	var seen := {}
+	var out: Array = []
+	for e in lineup:
+		if typeof(e) != TYPE_DICTIONARY:
+			continue
+		var id := String(e.get("id", ""))
+		var cell := Vector2i(int(e.get("x", -1)), int(e.get("y", -1)))
+		if not types.has(id) or cell.x < 0 or cell.x >= 8 or cell.y < 4 or cell.y > 7 or seen.has(cell):
+			continue
+		seen[cell] = true
+		out.append({"id": id, "x": cell.x, "y": cell.y})
+	return out
+
+
 func to_dict() -> Dictionary:
-	return {"champion": champion_id, "supports": support_ids.duplicate(), "continent": continent_id, "units": unit_ids.duplicate()}
+	return {"champion": champion_id, "supports": support_ids.duplicate(), "continent": continent_id, "units": unit_ids.duplicate(), "lineup": lineup.duplicate(true)}
 
 
 static func from_dict(d: Dictionary) -> Deck:
@@ -115,4 +135,7 @@ static func from_dict(d: Dictionary) -> Deck:
 	deck.continent_id = String(d.get("continent", ""))
 	for id in d.get("units", []):
 		deck.unit_ids.append(String(id))
+	for e in d.get("lineup", []):
+		if typeof(e) == TYPE_DICTIONARY:
+			deck.lineup.append({"id": String(e.get("id", "")), "x": int(e.get("x", -1)), "y": int(e.get("y", -1))})
 	return deck

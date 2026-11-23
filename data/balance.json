@@ -95,6 +95,8 @@
 	"battle_reroll_price": 20,
 	"level_up_base": 40,
 	"champion_hp_mult": 3.0,
+	"check_shield_pct": 0.15,
+	"highland_atk_bonus": 0.15,
 	"practice_gold": 500,
 	"victory_gold": 100,
 	"enemy_budget": {
@@ -142,5 +144,31 @@
 		"rare": 5,
 		"epic": 7,
 		"legendary": 9
-	}
+	},
+	"bank_invest_options": [
+		100,
+		250,
+		500
+	],
+	"stock_change_min": -0.2,
+	"stock_change_max": 0.3,
+	"casino_bet": 50,
+	"casino_pot_seed": 200,
+	"casino_small_chance": 0.2,
+	"casino_small_mult": 2,
+	"casino_big_chance": 0.1,
+	"casino_big_mult": 4,
+	"casino_jackpot_chance": 0.02,
+	"fate_values": [
+		-200,
+		-100,
+		0,
+		100,
+		200,
+		300
+	],
+	"fate_detour": 3,
+	"monster_ally_stat_mult": 0.75,
+	"monster_defeat_gold": 50,
+	"monster_unique": true
 }

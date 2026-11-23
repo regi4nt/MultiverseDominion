@@ -46,31 +46,68 @@ static func _preferred_rows(role: String, side: int) -> Array[int]:
 
 
 ## Chooses the strongest units that fit the capacity and places them by role.
-static func auto_deploy(prep: BattlePrep, side: int = 0) -> void:
+## `lineup` (player side only): the custom lineup of the Deck ({id, x, y} entries). Units of those types go to their cells first
+## (strongest copy of a type first, while the capacity allows); the rest of the capacity is filled the usual way.
+static func auto_deploy(prep: BattlePrep, side: int = 0, lineup: Array = []) -> void:
 	var all: Array[UnitInstance] = prep.roster.units.duplicate()
 	for u in all:
 		u.cell = Vector2i(-1, -1)
+	var taken := {}
+	var used := 0
+	if side == 0 and not lineup.is_empty():
+		var entries: Array = lineup.duplicate()
+		entries.sort_custom(func(a, b) -> bool: return _best_power(all, String(a["id"])) > _best_power(all, String(b["id"])))
+		for e in entries:
+			var cell := Vector2i(int(e["x"]), int(e["y"]))
+			if taken.has(cell):
+				continue
+			var best: UnitInstance = null
+			for u in all:
+				if u.card_id == String(e["id"]) and u.cell.x < 0 and (best == null or power(u) > power(best)):
+					best = u
+			if best == null:
+				continue
+			var cost := CardDatabase.capacity_cost(best.chess())
+			if used + cost > prep.capacity():
+				continue
+			if not Terrain.can_stand(prep.terrain, int(CardDatabase.get_unit(best.card_id)["range"]), cell):
+				continue  # a melee unit cannot hold a highland of this duel
+			best.cell = cell
+			taken[cell] = true
+			used += cost
+		var rest: Array[UnitInstance] = []
+		for u in all:
+			if u.cell.x < 0:
+				rest.append(u)
+		all = rest
 	all.sort_custom(func(a: UnitInstance, b: UnitInstance) -> bool: return power(a) > power(b))
 	var chosen: Array[UnitInstance] = []
-	var used := 0
 	for u in all:
 		var cost := CardDatabase.capacity_cost(u.chess())
 		if used + cost <= prep.capacity():
 			chosen.append(u)
 			used += cost
-	var taken := {}
 	for u in chosen:
 		var placed := false
+		var u_range := int(CardDatabase.get_unit(u.card_id)["range"])
 		for row in _preferred_rows(String(CardDatabase.get_unit(u.card_id).get("role", "Fighter")), side):
 			for col in COLUMN_ORDER:
 				var c := Vector2i(col, row)
-				if not taken.has(c):
+				if not taken.has(c) and Terrain.can_stand(prep.terrain, u_range, c):
 					taken[c] = true
 					u.cell = c
 					placed = true
 					break
 			if placed:
 				break
+
+
+static func _best_power(units: Array[UnitInstance], card_id: String) -> float:
+	var best := -1.0
+	for u in units:
+		if u.card_id == card_id:
+			best = maxf(best, power(u))
+	return best
 
 
 static func _shop_loop(prep: BattlePrep, difficulty: String, rng: RandomNumberGenerator) -> void:
@@ -105,11 +142,12 @@ static func _shop_loop(prep: BattlePrep, difficulty: String, rng: RandomNumberGe
 			prep.refresh_offers(false)
 
 
-## Standalone AI army (Battle Practice, tests).
-static func build_enemy(difficulty: String, level: int, rng: RandomNumberGenerator, deck: Deck) -> BattlePrep:
+## Standalone AI army (Battle Chess, tests).
+static func build_enemy(difficulty: String, level: int, rng: RandomNumberGenerator, deck: Deck, terrain: Dictionary = {}) -> BattlePrep:
 	var budget_table: Dictionary = GameData.b("enemy_budget")
 	var budget := int(budget_table.get(difficulty, 450))
 	var prep := BattlePrep.new(deck, rng, budget, budget, level)
+	prep.terrain = terrain
 	_shop_loop(prep, difficulty, rng)
 	auto_deploy(prep, 1)
 	return prep
@@ -117,11 +155,12 @@ static func build_enemy(difficulty: String, level: int, rng: RandomNumberGenerat
 
 ## AI player prepares for a duel with its PERSISTENT army: spends part of its real gold,
 ## may level up, deploys, and returns the side config for BattleEngine.setup().
-static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: int) -> Dictionary:
+static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: int, terrain: Dictionary = {}) -> Dictionary:
 	var ratios: Dictionary = GameData.b("ai_battle_budget_ratio")
 	var budget := int(float(p.gold) * float(ratios.get(p.difficulty, 0.35)))
 	var prep := BattlePrep.new(p.deck, rng, p.gold, budget, p.level, p.roster, p.battle_deck, p.hand)
 	prep.price_mult = p.battle_price_mult()
+	prep.terrain = terrain
 	if p.difficulty != "easy":
 		var total_cost := 0
 		for u in p.roster.units:
@@ -134,7 +173,7 @@ static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: in
 	p.gold = prep.gold
 	p.level = prep.level
 	p.capacity = prep.capacity()
-	return prep.to_side_cfg(p.champion_id, p.hand, p.commander_star)
+	return prep.to_side_cfg(p.champion_id, p.hand, p.commander_star, p.monster_id)
 
 
 static func pick_champion(rng: RandomNumberGenerator, exclude: String = "") -> String:

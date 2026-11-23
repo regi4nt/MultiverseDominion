@@ -1,0 +1,271 @@
+{
+	"_doc": "Hidden territory deposits: 2 treasures (one-time reward: gold, Reroll Tokens, optionally a Special Die) and 2 mines (income in gold every round for a limited number of rounds, optionally a Reroll Token every token_every payouts) per continent, each continent with its own names and numbers. Each one lies on a RANDOM territory tile of the whole board (never on a monster lair) and is never drawn on the map: a player finds it only by landing there. A treasure is gone for everyone once found; a mine belongs to whoever found it (see DepositSystem).",
+	"continents": {
+		"aetherion": [
+			{
+				"id": "buried_royal_tithe",
+				"kind": "treasure",
+				"name": "Buried Royal Tithe",
+				"lore": "A tax chest the old kings hid before the last war.",
+				"gold": 300,
+				"tokens": 0,
+				"die": false
+			},
+			{
+				"id": "jewelers_cache",
+				"kind": "treasure",
+				"name": "Crown Jeweler's Cache",
+				"lore": "Gems sewn into a collapsed workshop wall.",
+				"gold": 180,
+				"tokens": 1,
+				"die": false
+			},
+			{
+				"id": "sunstone_quarry",
+				"kind": "mine",
+				"name": "Sunstone Quarry",
+				"lore": "Golden stone that the Sunmarch masons forgot.",
+				"income": 30,
+				"rounds": 10,
+				"token_every": 0
+			},
+			{
+				"id": "emerald_seam",
+				"kind": "mine",
+				"name": "Emerald Seam",
+				"lore": "A green vein running under the Vale roots.",
+				"income": 24,
+				"rounds": 12,
+				"token_every": 6
+			}
+		],
+		"arcanum": [
+			{
+				"id": "forgotten_grimoire_vault",
+				"kind": "treasure",
+				"name": "Forgotten Grimoire Vault",
+				"lore": "A sealed vault of spellbooks, worth more than their weight in gold.",
+				"gold": 200,
+				"tokens": 0,
+				"die": true
+			},
+			{
+				"id": "mana_crystal_hoard",
+				"kind": "treasure",
+				"name": "Mana Crystal Hoard",
+				"lore": "Condensed mana, humming softly inside a cracked lens.",
+				"gold": 260,
+				"tokens": 0,
+				"die": false
+			},
+			{
+				"id": "aether_crystal_mine",
+				"kind": "mine",
+				"name": "Aether Crystal Mine",
+				"lore": "Crystals that regrow overnight if you leave the roots.",
+				"income": 35,
+				"rounds": 9,
+				"token_every": 0
+			},
+			{
+				"id": "umbral_ink_wells",
+				"kind": "mine",
+				"name": "Umbral Ink Wells",
+				"lore": "Black ink the scribes of the Vault pay dearly for.",
+				"income": 26,
+				"rounds": 12,
+				"token_every": 6
+			}
+		],
+		"machina": [
+			{
+				"id": "scrap_barons_stash",
+				"kind": "treasure",
+				"name": "Scrap Baron's Stash",
+				"lore": "A rusted safe packed with coin and bearings.",
+				"gold": 280,
+				"tokens": 0,
+				"die": false
+			},
+			{
+				"id": "prototype_cache",
+				"kind": "treasure",
+				"name": "Prototype Cache",
+				"lore": "Unfinished inventions, sold to the first bidder.",
+				"gold": 160,
+				"tokens": 1,
+				"die": false
+			},
+			{
+				"id": "ironvein_shaft",
+				"kind": "mine",
+				"name": "Ironvein Shaft",
+				"lore": "A steady shaft with a pit-foreman still shouting orders.",
+				"income": 32,
+				"rounds": 10,
+				"token_every": 0
+			},
+			{
+				"id": "voltaic_ore_pit",
+				"kind": "mine",
+				"name": "Voltaic Ore Pit",
+				"lore": "Sparking ore that pays fast and burns out fast.",
+				"income": 40,
+				"rounds": 8,
+				"token_every": 0
+			}
+		],
+		"sylvaris": [
+			{
+				"id": "druids_seed_hoard",
+				"kind": "treasure",
+				"name": "Druid's Seed Hoard",
+				"lore": "Rare seeds and a purse left by a vanished druid.",
+				"gold": 220,
+				"tokens": 1,
+				"die": false
+			},
+			{
+				"id": "heartwood_hollow",
+				"kind": "treasure",
+				"name": "Heartwood Hollow",
+				"lore": "A hollow tree that swallowed a trader's fortune.",
+				"gold": 300,
+				"tokens": 0,
+				"die": false
+			},
+			{
+				"id": "amberwood_tap",
+				"kind": "mine",
+				"name": "Amberwood Tap",
+				"lore": "Amber sap tapped from trees older than the Dominion.",
+				"income": 28,
+				"rounds": 11,
+				"token_every": 0
+			},
+			{
+				"id": "moonroot_mine",
+				"kind": "mine",
+				"name": "Moonroot Mine",
+				"lore": "A slow, patient mine below the Terra Roots.",
+				"income": 22,
+				"rounds": 14,
+				"token_every": 0
+			}
+		],
+		"drakmor": [
+			{
+				"id": "dragons_hoard",
+				"kind": "treasure",
+				"name": "Dragon's Hoard",
+				"lore": "Gold the wyrm never came back to guard.",
+				"gold": 350,
+				"tokens": 0,
+				"die": false
+			},
+			{
+				"id": "warlords_war_chest",
+				"kind": "treasure",
+				"name": "Warlord's War Chest",
+				"lore": "A war chest and a trophy die from the Pits.",
+				"gold": 240,
+				"tokens": 0,
+				"die": true
+			},
+			{
+				"id": "obsidian_pit",
+				"kind": "mine",
+				"name": "Obsidian Pit",
+				"lore": "Black glass for blades, mined at a furious pace.",
+				"income": 38,
+				"rounds": 8,
+				"token_every": 0
+			},
+			{
+				"id": "brimstone_deep",
+				"kind": "mine",
+				"name": "Brimstone Deep",
+				"lore": "Sulfur and ore from the belly of the Hellforge.",
+				"income": 30,
+				"rounds": 10,
+				"token_every": 0
+			}
+		],
+		"thalassia": [
+			{
+				"id": "sunken_galleon",
+				"kind": "treasure",
+				"name": "Sunken Galleon",
+				"lore": "A galleon that settled on the shoals, hold still full.",
+				"gold": 330,
+				"tokens": 0,
+				"die": false
+			},
+			{
+				"id": "pearl_reef_cache",
+				"kind": "treasure",
+				"name": "Pearl Reef Cache",
+				"lore": "A smuggler's pearl store hidden in the Coral Atoll.",
+				"gold": 190,
+				"tokens": 1,
+				"die": false
+			},
+			{
+				"id": "salt_pan_works",
+				"kind": "mine",
+				"name": "Salt Pan Works",
+				"lore": "Slow but dependable salt pans on the strait.",
+				"income": 25,
+				"rounds": 12,
+				"token_every": 0
+			},
+			{
+				"id": "black_pearl_beds",
+				"kind": "mine",
+				"name": "Black Pearl Beds",
+				"lore": "Rare beds in the Trench that pay in bursts.",
+				"income": 36,
+				"rounds": 9,
+				"token_every": 0
+			}
+		],
+		"eclipsia": [
+			{
+				"id": "frozen_hour_vault",
+				"kind": "treasure",
+				"name": "Frozen-Hour Vault",
+				"lore": "A vault stuck in a single second, and a spare die within.",
+				"gold": 210,
+				"tokens": 0,
+				"die": true
+			},
+			{
+				"id": "paradox_strongbox",
+				"kind": "treasure",
+				"name": "Paradox Strongbox",
+				"lore": "A box that was already open before you found it.",
+				"gold": 280,
+				"tokens": 0,
+				"die": false
+			},
+			{
+				"id": "starfall_seam",
+				"kind": "mine",
+				"name": "Starfall Seam",
+				"lore": "Fallen star metal buried in the Solstice dials.",
+				"income": 34,
+				"rounds": 10,
+				"token_every": 0
+			},
+			{
+				"id": "echo_ore_lode",
+				"kind": "mine",
+				"name": "Echo Ore Lode",
+				"lore": "Ore that is mined again every time it is mined.",
+				"income": 24,
+				"rounds": 12,
+				"token_every": 4
+			}
+		]
+	}
+}

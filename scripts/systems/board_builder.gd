@@ -1,15 +1,16 @@
 class_name BoardBuilder
 extends RefCounted
 ## Builds the 100-tile perimeter board (26x26 grid ring) for a continent.
-## Per side (region): 24 non-corner tiles = 10 Territory, 4 Portal Socket, 2 Shop,
-## 3 Event, 1 Auction, 2 Tax, 2 Special. Plus 4 corners => 100 tiles.
-## Totals: 40 Territory, 16 Portal Socket, 8 Shop, 12 Event, 4 Auction, 8 Tax, 8 Special, 4 Corner.
+## Per side (region): 24 non-corner tiles = 10 Territory, 1 Portal (the only teleport of the side),
+## 2 Bank (gold investment / stock market), 1 Casino, 2 Shop, 3 Event, 1 Auction, 2 Tax, 2 Special.
+## Plus 4 corners => 100 tiles.
+## Totals: 40 Territory, 4 Portal, 8 Bank, 4 Casino, 8 Shop, 12 Event, 4 Auction, 8 Tax, 8 Special, 4 Corner.
 
 const TILES_TOTAL := 100
 const GRID := 26
 const SIDE_PATTERN: Array[String] = [
-	"T", "T", "P", "T", "E", "T", "SH", "T", "X", "P", "T", "SP",
-	"T", "E", "P", "T", "SH", "A", "T", "SP", "T", "X", "P", "E",
+	"T", "T", "B", "T", "E", "T", "SH", "T", "X", "P", "T", "SP",
+	"T", "E", "L", "T", "SH", "A", "T", "SP", "T", "X", "B", "E",
 ]
 const CORNERS: Array[String] = ["start", "sanctuary", "rift", "crossroads"]
 const CORNER_NAMES: Array[String] = ["Dominion Gate (START)", "Sanctuary", "The Rift", "Crossroads"]
@@ -73,6 +74,12 @@ static func build(continent: Dictionary) -> Array[BoardTile]:
 			"SP":
 				t.type = BoardTile.Type.SPECIAL
 				t.name = "Special (%s)" % region_name
+			"B":
+				t.type = BoardTile.Type.BANK
+				t.name = "Bank & Stocks (%s)" % region_name
+			"L":
+				t.type = BoardTile.Type.CASINO
+				t.name = "Casino (%s)" % region_name
 		tiles.append(t)
 	return tiles
 

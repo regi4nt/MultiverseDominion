@@ -13,7 +13,7 @@ const HINTS := {
 	"buy": "Free territory! Buy it with Dominion Gold: rivals landing on it pay you rent. Owning 6 of the 10 lands of a region raises rent; all 10 give Regional Dominion.",
 	"upgrade": "Your own land! Pay gold to upgrade it (Level 1-3, the last level is a Landmark): every level raises the rent rivals pay you.",
 	"auction": "Auction House: a free territory is sold to the highest bidder. Bid, or pass. Every ruler can join.",
-	"portal": "An active portal (purple)! Warp to another active portal. Portals move every round.",
+	"portal": "An active portal (purple)! Warp to another portal. Each side has only one portal.",
 	"shop": "Territory Shop: buy Reroll Tokens, a Special Die, or restore a lost Life.",
 	"tile_event": "Event tile: a random card gives gold, moves you, or grants tokens.",
 	"tile_tax": "Tax tile: the bank takes gold. Keep a reserve for taxes and rent.",
@@ -24,10 +24,10 @@ const HINTS := {
 	"duel_response": "You were challenged to a Duel! Accept to fight (defeat costs 1 Life), or refuse and pay rent plus a penalty.",
 	"duel_start": "DUEL! The armies fight on an 8x8 board. First prepare: buy units, deploy them on your half and lock the formation.",
 	"conquest": "You won the Duel! Choose Conquest to take the land, or a Victory Reward for gold.",
-	"special_die": "You received a Special Die! Before rolling you may use it: Swift boosts your move, Fortune gives gold, Warp teleports you, Order bends the turn order.",
+	"special_die": "You received a Special Die! Before rolling you may use it: Swift boosts your move, Thief steals gold, Broker moves your stocks, Warp teleports you, Order bends the turn order, Destiny tests your luck.",
 	"life": "A Life was lost. At 0 Life a ruler is eliminated; you can restore Life in the Territory Shop.",
-	"round": "A new round begins: the active portals shift. Round limit: the richest ruler wins.",
-	"finish": "Tutorial complete! You know the core rules. Try a full match from NEW MATCH, or practise in Battle Practice.",
+	"round": "A new round begins: the stock market moves. Round limit: the richest ruler wins.",
+	"finish": "Tutorial complete! You know the core rules. Try a full match from NEW MATCH, or play a Battle Chess battle to earn Aether Coins.",
 }
 
 ## Texts shown inside the Battle scene during a tutorial duel.

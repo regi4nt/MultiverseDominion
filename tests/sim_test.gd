@@ -9,7 +9,7 @@ func _ready() -> void:
 	var tiles := BoardBuilder.build(cont)
 	var counts := BoardBuilder.count_types(tiles)
 	print("Tile counts: ", counts)
-	var expect := {"Corner": 4, "Territory": 40, "Portal": 16, "Shop": 8, "Event": 12, "Auction": 4, "Tax": 8, "Special": 8}
+	var expect := {"Corner": 4, "Territory": 40, "Portal": 4, "Bank": 8, "Casino": 4, "Shop": 8, "Event": 12, "Auction": 4, "Tax": 8, "Special": 8}
 	if tiles.size() != 100 or counts != expect:
 		push_error("FAIL: board layout")
 		failures += 1

@@ -71,7 +71,15 @@
 					"champion": "champion_elarion",
 					"color": "#3fa7d6"
 				}
-			]
+			],
+			"random_bonus": {
+				"coins_pct": 25,
+				"text": "+25% coins",
+				"ingame": {
+					"start_gold_extra": 30
+				},
+				"ingame_text": "+30 G at START"
+			}
 		},
 		{
 			"id": "arcanum",
@@ -80,10 +88,10 @@
 			"playable": true,
 			"color": "#8a5cf0",
 			"modifier": {
-				"id": "arcane_conduits",
-				"name": "Arcane Conduits",
-				"description": "Two portals per region are active at a time (8 in total).",
-				"portals_per_region": 2
+				"id": "arcane_markets",
+				"name": "Arcane Markets",
+				"description": "Enchanted exchanges: the stock market of the Banks gains +10% every round.",
+				"stock_bias": 0.1
 			},
 			"factions": [
 				{
@@ -144,7 +152,15 @@
 				"Sigil",
 				"Veiled",
 				"Eldritch"
-			]
+			],
+			"random_bonus": {
+				"fragments": 20,
+				"text": "+20 fragments",
+				"ingame": {
+					"start_tokens": 2
+				},
+				"ingame_text": "2 Reroll Tokens at start"
+			}
 		},
 		{
 			"id": "machina",
@@ -218,7 +234,15 @@
 				"Turbine",
 				"Dynamo",
 				"Clockwork"
-			]
+			],
+			"random_bonus": {
+				"coins_flat": 40,
+				"text": "+40 coins",
+				"ingame": {
+					"unit_price_mult": 0.9
+				},
+				"ingame_text": "Battle Shop -10%"
+			}
 		},
 		{
 			"id": "sylvaris",
@@ -291,7 +315,16 @@
 				"Sunleaf",
 				"Briar",
 				"Amber"
-			]
+			],
+			"random_bonus": {
+				"fragments": 15,
+				"coins_flat": 15,
+				"text": "+15 fragments, +15 coins",
+				"ingame": {
+					"harvest_extra": 2
+				},
+				"ingame_text": "+2 G per territory each round"
+			}
 		},
 		{
 			"id": "drakmor",
@@ -365,7 +398,15 @@
 				"Obsidian",
 				"Wrath",
 				"Dread"
-			]
+			],
+			"random_bonus": {
+				"coins_pct": 40,
+				"text": "+40% coins",
+				"ingame": {
+					"duel_win_gold": 30
+				},
+				"ingame_text": "+30 G per duel won"
+			}
 		},
 		{
 			"id": "thalassia",
@@ -439,7 +480,15 @@
 				"Driftwood",
 				"Squall",
 				"Anchor"
-			]
+			],
+			"random_bonus": {
+				"coins_flat": 60,
+				"text": "+60 coins",
+				"ingame": {
+					"tax_mult": 0.75
+				},
+				"ingame_text": "Tax -25%"
+			}
 		},
 		{
 			"id": "eclipsia",
@@ -513,7 +562,15 @@
 				"Rift",
 				"Chrono",
 				"Infinite"
-			]
+			],
+			"random_bonus": {
+				"fragments": 25,
+				"text": "+25 fragments",
+				"ingame": {
+					"pass_token": 1
+				},
+				"ingame_text": "+1 Reroll Token at START"
+			}
 		}
 	]
 }

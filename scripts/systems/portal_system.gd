@@ -1,7 +1,8 @@
 class_name PortalSystem
 extends RefCounted
-## 16 Portal Sockets (4 per region), 4 active (1 per region). Active portals move
-## at the end of every full round. Single Continent Match: portals never leave the board.
+## Portal tiles: ONE per region (4 on the board) = the only teleports. With a single socket per
+## region it is always active (rotation keeps it on), so the 4 portals link the 4 sides.
+## Single Continent Match: portals never leave the board.
 
 
 static func sockets_in_region(tiles: Array[BoardTile], region: int) -> Array[BoardTile]:

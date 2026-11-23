@@ -1,6 +1,7 @@
 extends Control
-## Collection & Deck (one screen, two tabs).
+## Card Hub = Collection + Deck + Lineup + Info (one screen, four tabs; the screen name is GameSession.CARD_HUB_NAME).
 ## Collection tab: browse all unit and support cards, see star scaling and owned copies.
+## Info tab: a reference guide (deck rules, territory board, roles & skills, synergies, battle basics) built from the live game data.
 ## Deck tab (Clash Royale style): your deck as a grid of card tiles on the left, the card collection on the right.
 ## Tap a collection card to add it (deck full: it is held, then tap a deck card to swap); tap a deck card to remove it.
 ## The unit cards come from the selected continent (its factions can be mixed freely); the King and the Support cards are not tied to a continent.
@@ -17,11 +18,22 @@ var _save_btn: Button
 var _message: Label
 var _collection_view: Control
 var _deck_view: Control
+var _lineup_view: Control
+var _info_view: Control
+## Set by a host screen (Territory Board) that shows this screen as an overlay: called instead of changing scene on "Back".
+var embedded_close: Callable = Callable()
 var _tab_buttons: Dictionary = {}
+## True while this screen is an overlay on the Territory Board (mid-match): Deck and Lineup can be viewed but not changed.
+var read_only: bool = false
+const READ_ONLY_NOTE := "View only during a match - the Deck and Lineup can't be changed here."
+var _reset_btn: Button
+var _lineup_clear_btn: Button
+var _lineup_save_btn: Button
 
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	read_only = embedded_close.is_valid()  # set by the Territory Board before the screen enters the tree
 	CardDatabase.set_continent(GameSession.continent_id)  # cards show the factions of the selected continent
 	deck = SaveManager.get_deck(CardDatabase.active_continent)
 	if deck.unit_ids.is_empty():
@@ -35,22 +47,25 @@ func _ready() -> void:
 
 	var head := HBoxContainer.new()
 	root.add_child(head)
-	var title := UiTheme.make_label("COLLECTION & DECK", 36, UiTheme.COL_GOLD)
+	var title := UiTheme.make_label(GameSession.CARD_HUB_NAME.to_upper(), 36, UiTheme.COL_GOLD)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	var back := UiTheme.make_button("Back", 48)
 	back.custom_minimum_size.x = 140
 	var back_to := GameSession.collection_return if GameSession.collection_return != "" else "res://scenes/main_menu/main_menu.tscn"
-	GameSession.collection_return = ""
-	back.pressed.connect(func(): get_tree().change_scene_to_file(back_to))
+	if embedded_close.is_valid():  # overlay on the Territory Board: close it, the match stays untouched
+		back.pressed.connect(func(): embedded_close.call())
+	else:
+		GameSession.collection_return = ""
+		back.pressed.connect(func(): get_tree().change_scene_to_file(back_to))
 	head.add_child(back)
 
-	# Top-level tabs: Collection | Deck
+	# Top-level tabs: Lineup | Deck | Collection | Info
 	var modes := HBoxContainer.new()
 	modes.add_theme_constant_override("separation", 8)
 	root.add_child(modes)
 	var mgroup := ButtonGroup.new()
-	for spec in [["collection", "Collection"], ["deck", "Deck"]]:
+	for spec in [["lineup", "Lineup"], ["deck", "Deck"], ["collection", "Collection"], ["info", "Info"]]:
 		var mb := UiTheme.make_toggle(spec[1], mgroup, 52)
 		mb.custom_minimum_size.x = 200
 		mb.button_pressed = (spec[0] == ("deck" if GameSession.open_deck_tab else "collection"))
@@ -101,6 +116,10 @@ func _ready() -> void:
 		_pool_tab = "king"  # coming from New Match ("Change faction"): show the faction list right away
 	_deck_view = _build_deck_view()
 	root.add_child(_deck_view)
+	_lineup_view = _build_lineup_view()
+	root.add_child(_lineup_view)
+	_info_view = _build_info_view()
+	root.add_child(_info_view)
 	_show_tab("deck" if GameSession.open_deck_tab else "collection")
 	GameSession.open_deck_tab = false
 	_rebuild()
@@ -114,13 +133,18 @@ func _rebuild() -> void:
 	var entries: Array = []  # [card, is_support]
 	var order: Array = _continents_active_first()
 	if _filter != "support" and _filter != "king":
-		var seen := {}  # the 8 Pawns exist on every continent: listed once (as the active continent's)
+		var seen := {}  # the other pieces are unique to one continent; the 8 Pawns exist on EVERY continent (own faction names): all are listed
 		for cid in order:
 			for u in CardDatabase.units_of_continent(String(cid)):
-				if seen.has(u["id"]):
+				if _filter != "all" and u["chess"] != _filter:
 					continue
-				seen[u["id"]] = true
-				if _filter == "all" or u["chess"] == _filter:
+				if u["chess"] == "pawn":
+					var pv: Dictionary = u.duplicate()  # per-continent Pawn: locked until its faction is open (continent unlocked in Journey)
+					pv["continent"] = String(cid)
+					pv["vkey"] = "%s@%s" % [u["id"], cid]
+					entries.append([pv, false])
+				elif not seen.has(u["id"]):
+					seen[u["id"]] = true
 					entries.append([u, false])
 	if _filter == "all" or _filter == "king":
 		for cid in order:  # the King of every faction of every continent (Legendary); locked until the faction is open
@@ -183,9 +207,10 @@ func _add_card(c: Dictionary, support: bool) -> void:
 		cnt = 1 if CardDatabase.is_king(String(c["id"])) else SaveManager.owned_count(c["id"])  # a King is one card; 0 = drawn locked
 	v.setup(c, support, cnt)
 	v.pressed.connect(_on_card)
-	v.set_selected(c["id"] == _selected_id)
+	var key := String(c.get("vkey", c["id"]))  # a Pawn appears once per continent: "id@continent"
+	v.set_selected(key == _selected_id)
 	_grid.add_child(v)
-	_views[c["id"]] = v
+	_views[key] = v
 
 
 func _on_card(id: String) -> void:
@@ -197,6 +222,13 @@ func _on_card(id: String) -> void:
 
 
 func _describe(id: String) -> String:
+	if id.contains("@"):  # a Pawn of a given continent: describe it with that continent active (name, faction, buff)
+		var parts := id.split("@")
+		var prev := CardDatabase.active_continent
+		CardDatabase.active_continent = parts[1]
+		var text := _describe(parts[0])
+		CardDatabase.active_continent = prev
+		return text
 	if CardDatabase.is_king(id):
 		var kc := CardDatabase.king_card(id)
 		return _describe_king(id) + (_lock_note(kc) if not _is_owned(kc) else "")
@@ -251,8 +283,187 @@ func _buff_text(id: String) -> String:
 func _show_tab(which: String) -> void:
 	_collection_view.visible = (which == "collection")
 	_deck_view.visible = (which == "deck")
+	_lineup_view.visible = (which == "lineup")
+	_info_view.visible = (which == "info")
+	if which == "lineup":
+		_refresh_lineup()
 	if _tab_buttons.has(which):
 		_tab_buttons[which].button_pressed = true
+
+
+# ------------------------------------------------------------------ lineup tab (custom Battle Chess lineup)
+## Pick a unit type, tap a cell of the 8x4 deployment area to place it (tap the same type again to remove it).
+## Auto Deploy in Battle Chess / duels follows this lineup: units of these types go to their cells first, the rest is filled automatically.
+
+const LINEUP_COLS := 8
+const LINEUP_ROWS := [4, 5, 6, 7]  # row 4 = front line (facing the enemy), row 7 = back line
+
+var _lineup: Dictionary = {}  # Vector2i(col, row) -> unit card id (working copy; Save lineup writes it)
+var _lineup_pick: String = ""
+var _lineup_palette: VBoxContainer
+var _lineup_grid: GridContainer
+var _lineup_info: Label
+var _lineup_msg: Label
+
+
+func _build_lineup_view() -> Control:
+	var row := HBoxContainer.new()
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 12)
+	# left: the unit types of the deck
+	var left := PanelContainer.new()
+	left.custom_minimum_size.x = 250
+	row.add_child(left)
+	var lscroll := UiTheme.make_scroll()
+	left.add_child(lscroll)
+	_lineup_palette = VBoxContainer.new()
+	_lineup_palette.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lineup_palette.add_theme_constant_override("separation", 6)
+	lscroll.add_child(_lineup_palette)
+	# right: the deployment area
+	var right := VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_theme_constant_override("separation", 8)
+	row.add_child(right)
+	right.add_child(UiTheme.make_label("Custom lineup - Auto Deploy follows it", 22, UiTheme.COL_GOLD))
+	var hint := UiTheme.make_label(READ_ONLY_NOTE + " Front line (towards the enemy) is on top." if read_only else "Front line (towards the enemy) is on top. Pick a unit on the left, then tap a cell.", 16, UiTheme.COL_TEXT)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right.add_child(hint)
+	_lineup_grid = GridContainer.new()
+	_lineup_grid.columns = LINEUP_COLS
+	_lineup_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lineup_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_lineup_grid.add_theme_constant_override("h_separation", 4)
+	_lineup_grid.add_theme_constant_override("v_separation", 4)
+	right.add_child(_lineup_grid)
+	_lineup_info = UiTheme.make_label("", 17, UiTheme.COL_TEXT)
+	_lineup_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right.add_child(_lineup_info)
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 8)
+	right.add_child(foot)
+	var clear := UiTheme.make_button("Clear", 52)
+	clear.pressed.connect(_on_lineup_clear)
+	clear.visible = not read_only
+	_lineup_clear_btn = clear
+	foot.add_child(clear)
+	var save := UiTheme.make_primary("Save lineup", 52)
+	save.pressed.connect(_on_lineup_save)
+	save.visible = not read_only
+	_lineup_save_btn = save
+	foot.add_child(save)
+	_lineup_msg = UiTheme.make_label("", 16, UiTheme.COL_TEXT)
+	_lineup_msg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lineup_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	foot.add_child(_lineup_msg)
+	return row
+
+
+## Loads the saved lineup of the current deck and redraws the tab (called whenever the tab is opened).
+func _refresh_lineup() -> void:
+	_lineup.clear()
+	for e in deck.valid_lineup():  # entries of unit types no longer in the deck are dropped
+		_lineup[Vector2i(int(e["x"]), int(e["y"]))] = String(e["id"])
+	var types: Array[String] = deck.effective_unit_ids()
+	if _lineup_pick != "" and not types.has(_lineup_pick):
+		_lineup_pick = ""
+	_lineup_msg.text = ""
+	_rebuild_lineup()
+
+
+func _rebuild_lineup() -> void:
+	var types: Array[String] = deck.effective_unit_ids()
+	for c in _lineup_palette.get_children():
+		_lineup_palette.remove_child(c)
+		c.queue_free()
+	_lineup_palette.add_child(UiTheme.make_label("Unit types (%d)" % types.size(), 20, UiTheme.COL_GOLD))
+	var group := ButtonGroup.new()
+	for chess in CardDatabase.CHESS_ORDER:
+		for id in types:
+			var u := CardDatabase.get_unit(id)
+			if u.is_empty() or String(u["chess"]) != chess:
+				continue
+			var placed := 0
+			for v in _lineup.values():
+				if v == id:
+					placed += 1
+			var b := UiTheme.make_toggle("%s  [%s] x%d" % [u["name"], String(u["chess"]).substr(0, 1).to_upper(), placed], group, 46)
+			b.button_pressed = (id == _lineup_pick)
+			b.disabled = read_only  # the palette only exists to place units
+			b.tooltip_text = "%s - %s\nCapacity %d" % [u["name"], u["role"], CardDatabase.capacity_cost(String(u["chess"]))]
+			b.pressed.connect(func(): _lineup_pick = String(id))
+			_lineup_palette.add_child(b)
+	for c in _lineup_grid.get_children():
+		_lineup_grid.remove_child(c)
+		c.queue_free()
+	for r in LINEUP_ROWS:
+		for col in range(LINEUP_COLS):
+			var cell := Vector2i(col, int(r))
+			var id := String(_lineup.get(cell, ""))
+			var cb := UiTheme.make_button(_cell_label(id), 56)
+			cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			cb.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			cb.clip_text = true
+			cb.add_theme_font_size_override("font_size", 14)
+			if id != "":
+				var u := CardDatabase.get_unit(id)
+				cb.tooltip_text = String(u.get("name", id))
+			if not read_only:
+				cb.pressed.connect(_on_lineup_cell.bind(cell))
+			_lineup_grid.add_child(cb)
+	_update_lineup_info()
+
+
+func _cell_label(id: String) -> String:
+	if id == "":
+		return "+"
+	var u := CardDatabase.get_unit(id)
+	return "%s\n%s" % [String(u.get("name", id)).get_slice(" ", 0), String(u.get("chess", "")).substr(0, 1).to_upper()]
+
+
+func _on_lineup_cell(cell: Vector2i) -> void:
+	if read_only:
+		return
+	var cur := String(_lineup.get(cell, ""))
+	if cur != "" and (_lineup_pick == "" or cur == _lineup_pick):
+		_lineup.erase(cell)  # tap a placed unit again to remove it
+	elif _lineup_pick != "":
+		_lineup[cell] = _lineup_pick
+	_lineup_msg.text = ""
+	_rebuild_lineup()
+
+
+func _on_lineup_clear() -> void:
+	if read_only:
+		return
+	_lineup.clear()
+	_lineup_msg.text = ""
+	_rebuild_lineup()
+
+
+func _lineup_entries() -> Array:
+	var out: Array = []
+	for cell in _lineup:
+		out.append({"id": String(_lineup[cell]), "x": cell.x, "y": cell.y})
+	return out
+
+
+func _update_lineup_info() -> void:
+	var cost := 0
+	for v in _lineup.values():
+		cost += CardDatabase.capacity_cost(String(CardDatabase.get_unit(String(v)).get("chess", "")))
+	var per := int(GameData.b("capacity_per_level"))
+	var need_lv := maxi(int(ceil(float(cost) / float(maxi(per, 1)))), int(GameData.b("start_level")))
+	_lineup_info.text = "%d units placed - Capacity %d (needs level %d). If your capacity or army is smaller, the strongest units are deployed first; with an empty lineup Auto Deploy uses its default formation." % [_lineup.size(), cost, need_lv]
+
+
+func _on_lineup_save() -> void:
+	if read_only:
+		return
+	deck.lineup = _lineup_entries()
+	deck.lineup = deck.valid_lineup()
+	SaveManager.set_lineup(deck.deck_continent(), deck.lineup)
+	_lineup_msg.text = "Lineup saved." if not deck.lineup.is_empty() else "Lineup cleared (default formation)."
 
 
 # ------------------------------------------------------------------ deck editor
@@ -373,10 +584,13 @@ func _build_deck_view() -> Control:
 	var reset := UiTheme.make_button("Reset", 56)
 	reset.custom_minimum_size.x = 140
 	reset.pressed.connect(_on_reset)
+	reset.visible = not read_only
+	_reset_btn = reset
 	foot.add_child(reset)
 	_save_btn = UiTheme.make_primary("Save deck", 56)
 	_save_btn.custom_minimum_size.x = 200
 	_save_btn.pressed.connect(_on_save)
+	_save_btn.visible = not read_only
 	foot.add_child(_save_btn)
 
 	_rebuild_pool()
@@ -410,6 +624,9 @@ func _section_ids() -> Array[String]:
 
 
 func _on_deck_continent(cid: String) -> void:
+	if read_only:
+		_say(READ_ONLY_NOTE, true)
+		return
 	if cid == _deck_continent:
 		return
 	_deck_continent = cid
@@ -608,6 +825,9 @@ func _update_marks() -> void:
 
 ## Tap a collection card: in the deck -> remove; free slot -> add; deck full -> hold it, then tap a deck card to swap.
 func _toggle_unit(id: String) -> void:
+	if read_only:
+		_say(READ_ONLY_NOTE, true)
+		return
 	if deck.unit_ids.has(id):
 		deck.unit_ids.erase(id)
 	elif deck.unit_ids.size() >= UNIT_SLOTS:
@@ -624,6 +844,9 @@ func _toggle_unit(id: String) -> void:
 
 
 func _toggle_support(id: String) -> void:
+	if read_only:
+		_say(READ_ONLY_NOTE, true)
+		return
 	var need := int(GameData.b("deck_support"))
 	if deck.support_ids.has(id):
 		deck.support_ids.erase(id)
@@ -645,6 +868,9 @@ func _toggle_support(id: String) -> void:
 
 ## Tap a deck tile: swap in the held card, otherwise remove the card.
 func _on_slot(_card_id: String, index: int) -> void:
+	if read_only:
+		_say(READ_ONLY_NOTE, true)
+		return
 	var ids := _section_ids()
 	if index >= ids.size():
 		_say("Tap a card on the right to add it.", true)
@@ -659,6 +885,9 @@ func _on_slot(_card_id: String, index: int) -> void:
 
 
 func _set_king(id: String) -> void:
+	if read_only:
+		_say(READ_ONLY_NOTE, true)
+		return
 	if not SaveManager.can_use_faction(String(GameData.get_champion(id).get("faction", ""))):
 		_say("That faction is locked. Win its continent in Journey to unlock it.")
 		return
@@ -668,6 +897,9 @@ func _set_king(id: String) -> void:
 
 
 func _on_reset() -> void:
+	if read_only:
+		_say(READ_ONLY_NOTE, true)
+		return
 	var d := Deck.create_default()
 	d.champion_id = deck.champion_id
 	d.continent_id = _deck_continent
@@ -679,6 +911,9 @@ func _on_reset() -> void:
 
 
 func _on_save() -> void:
+	if read_only:
+		_say(READ_ONLY_NOTE, true)
+		return
 	var errors := _deck_errors()
 	if not errors.is_empty():
 		_say(String(errors[0]))
@@ -698,7 +933,10 @@ func _refresh() -> void:
 	_pool_tabs["units"].text = "Units  %d / %d" % [deck.unit_ids.size(), UNIT_SLOTS]
 	_pool_tabs["supports"].text = "Support  %d / %d" % [deck.support_ids.size(), int(GameData.b("deck_support"))]
 	_save_btn.disabled = not errors.is_empty()
-	if not errors.is_empty():
+	if read_only:
+		_message.text = READ_ONLY_NOTE
+		_message.add_theme_color_override("font_color", UiTheme.COL_MUTED)
+	elif not errors.is_empty():
 		_message.text = String(errors[0])
 		_message.add_theme_color_override("font_color", UiTheme.COL_DANGER)
 	elif _note != "":
@@ -707,3 +945,144 @@ func _refresh() -> void:
 	else:
 		_message.text = "Battle deck: %d cards. Tap a card to add or remove it." % (deck.unit_ids.size() * int(GameData.b("unit_copies")) + 1 + deck.support_ids.size())
 		_message.add_theme_color_override("font_color", UiTheme.COL_MUTED)
+
+
+
+# ------------------------------------------------------------------ info tab
+
+const INFO_SECTIONS := [["overview", "Overview"], ["territory", "Territory"], ["roles", "Roles & Skills"], ["synergy", "Synergies"], ["battle", "Battle"]]
+## Plain-language description of each role skill (base values; factions vary the numbers slightly).
+const MECHANIC_INFO := {
+	"bulwark": "On its first action, taunts adjacent enemies (about 6 ticks): they can only attack this unit.",
+	"ballista_volley": "Every ~12 ticks hits the 3 nearest enemies for its ATK.",
+	"charge": "On its first action, leaps next to the furthest enemy and stuns it for a short time.",
+	"night_gallop": "On its first action, teleports next to the weakest enemy; its next attack deals bonus damage.",
+	"arcane_barrage": "Every ~6th attack also hits enemies within 2 cells of the target for part of the damage.",
+	"blessed_mend": "Every ~10 ticks heals all allies for a percentage of their max HP.",
+	"dominion_bind": "Crowd control: every ~12 ticks stuns the 2 highest-ATK enemies on the field for a few ticks."}
+const ROLE_TARGETING := {
+	"Assassin": "Hunts the enemy with the lowest HP.",
+	"Marksman": "Shoots the weakest enemy already in range.",
+	"Mage": "Shoots the weakest enemy already in range."}
+var _info_text: RichTextLabel
+var _info_buttons: Dictionary = {}
+
+
+func _build_info_view() -> Control:
+	var row := HBoxContainer.new()
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 12)
+	var side := VBoxContainer.new()
+	side.custom_minimum_size.x = 240
+	side.add_theme_constant_override("separation", 8)
+	row.add_child(side)
+	var group := ButtonGroup.new()
+	for spec in INFO_SECTIONS:
+		var b := UiTheme.make_toggle(spec[1], group, 52)
+		b.button_pressed = (spec[0] == "overview")
+		b.pressed.connect(_show_info.bind(spec[0]))
+		side.add_child(b)
+		_info_buttons[spec[0]] = b
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(panel)
+	var scroll := UiTheme.make_scroll()
+	panel.add_child(scroll)
+	_info_text = RichTextLabel.new()
+	_info_text.bbcode_enabled = true
+	_info_text.fit_content = true
+	_info_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_info_text.add_theme_font_size_override("normal_font_size", 18)
+	scroll.add_child(_info_text)
+	_show_info("overview")
+	return row
+
+
+func _show_info(which: String) -> void:
+	_info_text.text = _info_content(which)
+	if _info_buttons.has(which):
+		_info_buttons[which].button_pressed = true
+
+
+func _info_head(text: String) -> String:
+	return "[color=#d4af37][b]%s[/b][/color]" % text
+
+
+func _info_content(which: String) -> String:
+	match which:
+		"territory":
+			return _info_territory()
+		"roles":
+			return _info_roles()
+		"synergy":
+			return _info_synergy()
+		"battle":
+			return _info_battle()
+	return _info_overview()
+
+
+func _info_overview() -> String:
+	var copies: Array = GameData.b("star_copies")
+	var cost := ""
+	for chess in CardDatabase.CHESS_ORDER + ["king"]:
+		cost += "%s %d   " % [String(chess).capitalize(), CardDatabase.capacity_cost(chess)]
+	return "%s\nA battle deck holds %d unit types x %d copies = %d unit cards, 1 King and %d Support cards (%d in total). The units come from one continent; its factions can be mixed freely, the King and the Support cards are not tied to a continent.\n\n%s\n1-star = %d card, 2-star = %d copies merged, 3-star = %d copies merged. Stars multiply HP and ATK.\n\n%s\nEvery piece costs Capacity when you deploy it: %s\n\n%s\n[b]Collection[/b] lists every card with its stats and skill. [b]Deck[/b] is where you build the deck and pick your faction. Save needs exactly 15 unit types and 15 Support cards." % [
+		_info_head("Deck rules"), 15, int(GameData.b("unit_copies")), 15 * int(GameData.b("unit_copies")), 15, 15 * int(GameData.b("unit_copies")) + 1 + 15,
+		_info_head("Stars"), int(copies[0]), int(copies[1]), int(copies[2]),
+		_info_head("Capacity"), cost.strip_edges(),
+		_info_head("Tabs")]
+
+
+func _pct(key: String) -> int:
+	return int(round(float(GameData.b(key)) * 100.0))
+
+
+func _info_territory() -> String:
+	var up_cost: Array = GameData.b("upgrade_cost_ratio")
+	var up_rent: Array = GameData.b("upgrade_rent_mult")
+	var cost_txt := ""
+	for i in range(up_cost.size()):
+		cost_txt += "%s%d%%" % ["" if i == 0 else " / ", int(round(float(up_cost[i]) * 100.0))]
+	var rent_txt := ""
+	for i in range(1, up_rent.size()):
+		rent_txt += "%sx%s" % ["" if i == 1 else " / ", str(float(up_rent[i]))]
+	return "%s\nThe Territory Board is a loop of tiles around the continent. Everyone starts with %d Dominion Gold and %d Life. Roll 2 dice and move that many tiles; a double (or a Time Surge event) gives another roll, up to %d bonus rolls. A Reroll Token lets you roll again before you move. Tap any tile to inspect it.\n\n%s\n[b]Territory[/b]: buy it if it is free; if an opponent owns it you must pay Tax or face a Duel (below).\n[b]START[/b]: passing or landing gives %d G.   [b]Sanctuary[/b]: rest and receive %d G.\n[b]Rift[/b]: you skip your next turn.   [b]Crossroads[/b]: free warp to a random active portal.\n[b]Portal[/b]: each side has ONE portal (4 in total); it warps you to another portal.\n[b]Bank & Stocks[/b]: invest gold (100 / 250 / 500) in the stock market. The market moves every round (-20% to +30%); sell on any Bank tile. Stocks count toward net worth and are cashed out automatically to pay debts.   [b]Casino[/b]: place a 50 G bet to win x2, x4 or the whole pot.\n[b]Event[/b]: draws a random event card.   [b]Auction[/b]: a random free territory is auctioned to all living players, opening at %d%% of its price and rising %d%% per bid.\n[b]Tax[/b]: pay %d G to the bank.   [b]Special[/b]: a random gift, teleport or tribute.\n[b]Territory Shop[/b]: Reroll Token %d G, restore 1 Life %d G, Special Die %d G (carry up to %d, used before rolling).\n\n%s\nRent is %d%% of a territory's price. Own %d or more tiles of one region for x%s rent; own the whole region (Regional Dominion) for x%s rent. You can upgrade a territory %d times (cost %s of its price); each level raises its rent (%s). Selling a territory returns %d%% of its price.\n\n%s\nWhen you stop on an opponent's territory, its owner chooses Tax or Duel. Tax is just the rent. If the owner picks Duel you may Accept or Refuse; refusing costs the rent plus %d G.\nA Duel is an automatic battle between both players' permanent armies (the units you buy with Dominion Gold are kept between duels). The loser loses 1 Life.\nIf the attacker wins they choose Conquest (take the territory) or Victory Reward (%d%% of its price in gold, the territory stays). If the attacker loses, the territory stays.\nIf you cannot pay, your territories are sold automatically; if that is still not enough you lose 1 Life and receive a %d G bailout. At 0 Life you are eliminated.\n\n%s\nThe last player alive wins, or after round %d the player with the highest net worth." % [
+		_info_head("The board"), int(GameData.b("start_gold")), int(GameData.b("start_life")), int(GameData.b("max_bonus_rolls")),
+		_info_head("Tiles"), int(GameData.b("start_bonus")), int(GameData.b("sanctuary_bonus")),
+		_pct("auction_start_ratio"), _pct("auction_step_ratio"), int(GameData.b("tax_flat")),
+		int(GameData.b("reroll_price")), int(GameData.b("heal_price")), int(GameData.b("special_die_price")), int(GameData.b("max_special_dice")),
+		_info_head("Rent and regions"), _pct("rent_rate"), int(GameData.b("majority_threshold")), str(float(GameData.b("majority_rent_mult"))), str(float(GameData.b("dominion_rent_mult"))),
+		int(GameData.b("max_tile_level")), cost_txt, rent_txt, _pct("sell_ratio"),
+		_info_head("Tax, Duel and Conquest"), int(GameData.b("refuse_duel_penalty")), _pct("duel_reward_ratio"), int(GameData.b("bailout_gold")),
+		_info_head("How to win"), int(GameData.b("max_rounds"))]
+
+
+func _info_roles() -> String:
+	var out := _info_head("The 7 roles") + "\nEvery faction deals these 7 roles to its 7 pieces (2 Rook, 2 Knight, 2 Bishop, Queen) in its own arrangement. A piece's role decides its HP, ATK, range and skill; the chess piece decides its movement and Capacity cost. The values below are the base numbers; each faction varies them slightly.\n\n"
+	for b in CardDatabase.SLOT_BASE:
+		var role := String(b["role"])
+		out += "%s  [color=#9aa0b5](base piece: %s)[/color]\nHP %d   ATK %d   Range %d   Move %d\n%s\n%s\n\n" % [
+			_info_head(role), String(b["chess"]).capitalize(), int(b["hp"]), int(b["atk"]), int(b["range"]), int(b["move"]),
+			String(MECHANIC_INFO.get(String(b["mechanic"]), "")), String(ROLE_TARGETING.get(role, "Attacks the nearest enemy."))]
+	out += "[color=#9aa0b5]Pawns have their own small skills (for example Moon Chill slows its target). Each unit card also carries one continent Buff, shown on its detail card.[/color]"
+	return out
+
+
+func _info_synergy() -> String:
+	var out := _info_head("Faction Synergy") + "\nUnits of the same faction on the field: 2 = +5%, 4 = +15%, 6 = +30% HP and ATK. It only works for a faction on its home continent.\n\n"
+	out += _info_head("Role Synergy") + "\nUnits of the same role on the field give that role a bonus:\n"
+	var tiers: Array = BattleEngine.ROLE_TIERS.duplicate()
+	tiers.reverse()
+	for t in tiers:
+		out += "%d units = +%d%%\n" % [int(t[0]), int(round(float(t[1]) * 100.0))]
+	out += "\nWhat it boosts:\n"
+	for role in BattleEngine.ROLE_FOCUS:
+		var focus := String(BattleEngine.ROLE_FOCUS[role])
+		var what := "HP" if focus == "hp" else ("ATK" if focus == "atk" else "HP and ATK (%d%% of the bonus)" % int(round(BattleEngine.ROLE_BOTH_FACTOR * 100.0)))
+		out += "%s: %s\n" % [role, what]
+	return out
+
+
+func _info_battle() -> String:
+	return "%s\nBattles are fought automatically on an 8x8 grid (1 tick = 0.25 s). Your units start on your 4 rows, the enemy on the other 4. Units walk and attack by themselves: they move toward a target, attack inside their range and use their skill.\n\n%s\nThe King does not start on the grid. It enters only when all your regular units have fallen, and then casts its active skill. If your King falls, you lose the battle.\n\n%s\nSupport cards are played by hand during the battle and cost Energy, which refills over time. Playing cards of the same category in a row gives a combo refund.\n\n%s\nIf nobody wins before the time limit, the side with more total HP wins." % [
+		_info_head("How a battle works"), _info_head("King and Last Stand"), _info_head("Support cards"), _info_head("Time limit")]

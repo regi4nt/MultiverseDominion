@@ -6,6 +6,7 @@ var uid: int = 0
 var side: int = 0  # 0 = bottom (rows 4-7), 1 = top (rows 0-3)
 var card_id: String = ""
 var is_king: bool = false
+var is_monster: bool = false  # a wild territory monster (foe) or a tamed Monster card fighting beside the King
 var display_name: String = ""
 var chess: String = "pawn"
 var role: String = "Fighter"

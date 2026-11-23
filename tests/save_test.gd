@@ -77,7 +77,7 @@ func _test_human_match_roundtrip() -> void:
 	for u in b.players[0].roster.units:
 		total += UnitRoster.copies_value(u.stars)
 	check(total + b.players[0].battle_deck.remaining() == 135, "card conservation after restore (units + pile = 135)")
-	check(CardDatabase.active_continent == "arcanum" and WorldMods.modifier_name == "Arcane Conduits", "continent skin and world modifier restored")
+	check(CardDatabase.active_continent == "arcanum" and WorldMods.modifier_name == "Arcane Markets", "continent skin and world modifier restored")
 
 
 func _test_unstable_states() -> void:

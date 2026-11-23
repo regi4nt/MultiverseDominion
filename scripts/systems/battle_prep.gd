@@ -4,6 +4,7 @@ extends RefCounted
 ## deployment on the 4x8 area (rows 4..7), capacity, budget. Gold is the single currency
 ## (Dominion Gold); "budget" is only a spending cap taken from the gold the player owns.
 
+var terrain: Dictionary = {}  # highland cells of this duel (see Terrain)
 const AREA_MIN_ROW := 4
 const AREA_MAX_ROW := 7
 
@@ -228,11 +229,35 @@ func deploy(u: UnitInstance, cell: Vector2i) -> String:
 	for o in roster.units:
 		if o != u and o.cell == cell:
 			return "Cell is occupied."
+	if not Terrain.can_stand(terrain, int(CardDatabase.get_unit(u.card_id)["range"]), cell):
+		return "Highland: ranged units only (Range 2+)."
 	if u.cell.x < 0:
 		if used_capacity() + CardDatabase.capacity_cost(u.chess()) > capacity():
 			return "Not enough capacity (%d/%d)." % [used_capacity(), capacity()]
 	u.cell = cell
 	return ""
+
+
+## A new duel brings new ground: sets the terrain and moves deployed melee units that now stand on a highland to a free plains cell.
+func set_terrain(t: Dictionary) -> void:
+	terrain = t
+	for u in deployed_units():
+		if Terrain.can_stand(terrain, int(CardDatabase.get_unit(u.card_id)["range"]), u.cell):
+			continue
+		var moved := false
+		for row in range(AREA_MAX_ROW, AREA_MIN_ROW - 1, -1):
+			for col in range(BattleEngine.COLS):
+				var c := Vector2i(col, row)
+				var free := not terrain.has(c)
+				for o in roster.units:
+					if o != u and o.cell == c:
+						free = false
+				if free:
+					u.cell = c
+					moved = true
+					break
+			if moved:
+				break
 
 
 func return_to_bench(u: UnitInstance) -> String:
@@ -260,8 +285,8 @@ func level_up() -> String:
 	return ""
 
 
-func to_side_cfg(champion_id: String, supports: Array, champion_star: int = 1) -> Dictionary:
+func to_side_cfg(champion_id: String, supports: Array, champion_star: int = 1, monster_id: String = "") -> Dictionary:
 	var list: Array = []
 	for u in deployed_units():
 		list.append({"card_id": u.card_id, "stars": u.stars, "cell": u.cell})
-	return {"units": list, "champion": champion_id, "supports": supports, "champion_star": champion_star}
+	return {"units": list, "champion": champion_id, "supports": supports, "champion_star": champion_star, "monster": monster_id}

@@ -23,12 +23,13 @@ static func mission_of(p: PlayerState) -> Dictionary:
 static func mission_text(p: PlayerState) -> String:
 	var m := mission_of(p)
 	if m.is_empty():
-		return "Commander at max stars"
+		return "Commander at max level"
 	return "%s (%d/%d)" % [m["desc"], p.mission_progress, int(m["target"])]
 
 
+## Commander/King level label ("Lv 1".."Lv 3"); the level is the Commander star count.
 static func star_text(star: int) -> String:
-	return "*".repeat(clampi(star, 1, max_star()))
+	return "Lv %d" % clampi(star, 1, max_star())
 
 
 static func hp_mult(star: int) -> float:

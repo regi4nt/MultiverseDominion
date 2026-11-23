@@ -22,6 +22,30 @@ func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 
+	# --- Arena random map: every playable continent has its own bonus, paid only on a win
+	var all_have := true
+	for cont in GameData.continents:
+		if cont.get("playable", false) and ShopSystem.random_bonus(String(cont["id"])).is_empty():
+			all_have = false
+	check(all_have, "every playable continent has a random-map bonus")
+	var c0 := SaveManager.coins()
+	var f0 := SaveManager.fragments()
+	SaveManager.record_match(true, 5, 100, "arcanum", false, "", ShopSystem.random_bonus("arcanum"))
+	check(SaveManager.fragments() == f0 + 20 and SaveManager.last_bonus_text != "", "Arcanum bonus: +20 fragments on a win")
+	SaveManager.record_match(false, 5, 100, "arcanum", false, "", ShopSystem.random_bonus("arcanum"))
+	check(SaveManager.fragments() == f0 + 20 and SaveManager.last_bonus_text == "", "no random-map bonus on a loss")
+	SaveManager.data["wallet"]["coins"] = c0
+	SaveManager.data["wallet"]["fragments"] = f0
+	# in-game bonus: human only, random map only
+	var mc := MatchController.new()
+	mc.setup({"mode": "custom_ai", "continent_id": "arcanum", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 3, "random_map": true})
+	check(mc.players[0].reroll_tokens >= 2 and mc.players[1].reroll_tokens == 0, "random map (Arcanum): the human starts with 2 Reroll Tokens, the AI with none")
+	var mc2 := MatchController.new()
+	mc2.setup({"mode": "custom_ai", "continent_id": "arcanum", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 3})
+	check(mc2.players[0].reroll_tokens == 0, "no random-map bonus without a random map")
+	var mc3 := MatchController.from_dict(mc.to_dict())
+	check(mc3.random_map and mc3.players[0].reroll_tokens == mc.players[0].reroll_tokens, "random map survives save and load without paying the gift twice")
+
 	check(SaveManager.coins() == 600, "a new profile starts with 600 coins")
 	check(SaveManager.spend_coins(100) and SaveManager.coins() == 500 and not SaveManager.spend_coins(501) and SaveManager.coins() == 500, "spending needs enough coins and never goes negative")
 	SaveManager.add_coins(100)

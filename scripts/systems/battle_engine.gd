@@ -41,6 +41,7 @@ var side_passive: Array = [{}, {}]  # battle passive of each side's King (data/k
 var king_skill_used: Array = [false, false]
 var manual_king: Array = [false, false]  # true = that side's King skill is cast by hand (human); false = on entry (AI / tests)
 var king_entry_tick: Array = [-1, -1]
+var monster_card: Array = ["", ""]  # Monster card of each side: that monster joins the King when he enters Last Stand
 var regulars_alive_at_entry: Array = [-1, -1]  # test hook: must always be 0
 var hands: Array = [[], []]
 var used_supports: Array = [[], []]
@@ -56,11 +57,17 @@ var combo_last_tick: Array = [-9999, -9999]
 var ai_supports: Array = [false, true]
 var bonus_gold: Array = [0, 0]
 var gold_delta: Array = [0, 0]  # gold gained/lost by Support cards (e.g. Blood Oath), applied after the duel
+var terrain: Dictionary = {}  # Vector2i -> true: highland cells (see Terrain); empty = all plains
 var walls: Dictionary = {}  # Vector2i -> tick when the wall expires (Forge Bastion)
 var revive_pending: Array = [false, false]  # Guardian Angel family: number of revives left (bool-compatible)
 var revive_hp_pct: Array = [50, 50]
 var lifesteal: Array = [0.0, 0.0]
 var haste_until: Array = [0, 0]
+## "Check": a Champion in the arena that an enemy can hit is in check. The first check of a battle gives it a one-time shield
+## (balance key check_shield_pct, share of max HP) so the side that is down still has a chance to turn it around.
+var in_check: Array = [false, false]
+var check_shield_used: Array = [false, false]
+var last_piece_warned: Array = [false, false]
 var finished: bool = false
 var winner: int = -1  # 0, 1, or -1 = draw
 var end_reason: String = ""
@@ -80,11 +87,13 @@ func setup(cfg: Dictionary) -> void:
 	ai_supports = cfg.get("ai_supports", [false, true])
 	manual_king = cfg.get("manual_king", [false, false])
 	free_supports = bool(cfg.get("free_supports", false))
+	terrain = cfg.get("terrain", {})
 	energy = [mini(int(GameData.b("energy_start", 2)), energy_max()), mini(int(GameData.b("energy_start", 2)), energy_max())]
 	for side in range(2):
 		var sc: Dictionary = cfg["sides"][side]
 		king_data[side] = String(sc.get("champion", ""))
 		king_star[side] = clampi(int(sc.get("champion_star", 1)), 1, CommanderSystem.max_star())
+		monster_card[side] = String(sc.get("monster", ""))
 		side_passive[side] = GameData.king_passives.get(king_data[side], {})
 		hands[side] = (sc.get("supports", []) as Array).duplicate()
 		for sid in hands[side]:
@@ -104,6 +113,13 @@ func setup(cfg: Dictionary) -> void:
 			var role := String(CardDatabase.get_unit(e["card_id"]).get("role", ""))
 			var rbn := role_bonus(role, int(roles.get(role, 0)))
 			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), float(rbn["hp"]), float(rbn["atk"]))
+	for side in range(2):  # wild monsters ("foes"): they are the regular units of a side that has no King (monster hunt)
+		var foes: Array = cfg["sides"][side].get("foes", [])
+		for i in range(foes.size()):
+			var fc := MonsterSystem.FOE_CELL + Vector2i(i, 0)
+			if side == 0:
+				fc = Vector2i(fc.x, 7 - fc.y)
+			_spawn_monster(side, String(foes[i]), fc, false)
 	for u in units:  # Queen of Machina: the side starts with shields
 		if u.extra == "opening_shield":
 			for a in units_of(u.side):
@@ -214,6 +230,40 @@ func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: 
 	return u
 
 
+## A monster of data/monsters.json as a battle unit. `ally` = a tamed Monster card (stats x monster_ally_stat_mult).
+func _spawn_monster(side: int, monster_id: String, cell: Vector2i, ally: bool) -> BattleUnit:
+	var m := GameData.get_monster(monster_id)
+	if m.is_empty():
+		return null
+	var st := MonsterSystem.stats(monster_id, ally)
+	var u := BattleUnit.new()
+	_uid += 1
+	u.uid = _uid
+	u.side = side
+	u.card_id = monster_id
+	u.is_monster = true
+	u.display_name = String(m["name"])
+	u.chess = String(m.get("chess", "knight"))
+	u.role = "Fighter"
+	u.faction = ""
+	u.stars = 1
+	u.max_hp = int(st["hp"])
+	u.hp = u.max_hp
+	u.base_atk = int(round(float(st["atk"]) * WorldMods.atk_mult))
+	u.atk_range = int(m.get("range", 1))
+	u.move = int(m.get("move", 1))
+	u.cell = cell
+	var bf: Dictionary = m.get("buff", {})
+	u.extra = String(bf.get("type", ""))
+	u.extra_value = float(bf.get("value", 0.0))
+	_init_buff(u)
+	if u.buff_next_tick != 0:
+		u.buff_next_tick = tick + BUFF_INTERVAL
+	units.append(u)
+	grid[cell] = u
+	return u
+
+
 ## A numeric skill parameter of a unit (data: skill.params), falling back to the base value.
 func _p(u: BattleUnit, key: String, default: Variant) -> Variant:
 	return u.params.get(key, default)
@@ -250,6 +300,7 @@ func _skill_interval(u: BattleUnit) -> int:
 		"rally_banner": return 8
 		"blessed_mend": return int(_p(u, "interval", 10))
 		"ballista_volley": return int(_p(u, "interval", 12))
+		"dominion_bind": return int(_p(u, "interval", 12))
 	return 0
 
 
@@ -293,14 +344,12 @@ func _in_bounds(c: Vector2i) -> bool:
 
 func atk_now(u: BattleUnit) -> int:
 	var m := 1.0
+	if terrain.has(u.cell) and Terrain.is_ranged(u.atk_range):
+		m *= 1.0 + float(GameData.b("highland_atk_bonus", 0.15))  # ranged unit on a highland
 	if u.buff_until > tick:
 		m *= u.buff_mult
 	if u.brace_active:
 		m *= 1.3
-	for a in units:
-		if a.side == u.side and a.alive and a.skill_id == "sovereign_decree":
-			m *= 1.15
-			break
 	if u.extra == "rage" and u.hp * 2 < u.max_hp:
 		m *= 1.0 + u.extra_value
 	elif u.extra == "frenzy":
@@ -319,7 +368,7 @@ func _free_cell_near(c: Vector2i) -> Vector2i:
 	for y in range(ROWS):
 		for x in range(COLS):
 			var p := Vector2i(x, y)
-			if _blocked(p):
+			if _blocked(p) or terrain.has(p):  # summons / entering Champions are melee: plains only
 				continue
 			var d := _dist(p, c) * 10 + absi(p.x - c.x) + absi(p.y - c.y)
 			if d < best_d:
@@ -333,7 +382,7 @@ func _free_adjacent(c: Vector2i, prefer: Vector2i) -> Vector2i:
 	var best_d := 999
 	for d in DIRS:
 		var p := c + d
-		if _in_bounds(p) and not _blocked(p):
+		if _in_bounds(p) and not _blocked(p) and not terrain.has(p):  # teleports land on plains only
 			var dd := _dist(p, prefer)
 			if dd < best_d:
 				best_d = dd
@@ -368,6 +417,7 @@ func step() -> void:
 	if ai_supports[0] or ai_supports[1]:
 		_ai_use_supports()
 	_check_king_entries()
+	_update_check()
 	_check_end()
 	if not finished and tick >= MAX_TICKS:
 		var a := total_hp(0)
@@ -428,41 +478,38 @@ func _pick_target(u: BattleUnit) -> BattleUnit:
 
 
 func _move_toward(u: BattleUnit, target: BattleUnit) -> void:
+	# Chess movement (see ChessMove): breadth-first search over whole moves (a rook slide, a knight jump, ...),
+	# so the unit takes the first move of the shortest route to any cell from which it can hit the target.
 	var start := u.cell
-	var prev := {start: start}
+	var rng_u := u.atk_range
+	var blocked := func(c: Vector2i) -> bool: return _blocked(c) or not Terrain.can_stand(terrain, rng_u, c)  # highland: ranged only
+	var first := {start: start}  # cell -> the first-move destination that leads to it
 	var queue: Array[Vector2i] = [start]
 	var goal := Vector2i(-1, -1)
 	var qi := 0
-	while qi < queue.size():
+	while qi < queue.size() and goal.x < 0:
 		var c: Vector2i = queue[qi]
 		qi += 1
-		if c != start and _dist(c, target.cell) <= u.atk_range:
-			goal = c
-			break
-		for d in DIRS:
-			var n := c + d
-			if not _in_bounds(n) or prev.has(n) or _blocked(n):
+		for n in ChessMove.move_cells(u.chess, c, u.move, u.side, blocked):
+			if first.has(n):
 				continue
-			prev[n] = c
+			first[n] = n if c == start else first[c]
+			if _dist(n, target.cell) <= u.atk_range:
+				goal = n
+				break
 			queue.append(n)
-	if goal.x < 0:
-		# Path blocked: step to the free neighbour that gets closest.
-		var best := Vector2i(-1, -1)
-		var best_d := _dist(u.cell, target.cell)
-		for d in DIRS:
-			var n := u.cell + d
-			if _in_bounds(n) and not _blocked(n) and _dist(n, target.cell) < best_d:
-				best_d = _dist(n, target.cell)
-				best = n
-		if best.x >= 0:
-			_move_unit(u, best)
+	if goal.x >= 0:
+		_move_unit(u, first[goal])
 		return
-	var path: Array[Vector2i] = []
-	var cur := goal
-	while cur != start:
-		path.push_front(cur)
-		cur = prev[cur]
-	_move_unit(u, path[mini(u.move, path.size()) - 1])
+	# No route (walled in): take the legal move that gets closest, if any.
+	var best := Vector2i(-1, -1)
+	var best_d := _dist(start, target.cell)
+	for n in ChessMove.move_cells(u.chess, start, u.move, u.side, blocked):
+		if _dist(n, target.cell) < best_d:
+			best_d = _dist(n, target.cell)
+			best = n
+	if best.x >= 0:
+		_move_unit(u, best)
 
 
 func _move_unit(u: BattleUnit, c: Vector2i) -> void:
@@ -632,6 +679,21 @@ func _periodic_skill(u: BattleUnit) -> void:
 			for i in range(mini(int(_p(u, "targets", 3)), list.size())):
 				var dealt := _damage(list[i], atk_now(u))
 				events.append({"type": "attack", "from": u.cell, "to": list[i].cell, "dmg": dealt})
+		"dominion_bind":
+			# Controller: crowd control. Stuns the highest-ATK enemies (the biggest threats) on the whole field.
+			var foes := units_of(1 - u.side)
+			foes.sort_custom(func(a: BattleUnit, b: BattleUnit) -> bool:
+				var aa := atk_now(a)
+				var bb := atk_now(b)
+				if aa != bb:
+					return aa > bb
+				return a.uid < b.uid)
+			var bound := 0
+			for i in range(mini(int(_p(u, "targets", 2)), foes.size())):
+				foes[i].stun_until = maxi(foes[i].stun_until, tick + int(_p(u, "stun_ticks", 2)) + 1)
+				bound += 1
+			if bound > 0:
+				_log("%s binds %d enem%s!" % [u.display_name, bound, "y" if bound == 1 else "ies"])
 
 
 ## Returns true if the opening skill consumed this unit's action.
@@ -688,6 +750,49 @@ func _check_king_entries() -> void:
 			_enter_king(side)
 
 
+## Living enemies that can hit this side's Champion right now (empty = no check).
+func king_threats(side: int) -> Array[BattleUnit]:
+	var out: Array[BattleUnit] = []
+	var k: BattleUnit = kings[side]
+	if k == null or not k.alive:
+		return out
+	for e in units_of(1 - side):
+		if _dist(e.cell, k.cell) <= e.atk_range:
+			out.append(e)
+	return out
+
+
+func _update_check() -> void:
+	for side in range(2):
+		if king_data[side] == "":
+			continue
+		if not king_entered[side]:
+			# warning: the last regular piece is all that keeps the Champion out of the arena
+			if not last_piece_warned[side] and regulars_alive(side) == 1:
+				last_piece_warned[side] = true
+				events.append({"type": "last_piece", "side": side})
+				_log("Last piece! Side %d has one unit left before its Champion must step in." % side)
+			continue
+		var k: BattleUnit = kings[side]
+		var threats := king_threats(side)
+		if threats.is_empty():
+			in_check[side] = false
+			continue
+		if not in_check[side]:
+			in_check[side] = true
+			var cells: Array = []
+			for t in threats:
+				cells.append(t.cell)
+			events.append({"type": "check", "side": side, "cells": cells})
+			_log("CHECK! %s (side %d) is under attack." % [k.display_name, side])
+			if not check_shield_used[side]:
+				check_shield_used[side] = true
+				var sh := int(round(k.max_hp * float(GameData.b("check_shield_pct", 0.15))))
+				k.shield += sh
+				events.append({"type": "fx", "cells": [k.cell]})
+				_log("%s braces: +%d shield." % [k.display_name, sh])
+
+
 func _enter_king(side: int) -> void:
 	var ch := GameData.get_champion(king_data[side])
 	var u := BattleUnit.new()
@@ -723,7 +828,15 @@ func _enter_king(side: int) -> void:
 	king_entered[side] = true
 	king_entry_tick[side] = tick
 	regulars_alive_at_entry[side] = regulars_alive(side)
+	if monster_card[side] != "":  # the Monster card answers the King's call and fights beside him
+		var mc := _free_cell_near(u.cell)
+		if mc.x >= 0:
+			var mu := _spawn_monster(side, String(monster_card[side]), mc, true)
+			if mu != null:
+				events.append({"type": "fx", "cells": [mc]})
+				_log("%s joins %s!" % [mu.display_name, u.display_name])
 	_log("LAST STAND! %s enters the arena (side %d)." % [u.display_name, side])
+	events.append({"type": "last_stand", "side": side})
 	events.append({"type": "fx", "cells": [u.cell]})
 	if manual_king[side]:
 		_log("%s waits for the King skill (%s)." % [u.display_name, String(ch.get("active_name", "skill"))])
@@ -830,6 +943,9 @@ func _check_end() -> void:
 			lost[s] = not (kings[s] as BattleUnit).alive
 		elif king_data[s] == "":
 			lost[s] = regulars_alive(s) == 0
+	for s2 in range(2):
+		if lost[s2] and king_entered[s2]:
+			events.append({"type": "mate", "side": s2})
 	if lost[0] and lost[1]:
 		_finish(-1, "Both Champions fell")
 	elif lost[0]:

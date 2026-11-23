@@ -48,7 +48,7 @@ func _ready() -> void:
 	var play := UiTheme.make_button("NEW MATCH", 68)
 	play.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/match_setup/match_setup.tscn"))
 	right.add_child(play)
-	var coll := UiTheme.make_button("Collection & Deck")
+	var coll := UiTheme.make_button(GameSession.CARD_HUB_NAME)
 	coll.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/card_collection/card_collection.tscn"))
 	right.add_child(coll)
 	var shop := UiTheme.make_button("Shop")

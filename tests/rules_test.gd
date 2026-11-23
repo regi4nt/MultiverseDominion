@@ -12,6 +12,13 @@ func check(cond: bool, msg: String) -> void:
 		print("ok  - ", msg)
 
 
+## Match on the neutral base Special Dice / events (swift, warp, order, destiny, thief, broker), whatever the continent.
+func new_base_match(seed_v: int = 11) -> MatchController:
+	var c := new_match(seed_v)
+	GameData.apply_flavor("")
+	return c
+
+
 func new_match(seed_v: int = 11) -> MatchController:
 	var c := MatchController.new()
 	c.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 3, "seed": seed_v, "all_ai": true})
@@ -35,6 +42,8 @@ func _ready() -> void:
 	_test_unlocks()
 	_test_upgrades()
 	_test_commander()
+	_test_bank_casino()
+	_test_continent_flavor()
 	_test_games()
 	print("RULES TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(failures)
@@ -199,6 +208,108 @@ func _test_upgrades() -> void:
 	check(not AIController._wants_to_upgrade(ai, 100), "AI does not upgrade when it would dip into its reserve")
 
 
+func land_on(c: MatchController, pid: int, type: int) -> void:
+	for t in c.tiles:
+		if t.type == type:
+			c.current = pid
+			c.players[pid].position = t.index
+			break
+	c.state = MatchController.State.ROLLED
+	c.pending = {}
+	c._resolve_landing(c.players[pid])
+
+
+func _test_bank_casino() -> void:
+	var c := new_match(5)
+	for side in range(4):
+		var n := 0
+		for t in c.tiles:
+			if t.type == BoardTile.Type.PORTAL and t.region == side:
+				n += 1
+		check(n == 1, "side %d has exactly 1 portal" % side)
+	check(PortalSystem.active_indices(c.tiles).size() == 4, "all 4 portals are active")
+	# Bank
+	var p := c.players[0]
+	p.gold = 1000
+	land_on(c, 0, BoardTile.Type.BANK)
+	check(String(c.pending.get("type", "")) == "bank", "landing on a Bank opens the bank decision")
+	c.decide("invest_250")
+	check(p.gold == 750 and p.stock_value == 250 and p.stock_basis == 250, "invest 250 G moves gold into the portfolio")
+	check(String(c.pending.get("type", "")) == "bank", "the bank stays open for more actions")
+	check(EconomySystem.networth(c.tiles, p) == 1000, "stocks count toward net worth")
+	c._update_market()
+	check(p.stock_value == int(round(250.0 * (1.0 + c.market_change))), "market round moves the portfolio")
+	check(c.market_change >= -0.2001 and c.market_change <= 0.3001, "market change stays within bounds")
+	var v := p.stock_value
+	c.decide("withdraw")
+	check(p.stock_value == 0 and p.gold == 750 + v, "selling returns the portfolio to gold")
+	c.decide("leave")
+	check(c.pending.is_empty(), "leave closes the bank")
+	# forced cash-out when paying a debt
+	p.gold = 0
+	p.stock_value = 300
+	p.stock_basis = 300
+	c._pay(p, 200, -1, "test")
+	check(p.stock_value == 0 and p.gold == 100 and p.alive and p.life == 3, "debt is paid from stocks before land is sold")
+	# Casino
+	var q := c.players[1]
+	q.gold = 1000
+	land_on(c, 1, BoardTile.Type.CASINO)
+	check(String(c.pending.get("type", "")) == "casino", "landing on the Casino opens a bet offer")
+	var pot0 := c.casino_pot
+	c.decide("bet")
+	check(c.pending.is_empty() and c.stats["bets"] == 1, "bet resolves in one step")
+	check(q.gold != 1000 or c.casino_pot != pot0, "bet was paid")
+	var q2 := c.players[2]
+	q2.gold = 10
+	land_on(c, 2, BoardTile.Type.CASINO)
+	check(c.pending.is_empty(), "no bet offer when broke")
+	# Destiny Die uses the Fate faces
+	var dest_seen := {}
+	for sd in range(1, 60):
+		var cd := new_base_match(sd)
+		var dp := cd.players[0]
+		dp.gold = 1000
+		dp.special_dice.append("destiny")
+		var dg := dp.gold
+		var dt := dp.reroll_tokens
+		cd.current = 0
+		var used := cd.use_special_die(0)
+		if sd == 1:
+			check(used == "" and dp.special_dice.is_empty(), "Destiny Die is consumed")
+		if dp.reroll_tokens > dt:
+			dest_seen["six"] = true
+		elif dp.gold > dg:
+			dest_seen["win"] = true
+		elif dp.gold < dg:
+			dest_seen["lose"] = true
+		else:
+			dest_seen["detour"] = true
+	check(dest_seen.has("six") and dest_seen.has("win") and dest_seen.has("lose"), "Destiny Die can give a token, win gold, or take gold")
+	# Event cards: market up / down and the free chip
+	check(GameData.base_events.size() == 12, "12 base event cards")
+	var cm := new_match(9)
+	cm.players[0].stock_value = 1000
+	cm.players[1].stock_value = 500
+	cm._shift_market(0.2)
+	check(cm.players[0].stock_value == 1200 and cm.players[1].stock_value == 600, "Bull Market raises every portfolio")
+	cm._shift_market(-0.2)
+	check(cm.players[0].stock_value == 960, "Market Crash lowers every portfolio")
+	var g1 := cm.players[2].gold
+	var pot1 := cm.casino_pot
+	cm._casino_draw(cm.players[2], true)
+	check(cm.players[2].gold >= g1 and cm.casino_pot <= pot1, "free chip costs nothing and adds nothing to the pot")
+	# Save / load keeps portfolio, market and pot
+	p.stock_value = 120
+	p.stock_basis = 100
+	c.market_change = 0.12
+	c.casino_pot = 777
+	c.state = MatchController.State.AWAIT_ROLL
+	c.pending = {}
+	var c2 := MatchController.from_dict(c.to_dict())
+	check(c2.players[0].stock_value == 120 and c2.players[0].stock_basis == 100 and absf(c2.market_change - 0.12) < 0.001 and c2.casino_pot == 777, "save / load keeps bank + casino state")
+
+
 func _test_commander() -> void:
 	var c := new_match(31)
 	var p := c.players[0]
@@ -232,7 +343,7 @@ func _test_commander() -> void:
 	t2.level = int(GameData.b("max_tile_level")) - 1
 	c._do_upgrade(p, t2, 10)
 	check(p.commander_star == 3, "raising a Landmark: the Commander reaches 3 stars")
-	check(CommanderSystem.mission_of(p).is_empty() and CommanderSystem.mission_text(p) == "Commander at max stars", "no mission is left at 3 stars")
+	check(CommanderSystem.mission_of(p).is_empty() and CommanderSystem.mission_text(p) == "Commander at max level", "no mission is left at Lv 3")
 	var t3 := give_land(c, 0)
 	t3.level = int(GameData.b("max_tile_level")) - 1
 	c._do_upgrade(p, t3, 10)
@@ -262,14 +373,97 @@ func _test_commander() -> void:
 	check(a1 > BattleAI.army_power(c.players[0]), "army power rises with Commander stars")
 
 
+func _test_continent_flavor() -> void:
+	var title_sets := {}
+	var die_sets := {}
+	for cont in GameData.continents:
+		var cid := String(cont["id"])
+		check(GameData.continent_flavor.has(cid), "%s has its own events and dice" % cid)
+		GameData.apply_flavor(cid)
+		check(GameData.events.size() == 12, "%s: 12 event cards" % cid)
+		check(GameData.special_dice.size() == 6, "%s: 6 Special Dice" % cid)
+		var ids := {}
+		var effects := {}
+		for e in GameData.events:
+			ids[e["id"]] = true
+			effects[e["effect"]] = true
+		check(ids.size() == 12, "%s: event ids are unique" % cid)
+		check(effects.size() >= 8, "%s: the deck mixes at least 8 different effects" % cid)
+		var dkinds := {}
+		var dids := {}
+		for d in GameData.special_dice:
+			dids[d["id"]] = true
+			dkinds[d["kind"]] = true
+			check((d["faces"] as Array).size() == 6, "%s: %s has 6 faces" % [cid, d["name"]])
+		check(dids.size() == 6 and dkinds.size() >= 5, "%s: 6 distinct dice over at least 5 kinds" % cid)
+		title_sets[cid] = ",".join(GameData.events.map(func(e): return str(e["title"]) + str(e["effect"]) + str(e["value"])))
+		die_sets[cid] = ",".join(GameData.special_dice.map(func(d): return str(d["name"]) + str(d["faces"])))
+	var uniq_e := {}
+	var uniq_d := {}
+	for k in title_sets:
+		uniq_e[title_sets[k]] = true
+		uniq_d[die_sets[k]] = true
+	check(uniq_e.size() == GameData.continents.size() and uniq_d.size() == GameData.continents.size(), "every continent has a different event deck and Special Dice set")
+	# unique die kinds work
+	var cs := MatchController.new()
+	cs.setup({"continent_id": "sylvaris", "difficulty": "normal", "ai_count": 3, "seed": 5, "all_ai": true})
+	var sp := cs.players[0]
+	var n := 0
+	for t in cs.tiles:
+		if t.type == BoardTile.Type.TERRITORY and n < 2:
+			t.owner_id = sp.id
+			n += 1
+	check(cs._owned_land_count(sp) == 2, "owned land counter")
+	var gold_before := sp.gold
+	sp.special_dice.append("harvest")
+	cs.current = 0
+	cs.state = MatchController.State.AWAIT_ROLL
+	check(cs.use_special_die(0) == "" and sp.gold >= gold_before + 5 * 2, "Harvest Die pays per owned territory")
+	sp.life = 1
+	sp.special_dice.append("springdie")
+	var life0 := sp.life
+	cs.state = MatchController.State.AWAIT_ROLL
+	cs.use_special_die(0)
+	check(sp.life >= life0 and sp.life <= int(GameData.b("start_life")), "Healing die never exceeds the maximum Life")
+	# event effects
+	var cm := new_match(41)
+	var mp := cm.players[0]
+	var owned := 0
+	for t in cm.tiles:
+		if t.type == BoardTile.Type.TERRITORY and owned < 3:
+			t.owner_id = mp.id
+			owned += 1
+	cm.current = 0
+	var hunter := int(mp.passive_value) if mp.has_passive("treasure_hunter") else 0
+	var rich := cm.players[1]
+	mp.gold = 1000
+	rich.gold = 2000
+	GameData.events = [{"id": "t", "title": "t", "description": "t", "effect": "gain_per_land", "value": 10}]
+	cm._resolve_event(mp)
+	check(mp.gold == 1000 + 30 + hunter, "gain_per_land pays per territory")
+	mp.gold = 1000
+	GameData.events = [{"id": "t", "title": "t", "description": "t", "effect": "lose_per_land", "value": 10}]
+	cm._resolve_event(mp)
+	check(mp.gold == 1000 - 30 + hunter, "lose_per_land charges per territory")
+	mp.gold = 1000
+	GameData.events = [{"id": "t", "title": "t", "description": "t", "effect": "steal_richest", "value": 50}]
+	cm._resolve_event(mp)
+	check(mp.gold == 1000 + 50 + hunter and rich.gold == 1950, "steal_richest takes gold from the richest rival")
+	GameData.events = [{"id": "t", "title": "t", "description": "t", "effect": "skip_turn", "value": 1}]
+	var sk := mp.skip_turns
+	cm._resolve_event(mp)
+	check(mp.skip_turns == sk + 1, "skip_turn costs a turn")
+	GameData.apply_flavor("aetherion")
+
+
 func _test_dice() -> void:
-	check(GameData.special_dice.size() == 4, "4 Special Dice defined (Swift, Fortune, Warp, Order)")
+	check(GameData.base_special_dice.size() == 6, "6 base Special Dice defined (Swift, Warp, Order, Destiny, Thief, Broker)")
 	var faces_ok := true
 	for d in GameData.special_dice:
 		faces_ok = faces_ok and (d["faces"] as Array).size() == 6
 	check(faces_ok, "every Special Die has 6 faces")
 	# Swift: bonus applied to the next move
-	var c := new_match(21)
+	var c := new_base_match(21)
 	var p := c.players[0]
 	p.special_dice.append("swift")
 	check(c.use_special_die(0) == "" and p.special_dice.is_empty(), "a used die is consumed")
@@ -284,14 +478,27 @@ func _test_dice() -> void:
 	# (the landing may move the player again, e.g. portals or events, so the FIRST move is checked)
 	check(first_move.size() >= 1 and first_move[0] == expected, "the bonus is added to the move (first step went to %d, expected %d = %d + dice %d + bonus %d)" % [first_move[0] if first_move.size() > 0 else -1, expected, pos, c.last_dice.x + c.last_dice.y, bonus])
 	check(p.move_bonus == 0, "the bonus is used up after the move")
-	# Fortune
-	var c2 := new_match(22)
-	c2.players[0].special_dice.append("fortune")
-	var g := c2.players[0].gold
+	# Broker: free stake when empty, then the face moves the portfolio
+	var c2 := new_base_match(22)
+	c2.players[0].special_dice.append("broker")
 	c2.use_special_die(0)
-	check(c2.players[0].gold - g in [20, 30, 40, 50, 75, 100], "Fortune Die pays gold (%+d)" % (c2.players[0].gold - g))
+	check(c2.players[0].stock_basis == 100 and c2.players[0].stock_value in [90, 100, 110, 120, 130, 150], "Broker Die gives a 100 G stake and moves it (%d)" % c2.players[0].stock_value)
+	# Thief: steals from the richest rival, or pays a fine
+	var thief_seen := {}
+	for ts in range(60):
+		var ct := new_base_match(500 + ts)
+		ct.players[0].special_dice.append("thief")
+		ct.players[2].gold = 3000
+		var mg := ct.players[0].gold
+		var rg := ct.players[2].gold
+		ct.use_special_die(0)
+		if ct.players[0].gold > mg and ct.players[2].gold == rg - (ct.players[0].gold - mg):
+			thief_seen["steal"] = true
+		elif ct.players[0].gold == mg - 30:
+			thief_seen["caught"] = true
+	check(thief_seen.size() == 2, "Thief Die steals from the richest rival or pays a fine")
 	# Warp: teleports and resolves the landing
-	var c3 := new_match(23)
+	var c3 := new_base_match(23)
 	c3.players[0].special_dice.append("warp")
 	var from := c3.players[0].position
 	c3.use_special_die(0)
@@ -300,7 +507,7 @@ func _test_dice() -> void:
 	# Order
 	var seen := {}
 	for s in range(40):
-		var c4 := new_match(200 + s)
+		var c4 := new_base_match(200 + s)
 		c4.players[0].special_dice.append("order")
 		var tok := c4.players[0].reroll_tokens
 		var gold := c4.players[0].gold
@@ -315,19 +522,19 @@ func _test_dice() -> void:
 			seen["gold"] = true
 	check(seen.size() == 4, "Order Die faces all work: %s" % str(seen.keys()))
 	# restrictions
-	var c5 := new_match(24)
-	c5.players[0].special_dice.append("fortune")
+	var c5 := new_base_match(24)
+	c5.players[0].special_dice.append("broker")
 	c5.roll_dice()
 	check(c5.use_special_die(0) != "" and c5.players[0].special_dice.size() == 1, "dice cannot be used after rolling")
 	check(c5.use_special_die(5) != "", "invalid index is refused")
 	# sources: event and shop
-	var c6 := new_match(25)
+	var c6 := new_base_match(25)
 	c6._give_special_die(c6.players[0])
 	check(c6.players[0].special_dice.size() == 1, "an Event can give a Special Die")
 	for i in range(5):
 		c6._give_special_die(c6.players[0])
 	check(c6.players[0].special_dice.size() == int(GameData.b("max_special_dice")), "at most %d dice can be carried" % int(GameData.b("max_special_dice")))
-	var c7 := new_match(26)
+	var c7 := new_base_match(26)
 	c7.current = 0
 	c7.state = MatchController.State.AWAIT_DECISION
 	c7.pending = {"type": "shop"}
@@ -339,11 +546,11 @@ func _test_dice() -> void:
 	c7.decide("special")
 	check(c7.players[0].special_dice.size() == 1 and c7.players[0].gold == gold7 - c7.special_die_price(), "buying a die costs %d G" % c7.special_die_price())
 	# AI uses dice, save keeps them
-	var c8 := new_match(27)
-	c8.players[0].special_dice.append("fortune")
+	var c8 := new_base_match(27)
+	c8.players[0].special_dice.append("broker")
 	AIController.step(c8)
 	check(c8.players[0].special_dice.is_empty(), "the AI uses a useful die before rolling")
-	var c9 := new_match(28)
+	var c9 := new_base_match(28)
 	c9.players[0].special_dice.append("warp")
 	c9.players[0].special_dice.append("swift")
 	c9.players[0].move_bonus = 2
@@ -351,7 +558,7 @@ func _test_dice() -> void:
 	check(r.players[0].special_dice == ["warp", "swift"] and r.players[0].move_bonus == 2, "Special Dice survive Save/Continue")
 	var used := 0
 	for s in range(1, 9):
-		var g2 := new_match(300 + s)
+		var g2 := new_base_match(300 + s)
 		var steps := 0
 		while g2.state != MatchController.State.GAME_OVER and steps < 40000:
 			AIController.step(g2)

@@ -48,10 +48,16 @@ static func _decide(c: MatchController, p: PlayerState) -> void:
 			c.decide("upgrade" if _wants_to_upgrade(p, int(pend["price"])) else "skip")
 		"auction":
 			c.decide(_auction_choice(c, p))
+		"monster":
+			c.decide(_monster_choice(c, p, String(pend["monster"])))
 		"portal":
 			c.decide(_choose_portal(c, p, pend["options"]))
 		"shop":
 			c.decide(_shop_choice(c, p))
+		"bank":
+			c.decide(_bank_choice(c, p))
+		"casino":
+			c.decide(_casino_choice(c, p))
 		"encounter":
 			c.decide(_owner_choice(c, p))
 		"duel_response":
@@ -61,6 +67,18 @@ static func _decide(c: MatchController, p: PlayerState) -> void:
 			c.decide("reward" if p.gold < 150 and int(c.pending["reward"]) >= 60 else "conquest")
 		_:
 			c.decide("skip")
+
+
+## Fight a hidden monster when the army (without the gold share of army_power) is strong enough for the difficulty.
+static func _monster_choice(c: MatchController, p: PlayerState, monster_id: String) -> String:
+	var mine := BattleAI.army_power(p) - float(p.gold) * 0.4
+	var need := MonsterSystem.power(monster_id)
+	match p.difficulty:
+		"easy":
+			return "fight" if c.rng.randf() < 0.8 else "flee"
+		"hard":
+			return "fight" if mine >= need * 0.8 else "flee"
+	return "fight" if mine >= need * 0.65 else "flee"
 
 
 static func _wants_to_buy(c: MatchController, p: PlayerState, t: BoardTile, price: int) -> bool:
@@ -133,9 +151,40 @@ static func _tile_value(c: MatchController, p: PlayerState, t: BoardTile) -> flo
 		BoardTile.Type.CORNER:
 			if t.corner_kind == "rift":
 				return -100.0
-		BoardTile.Type.EVENT, BoardTile.Type.SHOP:
+		BoardTile.Type.EVENT, BoardTile.Type.SHOP, BoardTile.Type.BANK:
 			return 5.0
 	return 0.0
+
+
+## Bank: cash out when short of gold or well in profit, otherwise invest what a gold cushion allows.
+## Only one action per visit: the next AI step sees the new state and answers again, so it ends with "leave".
+static func _bank_choice(c: MatchController, p: PlayerState) -> String:
+	var cushion := 500
+	match p.difficulty:
+		"easy": cushion = 900
+		"hard": cushion = 350
+	if p.stock_value > 0 and (p.gold < 250 or p.stock_value >= int(p.stock_basis * 1.3) or (p.difficulty != "easy" and c.market_change < -0.1 and p.stock_value > p.stock_basis)):
+		return "withdraw"
+	if p.difficulty == "easy" and c.rng.randf() < 0.4:
+		return "leave"
+	if p.stock_value >= 600:
+		return "leave"  # do not put everything in one basket
+	var options: Array = GameData.b("bank_invest_options")
+	for i in range(options.size() - 1, -1, -1):
+		var amt := int(options[i])
+		if p.gold - amt >= cushion:
+			return "invest_%d" % amt
+	return "leave"
+
+
+## Casino: the house has a small edge, so only a rich AI (never a hard one) plays for fun.
+static func _casino_choice(c: MatchController, p: PlayerState) -> String:
+	if p.difficulty == "hard":
+		return "skip"
+	var price := c.casino_bet_price()
+	if p.gold - price >= (700 if p.difficulty == "normal" else 400) and c.rng.randf() < 0.5:
+		return "bet"
+	return "skip"
 
 
 static func _shop_choice(c: MatchController, p: PlayerState) -> String:
@@ -207,8 +256,32 @@ static func _auction_choice(c: MatchController, p: PlayerState) -> String:
 ## Uses a Special Die when it helps. Returns true if one was used.
 static func _use_special_die(c: MatchController, p: PlayerState) -> bool:
 	for i in range(p.special_dice.size()):
-		var id := p.special_dice[i]
-		if id == "warp" and p.gold < 300:
-			continue  # keep the Warp Die until there is gold to buy land
+		var def := GameData.get_special_die(p.special_dice[i])
+		match String(def.get("kind", "")):
+			"teleport":
+				if p.gold < 300:
+					continue  # keep the Warp-like die until there is gold to buy land
+			"steal":
+				var rich := false
+				for q in c.players:
+					if q.alive and q.id != p.id and not c.is_ally(q.id, p.id) and q.gold >= 150:
+						rich = true
+				if not rich:
+					continue  # nobody worth robbing
+			"fate":
+				if p.gold < 500:
+					continue  # a bad face costs gold: only gamble with a cushion
+			"levy":
+				if p.gold < 200:
+					continue  # a failed decree costs gold: keep a cushion
+			"gold":
+				if p.gold < 300:
+					continue  # a bad face costs gold
+			"land_gold":
+				if c._owned_land_count(p) == 0:
+					continue  # nothing to reap
+			"heal":
+				if p.life >= int(GameData.b("start_life")):
+					continue  # already at full Life
 		return c.use_special_die(i) == ""
 	return false

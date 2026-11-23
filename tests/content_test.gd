@@ -66,9 +66,12 @@ func _test_boards_and_modifiers() -> void:
 	# individual modifier effects
 	var c := MatchController.new()
 	c.setup({"continent_id": "arcanum", "faction_id": "astralis", "difficulty": "normal", "ai_count": 3, "seed": 5, "all_ai": true})
-	check(PortalSystem.active_indices(c.tiles).size() == 8, "Arcanum: 8 active portals (2 per region)")
+	check(PortalSystem.active_indices(c.tiles).size() == 4, "Arcanum: 4 active portals (only 1 portal tile per side)")
 	PortalSystem.rotate_portals(c.tiles, c.rng)
-	check(PortalSystem.active_indices(c.tiles).size() == 8, "Arcanum: still 8 after rotation")
+	check(PortalSystem.active_indices(c.tiles).size() == 4, "Arcanum: still 4 after rotation")
+	check(is_equal_approx(WorldMods.stock_bias, 0.1), "Arcanum: Arcane Markets gives a +10% stock bias")
+	c._update_market()
+	check(c.market_change >= -0.1001 and c.market_change <= 0.4001, "Arcanum: market change = base range shifted by +10%")
 	c.setup({"continent_id": "machina", "faction_id": "ferrum", "difficulty": "normal", "ai_count": 3, "seed": 5, "all_ai": true})
 	var t: BoardTile = c.tiles[1]
 	t.owner_id = 1

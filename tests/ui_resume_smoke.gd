@@ -22,6 +22,20 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var c: MatchController = board.ctrl
 	check_eq(SaveManager.has_match(), true, "autosave written at the start of the human turn", fails)
+	# Card Hub overlay: opens over the match, pauses it, restores the continent, closes with Back
+	var match_continent := CardDatabase.active_continent
+	var snap_hub := snap(c)
+	board._open_hub()
+	await get_tree().process_frame
+	check_eq(board._hub_node != null, true, "the Card Hub opens over the Territory Board", fails)
+	board._hub_node.get_child(0)._show_tab("info")
+	board._hub_node.get_child(0)._on_deck_continent("arcanum" if match_continent != "arcanum" else "aetherion")
+	board._on_tick()
+	check_eq(snap(c), snap_hub, "the match is paused while the Card Hub is open", fails)
+	board.on_back_requested()
+	await get_tree().process_frame
+	check_eq(board._hub_node == null, true, "Back closes the Card Hub overlay", fails)
+	check_eq(CardDatabase.active_continent, match_continent, "the match continent is restored after the Card Hub", fails)
 	# play a few of our own turns so that the saved match is not the initial one
 	board.tick.wait_time = 0.02
 	var turns := 0

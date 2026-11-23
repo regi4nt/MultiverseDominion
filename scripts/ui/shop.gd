@@ -12,8 +12,26 @@ var _rng := RandomNumberGenerator.new()
 var _pull1: Button
 var _pull10: Button
 var _pity_label: Label
+var _pity_bar: ProgressBar
 var _result_flow: HFlowContainer
-var _result_text: RichTextLabel
+var _result_banner: Label
+var _stage: PanelContainer
+
+const RARITY_TITLES := {"common": "", "rare": "RARE PULL", "epic": "EPIC PULL!", "legendary": "LEGENDARY!!"}
+const RARITY_SFX := {"common": "click", "rare": "coin", "epic": "magic", "legendary": "victory"}
+
+
+## Face-down card shown before the first pull.
+class CardBack extends Control:
+	func _init() -> void:
+		custom_minimum_size = Vector2(110, 150)
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color("1c2548"))
+		draw_rect(r, Color(UiTheme.COL_GOLD_DIM, 0.8), false, 2.0)
+		draw_rect(r.grow(-8), Color(UiTheme.COL_GOLD_DIM, 0.35), false, 1.0)
+		draw_string(ThemeDB.fallback_font, Vector2(0, size.y * 0.5 + 18.0), "?", HORIZONTAL_ALIGNMENT_CENTER, size.x, 52, Color(UiTheme.COL_GOLD, 0.55))
 
 var _buy_filter: String = "all"
 var _buy_grid: HFlowContainer
@@ -86,77 +104,172 @@ func _build_gacha() -> Control:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 12)
 
+	# Left: short info + pity bar + pull buttons.
 	var left := PanelContainer.new()
-	left.custom_minimum_size = Vector2(380, 0)
+	left.custom_minimum_size = Vector2(340, 0)
 	body.add_child(left)
 	var lbox := VBoxContainer.new()
 	lbox.add_theme_constant_override("separation", 10)
 	left.add_child(lbox)
 	lbox.add_child(UiTheme.make_label("SUPPORT GACHA", 26, UiTheme.COL_GOLD))
-	var info := RichTextLabel.new()
-	info.bbcode_enabled = true
-	info.fit_content = true
-	info.add_theme_font_size_override("normal_font_size", 17)
-	info.text = "Pull Support cards you do not own yet.\n[color=#8d93ad]Common %d%%   Rare %d%%\nEpic %d%%   Legendary %d%%[/color]\nA duplicate turns into Card Fragments (Common %d, Rare %d, Epic %d, Legendary %d).\nExchange fragments for a locked card in Buy Cards: the rarer the card, the more it costs.\nThe 10-pull always holds at least one Rare." % [
-		ShopSystem.RATES["common"], ShopSystem.RATES["rare"], ShopSystem.RATES["epic"], ShopSystem.RATES["legendary"],
-		ShopSystem.DUPLICATE_FRAGMENTS["common"], ShopSystem.DUPLICATE_FRAGMENTS["rare"], ShopSystem.DUPLICATE_FRAGMENTS["epic"], ShopSystem.DUPLICATE_FRAGMENTS["legendary"]]
+	var chips := HFlowContainer.new()
+	chips.add_theme_constant_override("h_separation", 6)
+	chips.add_theme_constant_override("v_separation", 6)
+	lbox.add_child(chips)
+	for r in ShopSystem.RARITY_ORDER:
+		var c := UiTheme.rarity_color(r)
+		var chip := UiTheme.make_label("%s %d%%" % [String(r).capitalize(), ShopSystem.RATES[r]], 16, c.lightened(0.35))
+		var sb := UiTheme.make_box(Color(c, 0.16), c, 2, 8)
+		sb.set_content_margin_all(5)
+		chip.add_theme_stylebox_override("normal", sb)
+		chips.add_child(chip)
+	var info := UiTheme.make_label("Duplicates become fragments. The 10-pull always holds a Rare.", 15, UiTheme.COL_MUTED)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbox.add_child(info)
-	_pity_label = UiTheme.make_label("", 17, UiTheme.COL_MUTED)
+	_pity_bar = ProgressBar.new()
+	_pity_bar.max_value = ShopSystem.PITY_LIMIT
+	_pity_bar.show_percentage = false
+	_pity_bar.custom_minimum_size = Vector2(0, 14)
+	var fill := UiTheme.make_box(Color("a65cf0"), Color("a65cf0"), 0, 7)
+	var bg := UiTheme.make_box(Color("111629"), Color("2e3350"), 1, 7)
+	_pity_bar.add_theme_stylebox_override("fill", fill)
+	_pity_bar.add_theme_stylebox_override("background", bg)
+	lbox.add_child(_pity_bar)
+	_pity_label = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
 	_pity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbox.add_child(_pity_label)
-	_pull1 = UiTheme.make_primary("Pull x1  (%d)" % ShopSystem.PULL_PRICE, 64)
+	var sp := Control.new()
+	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lbox.add_child(sp)
+	_pull1 = UiTheme.make_button("Pull x1  (%d)" % ShopSystem.PULL_PRICE, 60)
 	_pull1.pressed.connect(_on_pull.bind(1))
 	lbox.add_child(_pull1)
-	_pull10 = UiTheme.make_primary("Pull x10  (%d)" % ShopSystem.PULL10_PRICE, 64)
+	_pull10 = UiTheme.make_primary("Pull x10  (%d)" % ShopSystem.PULL10_PRICE, 72)
 	_pull10.pressed.connect(_on_pull.bind(10))
 	lbox.add_child(_pull10)
 
-	var rpanel := PanelContainer.new()
-	rpanel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(rpanel)
+	# Right: the "stage" where pulled cards are revealed one by one.
+	_stage = PanelContainer.new()
+	_stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_set_stage_color(UiTheme.COL_GOLD_DIM)
+	body.add_child(_stage)
 	var rscroll := UiTheme.make_scroll()
-	rpanel.add_child(rscroll)
+	_stage.add_child(rscroll)
 	var rbox := VBoxContainer.new()
 	rbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rbox.add_theme_constant_override("separation", 8)
+	rbox.add_theme_constant_override("separation", 10)
 	rscroll.add_child(rbox)
-	_result_text = RichTextLabel.new()
-	_result_text.bbcode_enabled = true
-	_result_text.fit_content = true
-	_result_text.add_theme_font_size_override("normal_font_size", 18)
-	_result_text.text = "[color=#8d93ad]Your pulls appear here.[/color]"
-	rbox.add_child(_result_text)
+	_result_banner = UiTheme.make_label("", 28, UiTheme.COL_GOLD)
+	_result_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_result_banner.resized.connect(func(): _result_banner.pivot_offset = _result_banner.size * 0.5)
+	rbox.add_child(_result_banner)
 	_result_flow = HFlowContainer.new()
-	_result_flow.add_theme_constant_override("h_separation", 10)
-	_result_flow.add_theme_constant_override("v_separation", 10)
+	_result_flow.alignment = FlowContainer.ALIGNMENT_CENTER
+	_result_flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_result_flow.add_theme_constant_override("h_separation", 12)
+	_result_flow.add_theme_constant_override("v_separation", 12)
 	rbox.add_child(_result_flow)
+	_show_idle()
 	return body
+
+
+func _set_stage_color(c: Color) -> void:
+	_stage.add_theme_stylebox_override("panel", UiTheme.make_box(Color(c.darkened(0.8), 0.95), c, 2, 14))
+
+
+func _clear_results() -> void:
+	for c in _result_flow.get_children():
+		_result_flow.remove_child(c)
+		c.queue_free()
+
+
+func _show_idle() -> void:
+	_clear_results()
+	_set_stage_color(UiTheme.COL_GOLD_DIM)
+	_result_banner.text = "Pull to reveal cards"
+	_result_banner.add_theme_color_override("font_color", UiTheme.COL_MUTED)
+	for i in range(5):
+		var back := CardBack.new()
+		back.rotation_degrees = (i - 2) * 3.0  # a loose fan instead of a flat row
+		_result_flow.add_child(back)
 
 
 func _on_pull(count: int) -> void:
 	var results := ShopSystem.pull_batch(count, _rng)
 	if results.is_empty():
-		_result_text.text = "[color=#e0705f]Not enough Aether Coins.[/color]"
+		Sfx.play("error")
+		_clear_results()
+		_result_banner.text = "Not enough Aether Coins."
+		_result_banner.add_theme_color_override("font_color", UiTheme.COL_DANGER)
 		return
-	for c in _result_flow.get_children():
-		_result_flow.remove_child(c)
-		c.queue_free()
+	_clear_results()
+	var best := 0
 	var new_n := 0
 	var frags := 0
-	var lines := ""
-	for r in results:
-		var card := CardDatabase.get_support(String(r["id"]))
-		var v := CardView.new()
-		v.setup(card, true, 1)
-		_result_flow.add_child(v)
+	for i in range(results.size()):
+		var r: Dictionary = results[i]
+		var rarity := String(r["rarity"])
+		best = maxi(best, ShopSystem.RARITY_ORDER.find(rarity))
 		if bool(r["new"]):
 			new_n += 1
-			lines += "[color=#59cd90]NEW[/color]  %s [color=#8d93ad](%s)[/color]\n" % [card["name"], String(r["rarity"]).capitalize()]
 		else:
 			frags += int(r["fragments"])
-			lines += "[color=#a98be0]Duplicate[/color]  %s  [color=#a98be0]+%d fragments[/color]\n" % [card["name"], int(r["fragments"])]
-	_result_text.text = "[color=#d4af37][b]%d new card%s[/b][/color]   [color=#a98be0]duplicates +%d fragments[/color]\n%s" % [new_n, "" if new_n == 1 else "s", frags, lines]
+		var slot := _make_slot(r)
+		_result_flow.add_child(slot)
+		_reveal(slot, i, rarity)
+	var best_r: String = ShopSystem.RARITY_ORDER[best]
+	var col := UiTheme.rarity_color(best_r)
+	_set_stage_color(col)
+	var title: String = RARITY_TITLES[best_r]
+	var total_delay := 0.11 * results.size()
+	_result_banner.text = "%s%d new  |  +%d fragments" % [title + "   " if title != "" else "", new_n, frags]
+	_result_banner.add_theme_color_override("font_color", col.lightened(0.4))
+	_result_banner.modulate.a = 0.0
+	var bt := _result_banner.create_tween()
+	bt.tween_interval(total_delay)  # the summary lands after the last card
+	bt.tween_property(_result_banner, "modulate:a", 1.0, 0.2)
+	if best >= 2:
+		bt.tween_callback(func(): _result_banner.scale = Vector2(1.15, 1.15))
+		bt.tween_property(_result_banner, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_refresh()
+
+
+## One pulled card with a rarity-glow frame and a NEW / +fragments tag.
+func _make_slot(r: Dictionary) -> Control:
+	var rarity := String(r["rarity"])
+	var col := UiTheme.rarity_color(rarity)
+	var rank := ShopSystem.RARITY_ORDER.find(rarity)
+	var frame := PanelContainer.new()
+	var sb := UiTheme.make_box(Color(col.darkened(0.75), 0.9), col, 2 + rank, 12, 0)
+	sb.set_content_margin_all(6)
+	if rank >= 1:  # Rare and up glow in their own colour, stronger the rarer
+		sb.shadow_color = Color(col, 0.35 + 0.15 * rank)
+		sb.shadow_size = 6 + 6 * rank
+		sb.shadow_offset = Vector2.ZERO
+	frame.add_theme_stylebox_override("panel", sb)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	frame.add_child(v)
+	var cv := CardView.new()
+	cv.setup(CardDatabase.get_support(String(r["id"])), true, 1)
+	v.add_child(cv)
+	var tag := UiTheme.make_label("NEW" if bool(r["new"]) else "+%d fragments" % int(r["fragments"]), 16,
+		Color("59cd90") if bool(r["new"]) else Color("a98be0"))
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(tag)
+	return frame
+
+
+func _reveal(slot: Control, index: int, rarity: String) -> void:
+	slot.modulate.a = 0.0
+	slot.scale = Vector2(0.4, 0.4)
+	slot.resized.connect(func(): slot.pivot_offset = slot.size * 0.5)
+	var delay := 0.11 * index
+	var t := slot.create_tween().set_parallel(true)  # bound to the slot: a new pull frees it and kills the tween
+	t.tween_property(slot, "modulate:a", 1.0, 0.18).set_delay(delay)
+	t.tween_property(slot, "scale", Vector2.ONE, 0.32).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_callback(func(): Sfx.play(RARITY_SFX.get(rarity, "click"))).set_delay(delay)
 
 
 # ------------------------------------------------------------------ buy cards
@@ -294,7 +407,8 @@ func _refresh() -> void:
 	_frag_label.text = "%d fragments" % SaveManager.fragments()
 	_pull1.disabled = coins < ShopSystem.PULL_PRICE
 	_pull10.disabled = coins < ShopSystem.PULL10_PRICE
-	_pity_label.text = "Epic or better is guaranteed within %d pull%s.\nWin a match +%d coins, lose +%d." % [
+	_pity_bar.value = ShopSystem.pity()
+	_pity_label.text = "Epic+ guaranteed in %d pull%s   |   Win +%d, lose +%d coins" % [
 		ShopSystem.pulls_to_pity(), "" if ShopSystem.pulls_to_pity() == 1 else "s", ShopSystem.WIN_REWARD, ShopSystem.LOSS_REWARD]
 	if _buy_btn != null and _selected_id != "":
 		var sel := CardDatabase.get_support(_selected_id)

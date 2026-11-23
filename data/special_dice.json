@@ -15,20 +15,6 @@
 			]
 		},
 		{
-			"id": "fortune",
-			"name": "Fortune Die",
-			"kind": "gold",
-			"desc": "Gain gold equal to the face.",
-			"faces": [
-				20,
-				30,
-				40,
-				50,
-				75,
-				100
-			]
-		},
-		{
 			"id": "warp",
 			"name": "Warp Die",
 			"kind": "teleport",
@@ -54,6 +40,48 @@
 				"token",
 				"token",
 				"gold"
+			]
+		},
+		{
+			"id": "destiny",
+			"name": "Destiny Die",
+			"kind": "fate",
+			"desc": "Roll the die of fate: 1-2 lose gold, 3 go back 3 tiles, 4-6 win gold (6 also a Reroll Token).",
+			"faces": [
+				1,
+				2,
+				3,
+				4,
+				5,
+				6
+			]
+		},
+		{
+			"id": "thief",
+			"name": "Thief Die",
+			"kind": "steal",
+			"desc": "Steal gold from the richest rival. The last face gets you caught: you pay a fine.",
+			"faces": [
+				20,
+				30,
+				40,
+				50,
+				60,
+				-30
+			]
+		},
+		{
+			"id": "broker",
+			"name": "Broker Die",
+			"kind": "stock",
+			"desc": "Moves your stock portfolio by the face (%). With no stocks you first get a free 100 G stake.",
+			"faces": [
+				-10,
+				0,
+				10,
+				20,
+				30,
+				50
 			]
 		}
 	]

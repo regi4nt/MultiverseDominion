@@ -2,7 +2,7 @@ class_name BoardTile
 extends RefCounted
 ## One of the 100 perimeter tiles of a Territory Board.
 
-enum Type { CORNER, TERRITORY, PORTAL, SHOP, EVENT, AUCTION, TAX, SPECIAL }
+enum Type { CORNER, TERRITORY, PORTAL, SHOP, EVENT, AUCTION, TAX, SPECIAL, BANK, CASINO }
 
 var index: int = 0
 var type: Type = Type.TERRITORY

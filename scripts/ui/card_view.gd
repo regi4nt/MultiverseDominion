@@ -69,7 +69,7 @@ func _gui_input(event: InputEvent) -> void:
 			_press_pos = event.global_position
 		else:
 			if _tracking and event.global_position.distance_to(_press_pos) <= 12.0:
-				pressed.emit(String(card.get("id", "")))
+				pressed.emit(String(card.get("vkey", card.get("id", ""))))
 			_tracking = false
 
 
@@ -78,7 +78,7 @@ func _faction_color() -> Color:
 		return Color(String(card["color"]))
 	if not is_support and CardDatabase.is_shared(card):
 		return Color("7d86ad")  # shared piece: neutral steel-blue, it takes the colour of whoever fields it
-	var f := GameData.get_faction(CardDatabase.active_continent, String(card.get("faction", "")))
+	var f := GameData.get_faction(String(card.get("continent", CardDatabase.active_continent)), String(card.get("faction", "")))
 	return Color(f.get("color", "#555566"))
 
 
@@ -103,7 +103,7 @@ func _draw() -> void:
 	if is_support:
 		Art.draw_category(self, String(card["category"]), sq, rar.lightened(0.35), base.lightened(0.15))
 	else:
-		Art.draw_emblem(self, CardDatabase.active_continent, sq, Color(base.lightened(0.5), 0.3), base.lightened(0.15))
+		Art.draw_emblem(self, String(card.get("continent", CardDatabase.active_continent)), sq, Color(base.lightened(0.5), 0.3), base.lightened(0.15))
 		Art.draw_piece(self, String(card["chess"]), sq, Color("f0e6c8"), base.darkened(0.35))
 	# info
 	if is_support:

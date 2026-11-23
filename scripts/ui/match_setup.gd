@@ -2,10 +2,10 @@ extends Control
 ## New Match. Two views in one scene:
 ##  - HUB: OFFLINE tab (Journey, Arena, Battle Chess, Tutorial) and ONLINE tab (Classic, Ranked, Battle Chess: coming soon).
 ##  - SETUP (Journey / Arena): players -> difficulty -> continent -> START MATCH. There is no faction choice here: the
-##    faction (and its King) is chosen in Collection & Deck -> Deck -> Faction; locked factions cannot be picked.
+##    faction (and its King) is chosen in Card Hub -> Deck -> Faction; locked factions cannot be picked.
 ## Journey = 1vs1 story path: win on a continent with each of its 4 factions to master it; every mastered continent lets the
 ## player CHOOSE one locked continent to open. Arena = free match (1vs1, 2vs2, 4 player) on open continents, unlocks nothing.
-## Battle Chess opens the 8x8 auto-battle (Battle Practice); Tutorial starts the guided match.
+## Battle Chess opens the 8x8 auto-battle (pays Aether Coins); Tutorial starts the guided match.
 
 const BOARD_SCENE := "res://scenes/territory_board/territory_board.tscn"
 const BATTLE_SCENE := "res://scenes/battle_board/battle_board.tscn"
@@ -38,6 +38,7 @@ var _champion_text: RichTextLabel
 var _portrait: PortraitView
 var _continent_text: Label
 var _journey_hint: Label
+var _wager_panel: WagerPanel
 var _start_btn: Button
 var _home_note: Label
 
@@ -45,6 +46,7 @@ var _home_note: Label
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	GameSession.difficulty = String(SaveManager.get_setting("default_difficulty"))
+	GameSession.wager = 0  # a wager is chosen per match; nothing carries over
 	if GameSession.mode == "tutorial":  # a normal match must not inherit the tutorial config
 		GameSession.mode = "ffa_ai"
 		GameSession.ai_count = 3
@@ -166,10 +168,11 @@ func _offline_cards() -> Array:
 			"chips": ["1 vs 1", "Unlocks continents"], "status": _journey_status()},
 		{"id": "arena", "icon": "king", "title": "ARENA", "sub": "Free match",
 			"desc": "Play a free match against AI on any unlocked continent. Nothing to unlock, just fight for the crown.",
-			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "%d of %d continents open" % [_open_continents(), GameData.continents.size()]},
+			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "%d of %d continents open" % [_open_continent_count(), GameData.continents.size()]},
 		{"id": "battle_chess", "icon": "rook", "title": "BATTLE CHESS", "sub": "8 x 8 auto battle",
-			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle.",
-			"chips": ["8 x 8", "Auto battle"], "status": "Practice against AI"},
+			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle. Every battle earns Aether Coins.",
+			"chips": ["8 x 8", "Auto battle", "Earns coins"],
+			"status": "Win +%d  -  Loss +%d Aether Coins" % [ShopSystem.PRACTICE_WIN_REWARD, ShopSystem.PRACTICE_LOSS_REWARD]},
 		{"id": "tutorial", "icon": "pawn", "title": "TUTORIAL", "sub": "10 rounds  ·  1 vs 1",
 			"desc": "A guided match against an easy AI that explains dice, land, tax and duels as you meet them.",
 			"chips": ["Guided", "Easy AI"],
@@ -191,7 +194,7 @@ func _online_cards() -> Array:
 	]
 
 
-func _open_continents() -> int:
+func _open_continent_count() -> int:
 	var n := 0
 	for c in GameData.continents:
 		if c.get("playable", false) and SaveManager.is_continent_unlocked(String(c["id"])):
@@ -211,11 +214,36 @@ func _on_card(id: String) -> void:
 		"journey", "arena":
 			_show_setup(id)
 		"battle_chess":
-			get_tree().change_scene_to_file(BATTLE_SCENE)
+			_ask_battle_wager()
 		"tutorial":
 			SaveManager.clear_match()  # the tutorial replaces the saved match, like START MATCH
 			GameSession.start_tutorial()
 			get_tree().change_scene_to_file(BOARD_SCENE)
+
+
+## Battle Chess has no setup screen: a dialog asks for the difficulty and an optional wager, then the battle starts.
+func _ask_battle_wager() -> void:
+	GameSession.wager = 0
+	GameSession.category = "battle_chess"
+	var panel := WagerPanel.new("battle_chess", true)
+	var dlg := UiDialog.new()
+	dlg.name = "BattleWagerDialog"
+	dlg.title = "Battle Chess"
+	dlg.tone = "warn"
+	dlg.ok_button_text = "FIGHT"
+	dlg.cancel_button_text = "Cancel"
+	dlg.body_node = panel
+	dlg.confirmed.connect(func():
+		GameSession.wager_odds = panel.odds()
+		if GameSession.wager > 0 and not SaveManager.place_wager(GameSession.wager):
+			GameSession.wager = 0
+		dlg.queue_free()
+		get_tree().change_scene_to_file(BATTLE_SCENE))
+	dlg.canceled.connect(func():
+		GameSession.wager = 0
+		dlg.queue_free())
+	add_child(dlg)
+	dlg.popup_centered(Vector2i(600, 0))
 
 
 ## One mode card: a flat Button (background, hover, press, disabled) with the content stacked on top of it.
@@ -328,6 +356,7 @@ func _show_setup(kind: String) -> void:
 	_view = "setup"
 	_kind = kind
 	GameSession.category = kind
+	GameSession.wager = 0 if kind != "arena" else mini(GameSession.wager, SaveManager.coins())  # Journey has no wager
 	GameSession.faction_id = SaveManager.player_faction_id()  # from the Deck, never chosen here
 	if kind == "journey":
 		GameSession.mode = "custom_ai"  # Journey is always 1 vs 1
@@ -385,6 +414,20 @@ func _show_setup(kind: String) -> void:
 func _on_start() -> void:
 	if not _can_start():
 		return
+	if _kind == "arena" and GameSession.wager > 0:
+		GameSession.wager_odds = _wager_panel.odds() if _wager_panel != null else 2.0
+		if not SaveManager.place_wager(GameSession.wager):  # the stake is paid now; not enough coins -> no wager
+			GameSession.wager = 0
+			if _wager_panel != null:
+				_wager_panel.refresh()
+			return
+	elif _kind != "arena":
+		GameSession.wager = 0
+	GameSession.random_bonus_active = false
+	if _kind == "arena" and GameSession.continent_random and _open_continents().size() >= 2:
+		var pool := _open_continents()
+		GameSession.continent_id = String(pool[randi() % pool.size()])
+		GameSession.random_bonus_active = true
 	SaveManager.clear_match()  # a new match replaces the saved one
 	GameSession.resume_match = false
 	GameSession.category = _kind
@@ -423,7 +466,9 @@ func _build_match_column(parent: Control) -> void:
 			b.button_pressed = (GameSession.mode == m["mode"] and GameSession.ai_count == m["ai"])
 			b.pressed.connect(func():
 				GameSession.mode = m["mode"]
-				GameSession.ai_count = m["ai"])
+				GameSession.ai_count = m["ai"]
+				if _wager_panel != null:
+					_wager_panel.refresh())  # the odds depend on the mode
 			UiTheme.scroll_passthrough(b)
 			c.add_child(b)
 	else:
@@ -445,7 +490,7 @@ func _build_match_column(parent: Control) -> void:
 		_journey_hint = UiTheme.make_label("", 16, UiTheme.COL_GOLD)
 		_journey_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		c.add_child(_journey_hint)
-	c.add_child(UiTheme.make_label("AI Difficulty", 20, UiTheme.COL_TEXT))
+	c.add_child(UiTheme.make_label("Difficulty", 20, UiTheme.COL_TEXT))
 	var drow := HBoxContainer.new()
 	drow.add_theme_constant_override("separation", 8)
 	c.add_child(drow)
@@ -454,9 +499,20 @@ func _build_match_column(parent: Control) -> void:
 		var b := UiTheme.make_toggle(d.capitalize(), dgroup, 52)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.button_pressed = (GameSession.difficulty == d)
-		b.pressed.connect(func(): GameSession.difficulty = d)
+		b.pressed.connect(func():
+			GameSession.difficulty = d
+			if _wager_panel != null:
+				_wager_panel.refresh())  # the odds depend on the difficulty
 		UiTheme.scroll_passthrough(b)
 		drow.add_child(b)
+	var life_note := UiTheme.make_label("Everyone starts with %d Life. A lost duel or bankruptcy costs 1." % int(GameData.b("start_life")), 15, UiTheme.COL_MUTED)
+	life_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	c.add_child(life_note)
+	_wager_panel = null
+	if _kind == "arena":
+		_wager_panel = WagerPanel.new("arena", false)
+		c.add_child(UiTheme.make_divider())
+		c.add_child(_wager_panel)
 
 
 func _build_continent_column(parent: Control) -> void:
@@ -471,6 +527,31 @@ func _build_continent_column(parent: Control) -> void:
 		cnote = UiTheme.make_label("Win with all 4 factions of a continent to unlock another one of your choice.", 15, UiTheme.COL_MUTED)
 	cnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	c.add_child(cnote)
+	var random_on := _kind == "arena" and GameSession.continent_random and _open_continents().size() >= 2
+	if _kind == "arena":
+		var mrow := HBoxContainer.new()
+		mrow.add_theme_constant_override("separation", 8)
+		c.add_child(mrow)
+		var mgroup := ButtonGroup.new()
+		var can_random := _open_continents().size() >= 2
+		for spec in [[true, "Random map\nBonus in game + on a win"], [false, "Choose map\nPick it yourself"]]:
+			var mb := UiTheme.make_toggle(spec[1], mgroup, 64)
+			mb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			mb.button_pressed = (random_on == spec[0])
+			mb.disabled = spec[0] and not can_random
+			mb.pressed.connect(func():
+				GameSession.continent_random = spec[0]
+				_show_setup("arena"))  # rebuild: the continent list is dimmed in random mode
+			UiTheme.scroll_passthrough(mb)
+			mrow.add_child(mb)
+		if not can_random:
+			var hint := UiTheme.make_label("Random needs 2 or more open continents.", 15, UiTheme.COL_MUTED)
+			hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			c.add_child(hint)
+		elif random_on:
+			var hint2 := UiTheme.make_label("Drawn from your %d open continents at the start. Each continent gives its own bonus in the game and on a win." % _open_continents().size(), 15, UiTheme.COL_GOLD)
+			hint2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			c.add_child(hint2)
 	var group := ButtonGroup.new()
 	for i in range(GameData.continents.size()):
 		var cont: Dictionary = GameData.continents[i]
@@ -484,15 +565,27 @@ func _build_continent_column(parent: Control) -> void:
 			UiTheme.scroll_passthrough(ub)
 			c.add_child(ub)
 			continue
-		var b := UiTheme.make_toggle("%d.  %s\n%s" % [i + 1, cont["name"], _continent_state(id, open)], group, 58)
-		b.disabled = not open
-		b.button_pressed = (GameSession.continent_id == id)
+		var state := _continent_state(id, open)
+		if random_on and open:  # random mode: each open continent shows the bonus it would pay
+			state = ShopSystem.random_bonus_lines(id)
+		var b := UiTheme.make_toggle("%d.  %s\n%s" % [i + 1, cont["name"], state], group, 84 if (random_on and open) else 58)
+		b.disabled = not open or random_on
+		b.button_pressed = (GameSession.continent_id == id) and not random_on
 		b.pressed.connect(func():
 			GameSession.continent_id = id
 			_refresh_continent_info()
 			_refresh_journey_hint())
 		UiTheme.scroll_passthrough(b)
 		c.add_child(b)
+
+
+## Playable continents the player has unlocked (the pool of the Arena random map).
+func _open_continents() -> Array:
+	var out: Array = []
+	for cont in GameData.continents:
+		if cont.get("playable", false) and SaveManager.is_continent_unlocked(String(cont["id"])):
+			out.append(String(cont["id"]))
+	return out
 
 
 func _continent_state(id: String, open: bool) -> String:
@@ -619,6 +712,10 @@ func _refresh_journey_hint() -> void:
 
 func _refresh_continent_info() -> void:
 	if _continent_text == null:
+		return
+	if _kind == "arena" and GameSession.continent_random and _open_continents().size() >= 2:
+		_continent_text.text = "Random: the continent (and its modifier) is drawn when the match starts."
+		_continent_text.tooltip_text = ""
 		return
 	var cont := GameData.get_continent(GameSession.continent_id)
 	_continent_text.text = "%s: %s" % [cont["modifier"]["name"], cont["modifier"]["description"]]

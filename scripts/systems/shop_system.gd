@@ -5,7 +5,36 @@ extends RefCounted
 
 const START_COINS := 600  # mirrored by SaveManager.default_data()
 const WIN_REWARD := 150
+const PRACTICE_WIN_REWARD := 75    # Battle Chess (offline auto battle): Aether Coins for a win
+const PRACTICE_LOSS_REWARD := 15  # ... for a loss or a draw
 const LOSS_REWARD := 50
+## Wager (Arena / Battle Chess): the stake is paid at the start; a win pays stake x odds (stake included).
+const WAGER_STEPS := [50, 100, 250, 500, 1000]
+const WAGER_DIFFICULTY_MULT := {"easy": 0.75, "normal": 1.0, "hard": 1.5}
+
+
+## Win multiplier: 1 vs 1 / 2 vs 2 / Battle Chess x2, the 4 Player free-for-all x3, scaled by the AI difficulty.
+static func wager_odds(kind: String, mode: String, _ai_count: int, difficulty: String) -> float:
+	var base := 3.0 if (kind == "arena" and mode == "ffa_ai") else 2.0
+	return base * float(WAGER_DIFFICULTY_MULT.get(difficulty, 1.0))
+
+
+## Arena "Random map": a win on the drawn continent pays that continent's own bonus (data/continents.json "random_bonus":
+## coins_pct, coins_flat, fragments, text). {} = none.
+static func random_bonus(continent_id: String) -> Dictionary:
+	return GameData.get_continent(continent_id).get("random_bonus", {})
+
+
+## Menu line: the win reward and the in-game bonus of a continent.
+static func random_bonus_lines(continent_id: String) -> String:
+	var b := random_bonus(continent_id)
+	if b.is_empty():
+		return "-"
+	return "Win: %s\nGame: %s" % [String(b.get("text", "-")), String(b.get("ingame_text", "-"))]
+
+
+static func wager_payout(stake: int, odds: float) -> int:
+	return int(round(float(stake) * odds))
 const PULL_PRICE := 100
 const PULL10_PRICE := 900  # 10 pulls for the price of 9; the 10th is at least Rare
 const PITY_LIMIT := 30  # the 30th pull without an Epic or better is guaranteed to be one

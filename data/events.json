@@ -62,6 +62,27 @@
 			"description": "You discover a special die.",
 			"effect": "special_die",
 			"value": 1
+		},
+		{
+			"id": "bull_market",
+			"title": "Bull Market",
+			"description": "The exchanges boom: every stock portfolio rises.",
+			"effect": "market_up",
+			"value": 20
+		},
+		{
+			"id": "market_crash",
+			"title": "Market Crash",
+			"description": "Panic on the exchanges: every stock portfolio falls.",
+			"effect": "market_down",
+			"value": 20
+		},
+		{
+			"id": "lucky_chip",
+			"title": "Lucky Chip",
+			"description": "You find a free casino chip and play it at once.",
+			"effect": "free_bet",
+			"value": 0
 		}
 	]
 }

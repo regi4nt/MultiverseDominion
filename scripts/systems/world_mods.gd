@@ -1,12 +1,13 @@
 class_name WorldMods
 extends RefCounted
 ## World modifier of the continent being played (data/continents.json -> "modifier").
-## Static on purpose: one match at a time. MatchController.setup() calls apply(); Battle Practice
+## Static on purpose: one match at a time. MatchController.setup() calls apply(); Battle Chess
 ## calls apply()/reset() too. Keys of the modifier dictionary map 1:1 to the variables below.
 
 static var modifier_name: String = ""
 static var start_bonus_extra: int = 0     # Aetherion: Royal Tithe
-static var portals_per_region: int = 1    # Arcanum: Arcane Conduits
+static var portals_per_region: int = 1    # portals kept active per region (the board has 1 portal tile per region)
+static var stock_bias: float = 0.0        # Arcanum: Arcane Markets (added to the every-round stock change)
 static var rent_mult: float = 1.0         # Machina: Industrial Age
 static var unit_price_mult: float = 1.0   # Machina: Industrial Age
 static var harvest_per_land: int = 0      # Sylvaris: Bountiful Harvest
@@ -22,6 +23,7 @@ static func reset() -> void:
 	modifier_name = ""
 	start_bonus_extra = 0
 	portals_per_region = 1
+	stock_bias = 0.0
 	rent_mult = 1.0
 	unit_price_mult = 1.0
 	harvest_per_land = 0
@@ -39,6 +41,7 @@ static func apply(continent: Dictionary) -> void:
 	modifier_name = String(m.get("name", ""))
 	start_bonus_extra = int(m.get("start_bonus_extra", 0))
 	portals_per_region = clampi(int(m.get("portals_per_region", 1)), 1, 3)
+	stock_bias = float(m.get("stock_bias", 0.0))
 	rent_mult = float(m.get("rent_mult", 1.0))
 	unit_price_mult = float(m.get("unit_price_mult", 1.0))
 	harvest_per_land = int(m.get("harvest_per_land", 0))

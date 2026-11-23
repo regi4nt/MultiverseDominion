@@ -18,13 +18,17 @@ var life: int = 3
 var level: int = 3  # Chess Capacity data is prepared; used from Phase 4.
 var capacity: int = 9
 var reroll_tokens: int = 0
+var extra_price_mult: float = 1.0  # Arena random map (Machina): extra Battle Shop discount, on top of the passive
 var skip_turns: int = 0
 var alive: bool = true
 var team: int = -1  # 2vs2: 0 = Team A, 1 = Team B; -1 = free-for-all (no team)
 var special_dice: Array[String] = []  # ids from data/special_dice.json, used before rolling
+var stock_value: int = 0  # gold currently invested at the Bank (moves with the market every round)
+var stock_basis: int = 0  # gold put in (for the profit / loss display)
 var move_bonus: int = 0  # Swift Die: added to the next move
 var commander_star: int = 1  # Commander stars 1..3, raised by missions (see CommanderSystem)
 var mission_progress: int = 0  # progress of the ACTIVE Commander mission
+var monster_id: String = ""  # Monster card won on a hidden territory monster (max one); it joins the King in a Duel
 
 # Persistent army (Phase 5): units bought with Dominion Gold stay between duels.
 var deck: Deck
@@ -47,4 +51,4 @@ func has_passive(passive_id: String) -> bool:
 
 ## Quartermaster passive: Battle Shop discount.
 func battle_price_mult() -> float:
-	return 1.0 - passive_value if passive == "quartermaster" else 1.0
+	return (1.0 - passive_value if passive == "quartermaster" else 1.0) * extra_price_mult

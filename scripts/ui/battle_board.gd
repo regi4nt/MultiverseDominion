@@ -1,7 +1,7 @@
 extends Control
-## Battle screen (Battle Practice): PREPARATION -> AUTO BATTLE -> RESULT.
+## Battle screen (Battle Chess): PREPARATION -> AUTO BATTLE -> RESULT.
 ## All rules live in BattlePrep / BattleEngine / BattleAI; this script only displays and forwards input.
-## Two modes: Battle Practice (standalone) and DUEL (duel_context set by the Territory Board before
+## Two modes: Battle Chess (standalone, pays Aether Coins) and DUEL (duel_context set by the Territory Board before
 ## add_child: {"human","opponent","tile","human_attacks"}). In duel mode the persistent armies and the
 ## real Dominion Gold are used and `battle_finished(result)` is emitted when the player continues.
 
@@ -12,6 +12,7 @@ var duel_context: Dictionary = {}
 var prep: BattlePrep
 var engine: BattleEngine
 var rng := RandomNumberGenerator.new()
+var terrain: Dictionary = {}  # highland cells of this duel: drawn at random every time the board opens
 var deck: Deck
 var champion_id: String = ""
 var commander_star: int = 1  # Commander stars (duels use the player's; practice is 1 star)
@@ -34,7 +35,7 @@ var level_btn: Button
 var hand_label: Label
 var hand_box: VBoxContainer
 var synergy_box: VBoxContainer  # top-left: faction + role synergy of the deployed units
-var prep_actions: VBoxContainer  # bottom of the right column (To Bench / Sell / Lock Formation), preparation only
+var prep_actions: VBoxContainer  # bottom of the right column (Auto Deploy / Lock Formation), preparation only
 var _own_faction: String = ""
 var prep_panel: VBoxContainer  # right column, preparation part (buttons)
 var prep_left: VBoxContainer  # left column, preparation part (shop + bench)
@@ -58,11 +59,17 @@ var _tip_panel: PanelContainer = null
 var _tip_label: Label = null
 var _leave_dialog: UiDialog
 var _start_dialog: UiDialog
+var _wager: int = 0  # Battle Chess stake (already paid); a win pays stake x odds, a draw returns it
+var _wager_odds: float = 2.0
 
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	rng.randomize()
+	if duel_context.is_empty():  # Battle Chess wager: the stake was paid in New Match, the battle owns it from now on
+		_wager = GameSession.wager
+		_wager_odds = GameSession.wager_odds
+		GameSession.wager = 0
 	if duel_context.is_empty():
 		CardDatabase.set_continent(GameSession.continent_id)
 		WorldMods.apply(GameData.get_continent(CardDatabase.active_continent))
@@ -79,6 +86,8 @@ func _ready() -> void:
 		prep = BattlePrep.new(deck, rng, me.gold, budget, me.level, me.roster, me.battle_deck, me.hand)
 		hand = prep.hand
 		prep.price_mult = me.battle_price_mult()  # Quartermaster passive (prices are computed on display)
+	terrain = Terrain.generate(rng)
+	prep.set_terrain(terrain)
 	var own_faction := String(GameData.get_champion(champion_id).get("faction", ""))
 	_own_faction = own_faction
 	_build_ui()
@@ -92,6 +101,8 @@ func _ready() -> void:
 	if not duel_context.is_empty():
 		var o: PlayerState = duel_context["opponent"]
 		_duel_msg = "DUEL at %s - you %s %s." % [duel_context["tile"], "attack" if duel_context["human_attacks"] else "defend against", o.display_name]
+		if _own_monster_id() != "":
+			_duel_msg += "  Monster card: %s joins your King in Last Stand." % GameData.get_monster(_own_monster_id()).get("name", "?")
 	_msg("")
 	if bool(duel_context.get("tutorial", false)):
 		_build_tip()
@@ -121,7 +132,7 @@ func _set_tip(text: String) -> void:
 
 
 func _build_ui() -> void:
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(CardDatabase.active_continent))  # the continent being played has its own sky and board
 	var margin := UiTheme.make_margin(12)
 	add_child(margin)
 	var root := HBoxContainer.new()
@@ -215,10 +226,16 @@ func _build_ui() -> void:
 	prep_left.add_theme_constant_override("separation", 4)
 	prep_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(prep_left)
+	var legend := HBoxContainer.new()  # rarity colour key for the shop / bench borders
+	legend.add_theme_constant_override("separation", 8)
+	for r in ["common", "rare", "epic", "legendary"]:
+		var ll := UiTheme.make_label("\u25A0 %s" % String(r).capitalize(), 12, UiTheme.rarity_color(r))
+		ll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		legend.add_child(ll)
+	prep_left.add_child(legend)
 	shop_box = VBoxContainer.new()
 	shop_box.add_theme_constant_override("separation", 3)
 	prep_left.add_child(shop_box)
-	prep_left.add_child(auto_btn)  # directly below the unit offers
 	prep_actions = VBoxContainer.new()
 	prep_actions.add_theme_constant_override("separation", 6)
 	left.add_child(prep_actions)
@@ -228,7 +245,7 @@ func _build_ui() -> void:
 	prep_actions.add_child(message_label)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 6)
-	prep_actions.add_child(row2)
+	prep_left.add_child(row2)  # To Bench / Sell sit directly below the unit offers
 	bench_btn = UiTheme.make_button("To Bench", 44)
 	bench_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bench_btn.pressed.connect(_on_to_bench)
@@ -239,6 +256,7 @@ func _build_ui() -> void:
 	row2.add_child(sell_btn)
 	var start := UiTheme.make_primary("LOCK FORMATION\n& FIGHT", 72)
 	start.pressed.connect(_on_start_pressed)
+	prep_actions.add_child(auto_btn)  # Auto Deploy: bottom-right corner, above Lock Formation
 	prep_actions.add_child(start)
 
 	# ---- battle panel
@@ -247,10 +265,7 @@ func _build_ui() -> void:
 	battle_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	battle_panel.visible = false
 	right.add_child(battle_panel)
-	battle_status = UiTheme.make_label("", 17)
-	battle_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long HP totals must not clip at the panel edge
-	battle_panel.add_child(battle_status)
-	var speeds := HBoxContainer.new()  # Pause / 1x / 2x / 4x: added at the bottom of this column (bottom-left corner)
+	var speeds := HBoxContainer.new()  # Pause / 1x / 2x / 4x: added under the log (bottom-right corner)
 	speeds.add_theme_constant_override("separation", 6)
 	var sg := ButtonGroup.new()
 	for s in [["Pause", 0.0], ["1x", 1.0], ["2x", 2.0], ["4x", 4.0]]:
@@ -264,24 +279,9 @@ func _build_ui() -> void:
 	king_box.add_theme_constant_override("separation", 4)
 	battle_panel.add_child(king_box)
 	battle_panel.add_child(UiTheme.make_label("Support hand (tap to play)", 16, UiTheme.COL_GOLD))
-	energy_label = UiTheme.make_label("Energy", 15)
-	battle_panel.add_child(energy_label)
-	energy_bar = ProgressBar.new()  # fills while the next energy point charges; a full bar wastes time
-	energy_bar.custom_minimum_size = Vector2(0, 14)
-	energy_bar.min_value = 0.0
-	energy_bar.max_value = 1.0
-	energy_bar.show_percentage = false
-	battle_panel.add_child(energy_bar)
-	combo_label = UiTheme.make_label("", 14, UiTheme.COL_GOLD)
-	combo_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	battle_panel.add_child(combo_label)
 	support_box = VBoxContainer.new()
 	support_box.add_theme_constant_override("separation", 4)
 	battle_panel.add_child(support_box)
-	var battle_push := Control.new()  # pushes the speed buttons to the bottom-left corner
-	battle_push.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	battle_panel.add_child(battle_push)
-	battle_panel.add_child(speeds)
 	battle_left = VBoxContainer.new()
 	battle_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	battle_left.visible = false
@@ -293,11 +293,27 @@ func _build_ui() -> void:
 	log_view.scroll_following = true
 	log_view.add_theme_font_size_override("normal_font_size", 14)
 	lp.add_child(log_view)
+	# Bottom-right corner: combo + energy bar, player/enemy status, then the speed buttons.
+	combo_label = UiTheme.make_label("", 14, UiTheme.COL_GOLD)
+	combo_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	battle_left.add_child(combo_label)
+	energy_label = UiTheme.make_label("Energy", 15)
+	battle_left.add_child(energy_label)
+	energy_bar = ProgressBar.new()  # fills while the next energy point charges; a full bar wastes time
+	energy_bar.custom_minimum_size = Vector2(0, 14)
+	energy_bar.min_value = 0.0
+	energy_bar.max_value = 1.0
+	energy_bar.show_percentage = false
+	battle_left.add_child(energy_bar)
+	battle_status = UiTheme.make_label("", 16)
+	battle_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long HP totals must not clip at the panel edge
+	battle_left.add_child(battle_status)
+	battle_left.add_child(speeds)
 
 	_leave_dialog = UiDialog.new()
 	_leave_dialog.title = "Leave battle?"
 	_leave_dialog.tone = "danger"
-	_leave_dialog.dialog_text = "Leave Battle Practice? This battle will be lost."
+	_leave_dialog.dialog_text = ("Leave Battle Chess? This battle will be lost, pays no coins and your wager of %d coins is forfeited." % _wager) if _wager > 0 else "Leave Battle Chess? This battle will be lost and pays no coins."
 	_leave_dialog.ok_button_text = "Leave"
 	_leave_dialog.cancel_button_text = "Stay"
 	_leave_dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
@@ -312,7 +328,7 @@ func _build_ui() -> void:
 	add_child(_start_dialog)
 
 
-## Menu button / Android Back in Battle Practice: ask first, unless the battle is already over.
+## Menu button / Android Back in Battle Chess: ask first, unless the battle is already over.
 func _request_leave() -> void:
 	if _result_shown:
 		get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
@@ -352,11 +368,13 @@ func _refresh_prep() -> void:
 		else:
 			if BattlePrep.is_support_id(id):
 				var sc := CardDatabase.get_support(id)
-				b.text = "%s  [Support %s, Lv %d]  %d\u00A0G\n%s" % [sc["name"], String(sc["category"]), prep.support_level_req(id), prep.support_price(id), sc["description"]]
+				b.text = "%s  [%s Support %s, Lv %d]  %d\u00A0G\n%s" % [sc["name"], String(sc.get("rarity", "common")).capitalize(), String(sc["category"]), prep.support_level_req(id), prep.support_price(id), sc["description"]]
 				b.add_theme_font_size_override("font_size", 13)
+				UiTheme.apply_rarity(b, String(sc.get("rarity", "common")))
 			else:
 				var card := CardDatabase.get_unit(id)
-				b.text = "%s  [%s %s]  %d\u00A0G" % [card["name"], String(card["chess"]).capitalize(), card["role"], prep.unit_price(id)]
+				b.text = "%s  [%s %s %s]  %d\u00A0G" % [card["name"], String(card["rarity"]).capitalize(), String(card["chess"]).capitalize(), card["role"], prep.unit_price(id)]
+				UiTheme.apply_rarity(b, String(card["rarity"]))
 			b.disabled = prep.can_buy(i) != ""
 		b.pressed.connect(_on_buy.bind(i))
 		shop_box.add_child(b)
@@ -374,7 +392,24 @@ func _refresh_prep() -> void:
 		b.add_theme_font_size_override("font_size", 13)
 		if i < bench.size():
 			var u := bench[i]
-			b.text = "%s %s" % [String(CardDatabase.get_unit(u.card_id)["name"]).substr(0, 7), "*".repeat(u.stars)]
+			var ucard := CardDatabase.get_unit(u.card_id)
+			b.tooltip_text = "%s (%s)" % [ucard["name"], String(ucard["rarity"]).capitalize()]
+			UiTheme.apply_rarity(b, String(ucard["rarity"]))
+			var bic := PieceIcon.new(u.chess(), UiTheme.rarity_color(String(ucard["rarity"])))
+			bic.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			bic.offset_left = 4.0
+			bic.offset_right = -4.0
+			bic.offset_top = 6.0
+			bic.offset_bottom = -4.0
+			b.add_child(bic)
+			if u.stars > 1:
+				var st_l := UiTheme.make_label("*".repeat(u.stars), 13, UiTheme.COL_GOLD)
+				st_l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+				st_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				st_l.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+				st_l.offset_top = -2.0
+				st_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				b.add_child(st_l)
 			b.toggle_mode = true
 			b.button_pressed = (u == selected)
 			b.pressed.connect(_on_select.bind(u))
@@ -385,17 +420,21 @@ func _refresh_prep() -> void:
 	if selected != null and not prep.roster.units.has(selected):
 		selected = null
 	if selected == null:
-		sel_label.text = "Select a unit (bench or board), then tap a cell in your area (rows below the gold line)."
+		sel_label.text = "Select a unit (bench or board), then tap a cell in your area (rows below the gold line).\nHighland (peak tiles): ranged units only, +%d%% ATK. Plains: any unit." % int(float(GameData.b("highland_atk_bonus", 0.15)) * 100.0)
+		sel_label.add_theme_color_override("font_color", UiTheme.COL_MUTED)
 	else:
 		var card := CardDatabase.get_unit(selected.card_id)
 		var st := selected.stats()
-		sel_label.text = "%s %s | HP %d ATK %d | Rng %d Mov %d | cost %d | %s: %s" % [card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], card["range"], card["move"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]] + _buff_line(selected.card_id)
+		sel_label.add_theme_color_override("font_color", UiTheme.rarity_color(String(card["rarity"])))
+		sel_label.text = "[%s] %s %s | HP %d ATK %d | Rng %d Mov %d | cost %d | %s: %s" % [String(card["rarity"]).capitalize(), card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], card["range"], card["move"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]] + _buff_line(selected.card_id) + "\n" + ChessMove.describe(selected.chess())
 	if selected_support >= prep.hand.size() or (selected_support >= 0 and not prep.can_sell_support(prep.hand[selected_support])):
 		selected_support = -1
 	if selected_support >= 0:
 		selected = null  # one thing is selected at a time: a unit OR a Support card
 		var sid: String = prep.hand[selected_support]
-		sel_label.text = "%s | %s" % [CardDatabase.get_support(sid)["name"], CardDatabase.get_support(sid)["description"]]
+		var ssc := CardDatabase.get_support(sid)
+		sel_label.add_theme_color_override("font_color", UiTheme.rarity_color(String(ssc.get("rarity", "common"))))
+		sel_label.text = "[%s] %s | %s" % [String(ssc.get("rarity", "common")).capitalize(), ssc["name"], ssc["description"]]
 		sell_btn.text = "Sell (+%d G)" % int(prep.support_price(sid) * float(GameData.b("sell_ratio")))
 	else:
 		sell_btn.text = "Sell"
@@ -413,6 +452,7 @@ func _refresh_prep() -> void:
 		hb.custom_minimum_size.y = 34
 		hb.add_theme_font_size_override("font_size", 13)
 		hb.tooltip_text = String(hs["description"])
+		UiTheme.apply_rarity(hb, String(hs.get("rarity", "common")))
 		hb.disabled = not sellable
 		hb.toggle_mode = true
 		hb.button_pressed = (i == selected_support)
@@ -513,7 +553,7 @@ func _on_level_up() -> void:
 
 
 func _on_auto() -> void:
-	BattleAI.auto_deploy(prep, 0)
+	BattleAI.auto_deploy(prep, 0, deck.valid_lineup())  # follows the custom Lineup of the Deck (if any)
 	selected = null
 	_msg("")
 	_refresh_prep()
@@ -546,6 +586,12 @@ func _on_sell() -> void:
 
 
 func _on_cell(cell: Vector2i) -> void:
+	if phase == "battle" and engine != null:
+		# tap a unit to see its chess move area and attack area; tap it again (or an empty cell) to hide them
+		var tapped: BattleUnit = engine.grid.get(cell)
+		grid.inspect_unit = null if tapped == null or tapped == grid.inspect_unit else tapped
+		grid.queue_redraw()
+		return
 	if phase != "prep":
 		return
 	for u in prep.deployed_units():
@@ -565,7 +611,7 @@ func _on_start_battle() -> void:
 	var enemy_cfg: Dictionary
 	if duel_context.is_empty():
 		var diff := String(GameSession.difficulty)
-		var enemy_prep := BattleAI.build_enemy(diff, prep.level + (1 if diff == "hard" else 0), rng, deck)
+		var enemy_prep := BattleAI.build_enemy(diff, prep.level + (1 if diff == "hard" else 0), rng, deck, terrain)
 		_enemy_champion = BattleAI.pick_champion(rng, champion_id)
 		_enemy_hand = BattleAI.pick_hand(deck, rng, 2)
 		enemy_cfg = enemy_prep.to_side_cfg(_enemy_champion, _enemy_hand)
@@ -575,10 +621,10 @@ func _on_start_battle() -> void:
 		me.gold = prep.gold
 		me.level = prep.level
 		me.capacity = prep.capacity()
-		enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1)
+		enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1, terrain)
 	engine = BattleEngine.new()
-	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "manual_king": [true, false], "sides": [
-		prep.to_side_cfg(champion_id, hand, commander_star), enemy_cfg]})
+	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "manual_king": [true, false], "terrain": terrain, "sides": [
+		prep.to_side_cfg(champion_id, hand, commander_star, _own_monster_id()), enemy_cfg]})
 	phase = "battle"
 	_set_tip(TutorialGuide.BATTLE["fight"])
 	prep_panel.visible = false
@@ -606,6 +652,12 @@ func _battle_sounds() -> void:
 				fell = true
 			"fx":
 				fx = true
+			"last_stand":
+				Sfx.play("portal")
+			"check":
+				Sfx.play("error")
+			"mate":
+				Sfx.play("defeat" if int(ev["side"]) == 0 else "victory")
 	if fell:
 		Sfx.play("death")
 	elif hit:
@@ -633,6 +685,10 @@ func _on_tick() -> void:
 	_update_battle_ui()
 	if engine.finished:
 		timer.stop()
+		for ev in engine.events:
+			if ev["type"] == "mate":  # let the CHECKMATE banner be seen before the result screen covers it
+				await get_tree().create_timer(1.4).timeout
+				break
 		_show_result()
 
 
@@ -645,6 +701,13 @@ func _update_battle_ui() -> void:
 	_refresh_king_btn()
 	_refresh_energy()
 	grid.queue_redraw()
+
+
+## Monster card of the human duelist ("" in Battle Chess or when none was won): it joins the King in Last Stand.
+func _own_monster_id() -> String:
+	if duel_context.is_empty():
+		return ""
+	return (duel_context["human"] as PlayerState).monster_id
 
 
 ## King panel: Passive (every continent), Buff (home continent only) and the active skill, cast by hand once the King is in the arena.
@@ -667,6 +730,11 @@ func _rebuild_king() -> void:
 		var pl := UiTheme.make_label("Buff - %s: %s%s" % [kb["name"], kb["desc"], "" if home else " (inactive: foreign faction)"], 13, UiTheme.COL_GOLD if home else UiTheme.COL_MUTED)
 		pl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		king_box.add_child(pl)
+	var mid := _own_monster_id()
+	if mid != "":
+		var ml := UiTheme.make_label("Monster card - %s\nJoins your King when he enters Last Stand." % MonsterSystem.summary(mid, true), 13, UiTheme.COL_GOLD)
+		ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		king_box.add_child(ml)
 	king_btn = UiTheme.make_button("", 64)
 	king_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	king_btn.add_theme_font_size_override("font_size", 14)
@@ -782,11 +850,22 @@ func _show_result() -> void:
 		tl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(tl)
 	v.add_child(UiTheme.make_label("Ticks: %d | Your survivors: %d | Enemy survivors: %d" % [engine.tick, engine.regulars_alive(0), engine.regulars_alive(1)], 18))
-	if won and duel_context.is_empty():
-		var reward := int(GameData.b("victory_gold")) + int(engine.bonus_gold[0])
-		v.add_child(UiTheme.make_label("Victory reward: +%d Dominion Gold (practice: not saved)" % reward, 18, UiTheme.COL_GOLD))
 	if duel_context.is_empty():
-		var again := UiTheme.make_button("New Practice Battle", 56)
+		var coins := SaveManager.record_practice(won)  # Battle Chess pays Aether Coins (once: _result_shown guards this screen)
+		if _wager > 0:
+			var outcome := "win" if won else ("draw" if engine.winner < 0 else "loss")
+			var paid := SaveManager.settle_wager(_wager, outcome, _wager_odds)
+			match outcome:
+				"win":
+					v.add_child(UiTheme.make_label("Wager won: +%d coins (stake %d, x%s)" % [paid, _wager, str(snappedf(_wager_odds, 0.01))], 20, UiTheme.COL_GOLD))
+				"draw":
+					v.add_child(UiTheme.make_label("Draw: wager of %d coins returned" % paid, 20, UiTheme.COL_GOLD))
+				_:
+					v.add_child(UiTheme.make_label("Wager lost: -%d coins" % _wager, 20, UiTheme.COL_DANGER))
+			_wager = 0  # settled once
+		v.add_child(UiTheme.make_label("Aether Coins: +%d  (total %d)" % [coins, SaveManager.coins()], 20, UiTheme.COL_GOLD))
+	if duel_context.is_empty():
+		var again := UiTheme.make_button("New Battle", 56)
 		again.pressed.connect(func(): get_tree().reload_current_scene())
 		v.add_child(again)
 		var menu := UiTheme.make_button("Main Menu", 56)

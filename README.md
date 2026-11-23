@@ -17,22 +17,91 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
    `godot --headless --path . res://tests/ui_duel_smoke.tscn` -> `UI DUEL SMOKE: PASS`.
    `godot --headless --path . res://tests/content_test.tscn` -> `CONTENT TEST RESULT: PASS` (Phase 6).
    `godot --headless --path . res://tests/ui_content_smoke.tscn` -> `UI CONTENT SMOKE: PASS` (7 benua di UI).
+   `godot --headless --path . res://tests/monster_test.tscn` -> `MONSTER TEST RESULT: PASS` (monster tersembunyi).
+   `godot --headless --path . res://tests/deposit_test.tscn` -> `DEPOSIT TEST RESULT: PASS` (tambang & harta karun tersembunyi).
+   `godot --headless --path . res://tests/skin_test.tscn` -> `SKIN TEST RESULT: PASS` (skin map per benua).
    Juga: `tutorial_test`, `audio_test`, `rules_test` (Auction, Special Dice, unlock), `team_test` (mode 2vs2), `save_test`, `perf_test`, `ui_resume_smoke`; dan
    `ui_tutorial_smoke` + `layout_test` (butuh render nyata, lihat BUILD_ANDROID.md bagian 4).
 
 ## Shop (Main Menu -> Shop, di atas Profile)
-- Mata uang: **Aether Coins** (disimpan di save, mulai 600). Menang match +150, kalah +50 (`ShopSystem`).
+- Mata uang: **Aether Coins** (disimpan di save, mulai 600). Menang match +150, kalah +50 (`ShopSystem`). **Battle Chess** juga memberi coin: menang +75, kalah/seri +15 (`ShopSystem.PRACTICE_WIN_REWARD` / `PRACTICE_LOSS_REWARD`, `SaveManager.record_practice`); tidak mengubah statistik, progres Journey, atau membuka kartu.
 - Tab **Gacha**: Pull x1 = 100, Pull x10 = 900 (10 kartu, minimal 1 Rare). Rate: Common 60 / Rare 28 / Epic 10 / Legendary 2 (%).
   Pity: Epic atau lebih dijamin paling lambat pull ke-30. Kartu duplikat diubah jadi **Card Fragment** (Common 10, Rare 25, Epic 60, Legendary 150), disimpan di save (`wallet.fragments`) dan ditampilkan di header Shop.
 - Tab **Buy Cards**: beli langsung Support yang masih terkunci (filter per kategori). Harga: Common 200, Rare 500, Epic 1200, Legendary 3000.
   Atau **tukar dengan fragment** lewat tombol *Exchange* di panel yang sama: makin langka kartunya makin banyak fragment (Common 50, Rare 150, Epic 400, Legendary 1000; `ShopSystem.exchange`).
 - Tes: `godot --headless --path . res://tests/shop_test.tscn` -> `SHOP TEST RESULT: PASS`; `ui_shop_smoke.tscn` -> `UI SHOP SMOKE: PASS`.
 
+## UX geser (scroll)
+- Semua area scroll dibuat lewat `UiTheme.make_scroll()` yang sekarang mengembalikan `TouchScroll` (`scripts/ui/touch_scroll.gd`): kontrol Button / Panel / RichTextLabel di dalamnya otomatis `MOUSE_FILTER_PASS` (juga yang ditambahkan belakangan, mis. grid kartu yang dibangun ulang), jadi geseran yang dimulai di atas tombol atau kartu tetap men-scroll daftar (Deck, New Match, Shop, Settings, dialog, dll).
+- Geseran yang dimulai di atas tombol membatalkan tekan tombol itu setelah melewati dead zone, jadi melepas jari tidak ikut menekan tombol. Slider, scrollbar, LineEdit/TextEdit tetap `STOP`.
+
+## Taruhan / Wager (Arena dan Battle Chess)
+- Sebelum bertanding pemain bisa mempertaruhkan **Aether Coins**: None / 50 / 100 / 250 / 500 / 1000 (chip yang melebihi saldo nonaktif). Journey dan Tutorial tidak punya taruhan.
+- **Arena**: panel *Wager* ada di kolom Match (di bawah Difficulty). **Battle Chess**: menekan kartunya membuka dialog kesulitan + taruhan, lalu tombol FIGHT.
+- Stake dibayar **saat match dimulai** (`SaveManager.place_wager`). Menang: dibayar **stake x odds** (stake sudah termasuk), kalah: stake hangus. Battle Chess seri: stake dikembalikan.
+  Keluar di tengah Battle Chess = stake hangus. Arena: stake ikut tersimpan di match yang bisa dilanjutkan (`MatchController.wager`), diselesaikan satu kali (`wager_settled`).
+- Odds (`ShopSystem.wager_odds`): 1 vs 1 / 2 vs 2 / Battle Chess x2, 4 Player x3; dikali kesulitan AI easy x0.75, normal x1, hard x1.5. Taruhan ini **di luar** hadiah coin normal (menang +150/+75, kalah +50/+15).
+
+## Monster tersembunyi di Territory
+- **4 monster per benua** (7 benua = 28 monster, semuanya berbeda: nama, stat, dan buff; data di `data/monsters.json`). Satu monster untuk tiap region (Utara/Timur/Selatan/Barat), masing-masing bersembunyi di **petak Territory acak** region itu.
+  Lokasinya diacak tiap match (seed yang sama = lokasi yang sama) dan **tidak pernah ditampilkan di peta**: `describe_tile`, papan, dan info petak tidak menyebutnya. Pemain baru tahu setelah **mendarat** di petak itu. Match Tutorial tidak punya monster.
+- **Bertemu monster**: mendarat di petak berisi monster -> pilih **Fight** atau **Flee** (`pending.type = "monster"`, tombol keputusan biasa). Setelah itu petak diproses seperti biasa (beli / sewa / duel).
+  Fight = auto battle (`MonsterSystem.fight`): pasukan permanen pemain yang dipasang otomatis + King (Last Stand) melawan monster. Tidak membeli unit dan kartu Support tidak terpakai.
+  Kalah = kehilangan `monster_defeat_gold` (50 G) dan monster tetap di sarangnya; kabur = gratis.
+- **Menang = dapat Kartu Monster**, **maksimal 1 per pemain**. Pemain yang sudah punya kartu berjalan melewati monster lain tanpa terjadi apa-apa (monster tetap tersembunyi). Monster yang sudah dikalahkan hilang untuk semua pemain (`monster_unique`: true di `balance.json`; set `false` agar tiap pemain bisa mengalahkan monster yang sama).
+- **Membantu King di Duel**: saat King masuk lewat Last Stand, monster ikut turun di samping King dan bertarung di pihak yang sama, dengan stat **75%** dari monster liar (`monster_ally_stat_mult`). Buff monster (armor, burn, regen, aura ATK, dst.) memakai efek buff kartu yang sudah ada. Berlaku untuk duel pemain maupun AI (`BattleEngine` side config key `"monster"`, `BattlePrep.to_side_cfg(..., monster_id)`).
+- UI: kartu pemain menampilkan "Monster: nama" (tooltip = stat + buff); popup hasil untuk pemain manusia; panel King di layar Battle menampilkan kartu monster. Tersimpan di save/resume (`monsters`, `PlayerState.monster_id`); save lama tanpa monster tetap bisa dimuat.
+- Keseimbangan (diukur dengan 14 game AI per benua): kekuatan tiap monster dikalibrasi agar kira-kira **60% menang di pertengahan game (ronde ~14)**, sulit di awal (pasukan 3 pion hampir pasti kalah), dan makin mudah seiring pasukan tumbuh. Kartu monster menaikkan peluang menang duel rata-rata sekitar 15 poin persen pada pasangan pasukan yang seimbang.
+- Kode: `scripts/systems/monster_system.gd`, `MatchController._meet_monster` / `_answer_monster`, `AIController._monster_choice`. Tes: `godot --headless --path . res://tests/monster_test.tscn` -> `MONSTER TEST RESULT: PASS`.
+
+## Tambang & harta karun tersembunyi di Territory
+- **4 temuan per benua: 2 harta karun + 2 tambang** (7 benua = 28 temuan, semuanya berbeda: nama, lore, hadiah, dan durasi; data di `data/deposits.json`). Tiap temuan tersembunyi di **petak Territory acak di seluruh papan** (region mana pun), tidak pernah di petak yang sama dengan temuan lain dan tidak pernah di sarang monster.
+  Lokasinya diacak tiap match (seed yang sama = lokasi yang sama), memakai generator acak sendiri sehingga aliran rng utama dan lokasi monster tidak berubah. Seperti monster, **tidak pernah ditampilkan di peta**: `describe_tile` dan info petak tidak menyebutnya. Match Tutorial tidak punya temuan. Opsi `deposits: false` pada cfg `setup()` mematikannya.
+- **Menemukan**: cukup **mendarat** di petak itu (otomatis, tanpa keputusan). Setelah itu petak diproses seperti biasa (beli / sewa / duel / monster).
+- **Harta karun**: hadiah sekali ambil untuk penemunya (emas, kadang Reroll Token, kadang Special Die; jika kantong dadu penuh, emasnya tetap dibayar). Setelah ditemukan, hilang untuk semua pemain.
+- **Tambang**: menjadi milik penemunya dan membayar **emas tiap akhir ronde** selama sejumlah ronde (`rounds`), sebagian tambang juga memberi 1 Reroll Token tiap `token_every` pembayaran. Tambang pemain yang tersingkir berhenti membayar. Pemain lain yang mendarat di tambang yang sudah ditemukan tidak mendapat apa-apa.
+- Contoh isi: Aetherion = Buried Royal Tithe (300 G), Crown Jeweler's Cache (180 G + Token), Sunstone Quarry (30 G x 10 ronde), Emerald Seam (24 G x 12 ronde + Token tiap 6). Drakmor = Dragon's Hoard (350 G), Warlord's War Chest (240 G + Special Die), Obsidian Pit (38 G x 8), Brimstone Deep (30 G x 10). Angka lengkap tiap benua ada di `data/deposits.json`.
+- UI: popup untuk pemain manusia saat menemukan harta karun atau tambang; kartu pemain menampilkan "Mines: N (+X G / round)" (tooltip = tambang + sisa ronde). Tersimpan di save/resume (`deposits`); save lama tanpa temuan tetap bisa dimuat.
+- Kode: `scripts/systems/deposit_system.gd`, `MatchController._find_deposit` / `_pay_mines` (dipanggil dari `_end_of_round`), signal `deposit_event`. Tes: `godot --headless --path . res://tests/deposit_test.tscn` -> `DEPOSIT TEST RESULT: PASS`.
+
+## Skin map berbeda untuk tiap benua (Territory dan Battle)
+- Tiap benua punya **tampilan papan sendiri**, baik di **Territory Board** (cincin 100 petak + plat tengah) maupun **Battle Board** (grid 8x8), plus **langit latar** layarnya. Semuanya digambar prosedural dengan `_draw()` (tanpa file gambar, tetap ringan di Android). Data di `data/map_skins.json`, kode di `scripts/ui/map_skin.gd` (`MapSkin`).
+- Ciri tiap benua:
+
+| Benua | Warna | Motif (`pattern`) | Bentuk petak / sel | Emblem watermark |
+|---|---|---|---|---|
+| Aetherion | emas kerajaan | `marble` (urat marmer) | agak bulat (0.12) | ratu / mahkota |
+| Arcanum | ungu arkana | `runes` (glif rune) | bulat sedang (0.30) | bintang arkana |
+| Machina | tembaga + baja | `gears` (roda gigi) | hampir siku (0.03) | roda gigi besar |
+| Sylvaris | hijau hutan | `leaves` (daun, arah beda tiap sel) | sangat bulat (0.42) | daun |
+| Drakmor | merah lava | `embers` (retakan + percikan) | tajam (0.04) | taring naga |
+| Thalassia | biru laut | `waves` (garis ombak) | bulat (0.25) | ombak |
+| Eclipsia | indigo + bintang emas | `stars` (bintang 4 sudut) | hampir lingkaran (0.45) | gerhana |
+
+- **Territory**: warna bingkai papan, plat tengah, judul benua, petak Territory (selang-seling), warna petak layanan (Shop, Bank, dst. tetap satu keluarga warna agar mudah dikenali tetapi diberi tint benua), motif di tiap petak Territory, dan watermark emblem benua di plat tengah.
+- **Battle**: bingkai, petak sisi kita (nada dingin) dan sisi musuh (nada merah-ungu) tetap **mudah dibedakan di setiap skin** (dijaga oleh tes), garis deploy, Highland, dinding, motif di tiap sel, dan watermark emblem di tengah papan. Battle selalu memakai skin benua yang sedang dimainkan (duel di dalam match memakai benua match-nya, Battle Practice / Battle Chess memakai benua terpilih).
+- Menambah atau mengubah skin cukup lewat `data/map_skins.json` (warna heksadesimal, `radius`, `pattern`, `motif_a`, `emblem_a`). Key yang hilang atau nama `pattern` yang tidak dikenal otomatis kembali ke tampilan lama (`MapSkin.DEFAULT_*`), jadi benua baru tanpa skin tidak merusak apa pun.
+- Tes: `godot --headless --path . res://tests/skin_test.tscn` -> `SKIN TEST RESULT: PASS` (data lengkap, tiap benua unik, fallback, semua motif dan kedua papan benar-benar digambar). Screenshot semua benua: `xvfb-run godot --path . res://tests/skin_shots.tscn` (hasil di `/tmp/shots_skins`).
+
 ## Cara bermain (Phase 2)
 - Roll Dice (2xD6). Double / event "Time Surge" = lempar lagi (maks 2 bonus).
+- **Kartu Event** (12, `data/events.json`): Hidden Treasure, Royal Levy, Tailwind, Sudden Storm, Blessing of Fortune, Grand Festival, Bandit Ambush, Time Surge, Special Die, plus **Bull Market** (semua saham +20%), **Market Crash** (semua saham -20%), **Lucky Chip** (taruhan Casino gratis).
 - Reroll Token: ulang lemparan sebelum bergerak (beli di Shop / event / passive Elarion).
 - Wilayah kosong: beli. Wilayah lawan: bayar Tax (rent). Mayoritas region (6/10) x1.5, Regional Dominion (10/10) x2.5.
-- Portal aktif (ungu) memindahkan ke portal aktif lain; portal berpindah tiap akhir ronde penuh.
+- **Portal**: tiap sisi hanya punya **1 portal** (4 di papan, selalu aktif); mendarat di sana bisa warp ke portal sisi lain.
+- **Bank & Saham** (ikon grafik hijau, 2 per sisi = 8): investasi gold 100 / 250 / 500. Pasar bergerak tiap ronde (acak -20% s/d +30%, `stock_change_min/max`), berlaku untuk semua portofolio.
+  Jual semua di Bank mana pun. Saham dihitung di net worth dan otomatis dicairkan lebih dulu saat harus bayar utang (sebelum tanah dijual). State: `PlayerState.stock_value/stock_basis`, `MatchController.market_change`, tersimpan di save.
+- **Kartu Event & Special Die per benua** (`data/continent_flavor.json`, dimuat lewat `GameData.apply_flavor` saat match mulai / save di-load): tiap benua punya **12 kartu event dan 6 Special Die sendiri** (nama, efek, dan angka berbeda; set netral di `data/events.json` / `data/special_dice.json` hanya dipakai sebagai cadangan dan oleh tes). Ringkasan:
+  - **Aetherion** (kerajaan): ekonomi stabil. Crown Tax (-10 G/teritori), Grand Tourney (+10 G/teritori), Royal Pardon (+1 Life). Dadu: Charger, **Decree** (rival bayar), Rogue (curi), **Tribute** (emas per teritori), Guild Broker, **Physician** (heal).
+  - **Arcanum** (sihir): kacau & berisiko. Ley Line (warp portal), Wild Teleport (warp teritori acak), pasar +/-30%. Dadu: **Ritual** (token), Portal Spell, Mana Broker (swing besar), Binding, Oracle (fate), **Arcane Surge** (emas).
+  - **Machina** (industri): Factory Inspection (-15 G/teritori), Factory Output (+15 G/teritori), Patent Sale (curi 50 G), Gear Jam. Dadu: Overclock, Piston, **Factory** (emas per teritori), **Ticker**, Saboteur, Spare Parts.
+  - **Sylvaris** (alam): aman & menyembuhkan. Spring of Life (+2 Life), Bumper Harvest, Locust Swarm, tanpa kartu rugi emas langsung. Dadu: **Harvest**, **Healing Spring**, Vine, Seed Broker (stabil), Foraging, Spirit.
+  - **Drakmor** (perang): angka besar. Dragon's Hoard (+250 G), Demon's Toll (-150 G), Pillage (curi 80 G), Victory Revel (+50 G/rival). Dadu: **Warlord**, Charge, Pillager, **Blood Fate** (+/-250..350), Spoils, War Council.
+  - **Thalassia** (laut): gerak & badai. Fair Winds (+5), Tempest (-4), Whirlpool (warp portal), Becalmed (skip), Pirate Raid (-120 G). Dadu: **Tempest** (-2..+6), Whirlpool, Corsair, Merchant, **Treasure Dive**, Sea Charm.
+  - **Eclipsia** (waktu): Time Loop (warp ke START + bonus), Echo Thief, Temporal Dividend (+8 G/teritori), 2 Reroll Token. Dadu: **Paradox** (START 2x), Epoch, **Fate Weave** (+/-150..400), Moment, **Futures** (swing -30..+100%), Chrono (-3..+6).
+  Efek kartu baru: `gain_per_land`, `lose_per_land`, `steal_richest`, `heal`, `skip_turn`, `warp_portal`, `warp_land`, `warp_start`; jenis dadu baru: `land_gold`, `levy`, `tokens`, `gold`, `heal` (dadu `fate` boleh punya `fate_values` sendiri).
+- **Destiny Die** (Special Die ke-5, `data/special_dice.json`): dadu nasib baik/buruk, dibeli di Shop / dari Event, dipakai sebelum lempar dadu. 1 = bencana (-200 G), 2 = sial (-100 G), 3 = mundur 3 petak (petak itu diproses), 4 = +100 G, 5 = +200 G, 6 = +300 G + Reroll Token. Nilai di `fate_values` / `fate_detour` (`data/balance.json`); rugi dibayar lewat `_pay` (saham dicairkan dulu, lalu tanah dijual). Tidak ada petak Fate di papan.
+- **Casino** (tempat judi, ikon dadu merah, 1 per sisi = 4): taruhan 50 G (`casino_bet`). Hadiah: x2 (20%), x4 (10%), atau seluruh pot (2%, pot naik tiap taruhan, awal 200 G). Parameter di `data/balance.json` (`casino_*`).
 - Bangkrut = jual wilayah otomatis; jika tetap kurang -> -1 Life + bailout. Life 0 = tereliminasi.
 - Menang: lawan habis, atau ronde 40 -> net worth tertinggi.
 - Ketuk petak mana pun di papan untuk info detail.
@@ -49,8 +118,8 @@ Satu scene (`scripts/ui/match_setup.gd`) dengan dua tampilan. Tombol Back / Esc 
 - **Arena**: match bebas melawan AI di benua yang sudah terbuka. Players: **1 vs 1**, **2 vs 2**, **4 Player**. **Tidak membuka benua** (kemenangan tetap memberi koin, statistik, dan kartu Support).
   Flag `journey` ikut di config match (`GameSession.category`) dan di save/resume (`MatchController.journey`); `SaveManager.record_match(..., journey)` hanya membuka benua jika `journey` true.
 - **Faksi tidak dipilih di New Match.** Kolom kanan setup hanya menampilkan faksi + King dari Deck (read-only) dan tombol **Change faction in Deck**
-  (membuka Collection & Deck -> Deck -> tab Faction; Back kembali ke New Match lewat `GameSession.collection_return`, `open_deck_tab`).
-- **Faksi dipilih di Deck**: tab **Faction** (dulu "King") di Collection & Deck menampilkan 28 faksi per benua. Faksi dari benua yang belum terbuka **terkunci** (tombol nonaktif,
+  (membuka Card Hub -> Deck -> tab Faction; Back kembali ke New Match lewat `GameSession.collection_return`, `open_deck_tab`).
+- **Faksi dipilih di Deck**: tab **Faction** (dulu "King") di Card Hub menampilkan 28 faksi per benua. Faksi dari benua yang belum terbuka **terkunci** (tombol nonaktif,
   "Locked - unlock X in Journey") dan tidak bisa dipilih; faksi 4 benua yang terbuka bisa dipilih. Faksi terkunci terbuka otomatis saat benuanya dibuka lewat Journey.
   King pilihan = faksi pemain di setiap match dan di Battle Chess (`SaveManager.player_champion_id()` / `player_faction_id()`; King dari faksi terkunci di save lama jatuh kembali ke faksi terbuka pertama).
   Faksi pemain boleh dari benua lain daripada benua match (musuh AI tetap dari faksi benua match); `GameData.find_faction` mencari di semua benua.
@@ -59,7 +128,7 @@ Satu scene (`scripts/ui/match_setup.gd`) dengan dua tampilan. Tombol Back / Esc 
   `BattleEngine._synergy` dan panel Synergy juga menolak faksi non-home sebagai pengaman (mis. bidak shared milik King asing).
   Di benua asing faksi tetap bisa main, tanpa buff King, tanpa buff kartu, dan tanpa Faction Synergy (passive King tetap aktif di mana pun) untuk faksi itu (Role Synergy dan modifier benua tidak terpengaruh).
   **Journey wajib faksi asal**: tombol START MATCH nonaktif jika faksi di Deck bukan faksi benua Journey. Setup menampilkan catatan status bonus.
-- **Battle Chess**: membuka scene Battle (sebelumnya tombol "Battle Practice"). **Tutorial**: match panduan seperti sebelumnya.
+- **Battle Chess**: membuka scene Battle (sebelumnya "Battle Practice"; sekarang bukan latihan: setiap battle memberi Aether Coins). **Tutorial**: match panduan seperti sebelumnya.
 - Perubahan perilaku: sebelumnya kemenangan di mode apa pun membuka benua berikutnya secara berurutan; sekarang hanya Journey, lewat mastery dan pilihan pemain. Benua yang sudah terbuka di save lama tetap terbuka (tetapi tidak memberi hak pilih; kemenangan lama tidak tercatat per faksi).
 - Tes: `godot --headless --path . res://tests/newmatch_test.tscn` -> `NEW MATCH TEST RESULT: PASS` (aturan unlock, config, hub, setup). `tests/layout_test` ikut memeriksa hub (offline / online) dan setup Arena / Journey di 7 rasio layar.
   Screenshot untuk review: `xvfb-run godot --path . res://tests/newmatch_shots.tscn` menulis PNG ke `/tmp/shots`.
@@ -83,10 +152,10 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
 - Kapasitas catur (`CapacitySystem`): Pawn 1, Rook/Knight/Bishop 2, Queen 4, King 6; level 3 = 9 ... level 10 = 30.
   Asumsi: King/Champion tidak dihitung ke kapasitas deploy (hanya masuk saat Last Stand) — konfirmasi di Phase 4.
 - `BattleDeck`: tumpukan 135 kartu untuk Battle Shop (5 kartu per refresh, sisa kembali ke tumpukan).
-- Main Menu -> Collection & Deck: satu layar dengan dua tab. Tab Collection (filter, detail, stat 1/2/3 bintang) dan tab Deck (pilih Champion + tepat 15 Support, simpan ke save).
+- Main Menu -> Card Hub (dulu "Card Hub"; nama di `GameSession.CARD_HUB_NAME`): satu layar dengan tiga tab. Tab Collection (filter, detail, stat 1/2/3 bintang), tab Deck (pilih Champion + tepat 15 Support, simpan ke save), dan tab **Info** (panduan: aturan dek, **Territory** (dadu, jenis petak, rent/region, Tax-Duel-Conquest, cara menang), 7 role + skill, sinergi faksi/role, dasar battle; semua angka dibaca dari data game). Card Hub juga bisa dibuka dari **Territory Board** (tombol Card Hub di kolom pemain): tampil sebagai overlay, match berhenti sementara (tidak disimpan/dimuat ulang), benua match dipulihkan saat ditutup, dan dek yang disimpan berlaku untuk match berikutnya.
 - Koleksi awal: semua unit x9 dan 15 dari 105 Support; 90 Support terkunci (cara membuka: tiap kemenangan membuka satu Support terkunci, lihat "Aturan tambahan").
 
-## Deck (Main Menu -> Collection & Deck -> tab Deck)
+## Deck (Main Menu -> Card Hub -> tab Deck)
 - Editor bergaya Clash Royale: **deck sebagai kartu visual di kiri** (grid 3 x 5, lencana biaya capacity di tiap kartu, "avg cost" di judul) dan **koleksi di kanan** (5 kolom).
   Tab: **Units n / 15** (filter per faksi), **Support n / 15** (filter per kategori), **Faction** (kartu faksi per benua dengan gaya yang sama; panel kiri menampilkan King terpilih + skill-nya; faksi terkunci diberi overlay LOCKED).
   Ketuk kartu koleksi untuk memasang (kartu yang sudah di deck tampak redup; ketuk lagi untuk melepas). Jika deck penuh, kartu itu "dipegang" dan semua slot menyala emas:
@@ -173,18 +242,20 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
   (`passive_value`, `active_value`). Passive: Royal Treasury, Shadow Ledger, Landlord, Fortune Weave, Toll Keeper, Treasure Hunter,
   Spoils of War, Quartermaster, Mender, Vanguard. Aktif: Sun Judgment, Starfall Decree, Eclipse Veil, Banner of Iron, Inferno Burst,
   Chrono Stasis, Soul Drain, Frost Veil, Overcharge, Rift Strike, Life Surge.
-- **World modifier** (`WorldMods`): Aetherion Royal Tithe (+50 START), Arcanum Arcane Conduits (8 portal aktif), Machina Industrial Age (rent +25%,
+- **World modifier** (`WorldMods`): Aetherion Royal Tithe (+50 START), Arcanum Arcane Markets (pasar saham Bank +10% tiap ronde), Machina Industrial Age (rent +25%,
   harga shop -20%), Sylvaris Bountiful Harvest (+6 G per wilayah per ronde), Drakmor War Fever (ATK battle +15%, pemenang duel +60 G),
   Thalassia Sea Trade (tax setengah, Reroll Token 40 G), Eclipsia Time Fold (+1 Reroll Token tiap lewat START, bonus roll maks 3).
 - **Kartu (v19)**: tiap faksi punya **dek 15 tipe unit** (15 x 9 salinan = 135): **8 Pawn benua** (2 per faksi, "slot" 0-3; di benua lain ia milik faksi benua itu, nama diawali
   nama faksi, mis. "Ferrum Royal Guard"; sama untuk semua faksi di benua itu) + **7 bidak milik faksi sendiri** (2 Rook, 2 Knight, 2 Bishop, 1 Queen; `faction: "<id faksi>"`,
   `slot: -1`, field `continent`): 28 faksi x 7 = **196 kartu unik** dengan nama, nama skill, angka skill (`skill.params`), buff, serta HP/ATK sendiri. Dek ditentukan
   oleh Champion (`Deck.faction_id()` -> `CardDatabase.faction_units`), jadi Battle Shop hanya menawarkan Pawn benua + bidak faksi pemain.
-  Setiap slot (Rook Tank, Rook Marksman, Knight Fighter, Knight Assassin, Bishop Mage, Bishop Support, Queen) punya nilai dasar di `CardDatabase.SLOT_BASE`; HP/ATK tiap
-  faksi boleh menyimpang sedikit (maks ~12%) dengan HP x ATK tetap seimbang (`validate_all_continents`). Role, range, move, rarity, dan mekanik skill tetap sama per slot;
+  Tiap faksi membagi 7 role (Tank, Marksman, Fighter, Assassin, Mage, Support, Controller) ke 7 bidaknya dengan susunan sendiri (28 susunan berbeda; Solvaris memakai susunan dasar:
+  Rook Tank, Rook Marksman, Knight Fighter, Knight Assassin, Bishop Mage, Bishop Support, Queen Controller). HP/ATK/range dan skill mengikuti ROLE (nilai dasar di `CardDatabase.SLOT_BASE`, dicari lewat `role_base`);
+  move dan biaya kapasitas mengikuti jenis bidak; HP/ATK tiap
+  faksi boleh menyimpang sedikit (maks ~12%) dengan HP x ATK tetap seimbang (`validate_all_continents`). Role, range, dan mekanik skill tetap sama per role, move per bidak;
   skill menunjuk mekanik dasar lewat `skill.mechanic` (`CardDatabase.skill_mechanic`). Angka skill yang divariasikan: durasi taunt, interval dan jumlah target Rook Marksman,
-  durasi stun Knight Fighter, bonus serangan pertama Knight Assassin, frekuensi dan persen splash Bishop Mage, interval dan persen heal Bishop Support. Queen selalu
-  aura +15% ATK ditambah buff.
+  durasi stun Knight Fighter, bonus serangan pertama Knight Assassin, frekuensi dan persen splash Bishop Mage, interval dan persen heal Bishop Support. Controller (role Controller, bukan lagi aura ATK) memakai skill kontrol **Dominion Bind**: tiap `interval` tick men-stun `targets` musuh ber-ATK
+  tertinggi (di seluruh arena) selama `stun_ticks` tick (angka tiap faksi berbeda, lihat `PARAM_KEYS["dominion_bind"]`), ditambah buff.
   **Save lama**: id bidak bersama versi lama diterjemahkan lewat `legacy_ids` di `cards.json` ke bidak faksi pertama benua itu (`CardDatabase.canonical_id`).
   **Buff benua (`data/card_buffs.json`)**: tiap kartu unit punya satu buff tema (8 Pawn x 7 benua + 196 bidak faksi, nama unik). 8 Pawn yang sama mendapat buff berbeda di
   tiap benua. Buff = tipe efek + nilai (`CardDatabase.BUFF_TYPES`, 22 tipe, diterapkan di `BattleEngine`): armor, evade, thorns, execute, frenzy, aura_atk, burn, stun_proc, ward, splash,
@@ -213,8 +284,9 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
   di atas separuh papan musuh saat persiapan duel). Hasilnya tidak dihitung ke statistik; `profile.tutorial_done` disimpan.
 - **Auction sungguhan**: lot acak dilelang ke semua pemain hidup, mulai dari yang mendarat; buka 40% harga, naik 10% per tawaran;
   yang pass atau tak mampu keluar; AI menaksir lot dari harga, region yang dilengkapi, dan tingkat kesulitan.
-- **Special Dice** (4 jenis x 6 sisi, `data/special_dice.json`): Swift (bonus gerak), Fortune (gold), Warp (teleport, menggantikan lemparan),
-  Order (lempar ekstra / lawan berikutnya lewat giliran / token / gold). Sumber: kartu Event dan Territory Shop (120 G); maks 3 dibawa; dipakai
+- **Special Dice** (6 jenis x 6 sisi, `data/special_dice.json`): Swift (bonus gerak), Warp (teleport, menggantikan lemparan),
+  Order (lempar ekstra / lawan berikutnya lewat giliran / token / gold), Destiny (dadu nasib baik/buruk), **Thief** (curi 20-60 G dari lawan terkaya; sisi terakhir tertangkap, denda 30 G),
+  **Broker** (portofolio saham -10% s/d +50%; tanpa saham dapat modal gratis 100 G). Sumber: kartu Event dan Territory Shop (120 G); maks 3 dibawa; dipakai
   sebelum melempar. AI memakainya. Tersimpan di save. (Sumber dari Champion dan Rule Card belum ada.)
 - **Kartu baru**: tiap kemenangan membuka satu dari 90 Support yang terkunci (urutan tetap: 6 kartu awal, lalu common -> rare -> epic -> legendary). Pool unit baru belum ada.
 - **Seni prosedural** (`Art`, `PortraitView`; tanpa file gambar): siluet 6 bidak catur, 7 lambang benua, 7 ikon kategori Support, potret perisai

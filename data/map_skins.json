@@ -1,0 +1,306 @@
+{
+	"_doc": "Map skins: one per continent, three sections. territory = Territory Board (BoardView): frame_bg/frame (board plate), center_bg/center_border (centre plate), title/title_dim (continent name and rule), tile/tile_alt (territory tiles, alternating by index), tint+tint_amt (tint of the non-territory tiles), radius (tile corner radius in tile sizes), pattern + motif/motif_a (small procedural motif on territory tiles), emblem/emblem_a (big continent emblem watermark in the centre). battle = Battle Board (BattleGridView): frame_bg/frame, mine_light/mine_dark (your half), foe_light/foe_dark (enemy half), radius, line (deploy line), highland/highland_rim, wall/wall_rim, pattern/motif/motif_a, emblem/emblem_a. backdrop = top / bottom colours of the screen's radial background. pattern is one of MapSkin.PATTERNS. Colours are hex strings (RRGGBB). Missing keys fall back to the original look (MapSkin.DEFAULT_*).",
+	"continents": {
+		"aetherion": {
+			"territory": {
+				"frame_bg": "14110a",
+				"frame": "c9a227",
+				"center_bg": "1c1810",
+				"center_border": "8a7222",
+				"title": "e6c65a",
+				"title_dim": "8a7222",
+				"tile": "2a2414",
+				"tile_alt": "332b17",
+				"tint": "b08d2a",
+				"tint_amt": 0.18,
+				"radius": 0.12,
+				"pattern": "marble",
+				"motif": "e6c65a",
+				"motif_a": 0.17,
+				"emblem": "e6c65a",
+				"emblem_a": 0.07
+			},
+			"battle": {
+				"frame_bg": "100d06",
+				"frame": "c9a227",
+				"mine_light": "3a3a4a",
+				"mine_dark": "30303f",
+				"foe_light": "4a2c22",
+				"foe_dark": "3d241b",
+				"radius": 0.1,
+				"line": "e6c65a",
+				"highland": "e6c65a",
+				"highland_rim": "f3dc8c",
+				"wall": "6b6250",
+				"wall_rim": "c9a227",
+				"pattern": "marble",
+				"motif": "e6c65a",
+				"motif_a": 0.14,
+				"emblem": "e6c65a",
+				"emblem_a": 0.06
+			},
+			"backdrop": {
+				"top": "3a2f12",
+				"bottom": "0d0a04"
+			}
+		},
+		"arcanum": {
+			"territory": {
+				"frame_bg": "0d0a22",
+				"frame": "8a5cf0",
+				"center_bg": "16113a",
+				"center_border": "5a3fb0",
+				"title": "b79cff",
+				"title_dim": "6a4fc2",
+				"tile": "1e1840",
+				"tile_alt": "271f50",
+				"tint": "8a5cf0",
+				"tint_amt": 0.22,
+				"radius": 0.3,
+				"pattern": "runes",
+				"motif": "b79cff",
+				"motif_a": 0.22,
+				"emblem": "b79cff",
+				"emblem_a": 0.08
+			},
+			"battle": {
+				"frame_bg": "0a0720",
+				"frame": "8a5cf0",
+				"mine_light": "2a2468",
+				"mine_dark": "221d58",
+				"foe_light": "54204e",
+				"foe_dark": "441a3f",
+				"radius": 0.3,
+				"line": "b79cff",
+				"highland": "b79cff",
+				"highland_rim": "e0d2ff",
+				"wall": "4a4470",
+				"wall_rim": "8a5cf0",
+				"pattern": "runes",
+				"motif": "b79cff",
+				"motif_a": 0.18,
+				"emblem": "b79cff",
+				"emblem_a": 0.07
+			},
+			"backdrop": {
+				"top": "2a1a5a",
+				"bottom": "090616"
+			}
+		},
+		"machina": {
+			"territory": {
+				"frame_bg": "0f0d0a",
+				"frame": "c98a3c",
+				"center_bg": "1b1812",
+				"center_border": "7a5828",
+				"title": "f0d23a",
+				"title_dim": "8a6a22",
+				"tile": "2a251d",
+				"tile_alt": "342d22",
+				"tint": "c98a3c",
+				"tint_amt": 0.2,
+				"radius": 0.03,
+				"pattern": "gears",
+				"motif": "f0b84a",
+				"motif_a": 0.2,
+				"emblem": "f0b84a",
+				"emblem_a": 0.07
+			},
+			"battle": {
+				"frame_bg": "0b0a08",
+				"frame": "c98a3c",
+				"mine_light": "2e3a4c",
+				"mine_dark": "26313f",
+				"foe_light": "4c2f22",
+				"foe_dark": "3d261c",
+				"radius": 0.03,
+				"line": "f0d23a",
+				"highland": "c98a3c",
+				"highland_rim": "f0d23a",
+				"wall": "7a828c",
+				"wall_rim": "f0d23a",
+				"pattern": "gears",
+				"motif": "f0b84a",
+				"motif_a": 0.16,
+				"emblem": "f0b84a",
+				"emblem_a": 0.06
+			},
+			"backdrop": {
+				"top": "3a2a16",
+				"bottom": "0c0905"
+			}
+		},
+		"sylvaris": {
+			"territory": {
+				"frame_bg": "07140b",
+				"frame": "4fb06d",
+				"center_bg": "0f2214",
+				"center_border": "2f7a48",
+				"title": "8fe0a5",
+				"title_dim": "3f9d6b",
+				"tile": "1a2d1c",
+				"tile_alt": "213825",
+				"tint": "4fb06d",
+				"tint_amt": 0.22,
+				"radius": 0.42,
+				"pattern": "leaves",
+				"motif": "8fe0a5",
+				"motif_a": 0.2,
+				"emblem": "8fe0a5",
+				"emblem_a": 0.08
+			},
+			"battle": {
+				"frame_bg": "050f08",
+				"frame": "4fb06d",
+				"mine_light": "1f4a3e",
+				"mine_dark": "1a3f34",
+				"foe_light": "4c2a3a",
+				"foe_dark": "3e2230",
+				"radius": 0.42,
+				"line": "8fe0a5",
+				"highland": "a67c4a",
+				"highland_rim": "d9b878",
+				"wall": "5b4a36",
+				"wall_rim": "a67c4a",
+				"pattern": "leaves",
+				"motif": "8fe0a5",
+				"motif_a": 0.16,
+				"emblem": "8fe0a5",
+				"emblem_a": 0.07
+			},
+			"backdrop": {
+				"top": "17402a",
+				"bottom": "050f08"
+			}
+		},
+		"drakmor": {
+			"territory": {
+				"frame_bg": "120807",
+				"frame": "d1432f",
+				"center_bg": "1f0e0b",
+				"center_border": "8a2a1c",
+				"title": "ff9a4f",
+				"title_dim": "a8401f",
+				"tile": "2a1512",
+				"tile_alt": "351a16",
+				"tint": "d1432f",
+				"tint_amt": 0.24,
+				"radius": 0.04,
+				"pattern": "embers",
+				"motif": "ff7a2f",
+				"motif_a": 0.24,
+				"emblem": "ff7a2f",
+				"emblem_a": 0.08
+			},
+			"battle": {
+				"frame_bg": "0d0403",
+				"frame": "d1432f",
+				"mine_light": "2c3342",
+				"mine_dark": "252b38",
+				"foe_light": "5e1e1a",
+				"foe_dark": "4a1814",
+				"radius": 0.04,
+				"line": "ff7a2f",
+				"highland": "8a6a5a",
+				"highland_rim": "ff9a4f",
+				"wall": "4a3f3a",
+				"wall_rim": "d1432f",
+				"pattern": "embers",
+				"motif": "ff7a2f",
+				"motif_a": 0.2,
+				"emblem": "ff7a2f",
+				"emblem_a": 0.07
+			},
+			"backdrop": {
+				"top": "4a1710",
+				"bottom": "0d0403"
+			}
+		},
+		"thalassia": {
+			"territory": {
+				"frame_bg": "050f1c",
+				"frame": "2f8fd6",
+				"center_bg": "0c1c30",
+				"center_border": "24608f",
+				"title": "8fd0ff",
+				"title_dim": "3f7fb0",
+				"tile": "13263f",
+				"tile_alt": "19304d",
+				"tint": "2f8fd6",
+				"tint_amt": 0.22,
+				"radius": 0.25,
+				"pattern": "waves",
+				"motif": "8fd0ff",
+				"motif_a": 0.2,
+				"emblem": "8fd0ff",
+				"emblem_a": 0.08
+			},
+			"battle": {
+				"frame_bg": "040b14",
+				"frame": "2f8fd6",
+				"mine_light": "1b4066",
+				"mine_dark": "173659",
+				"foe_light": "542a52",
+				"foe_dark": "42223f",
+				"radius": 0.25,
+				"line": "8fd0ff",
+				"highland": "3fb6a8",
+				"highland_rim": "9fe8dc",
+				"wall": "4a6a7a",
+				"wall_rim": "8fd0ff",
+				"pattern": "waves",
+				"motif": "8fd0ff",
+				"motif_a": 0.16,
+				"emblem": "8fd0ff",
+				"emblem_a": 0.07
+			},
+			"backdrop": {
+				"top": "0f3a66",
+				"bottom": "030a14"
+			}
+		},
+		"eclipsia": {
+			"territory": {
+				"frame_bg": "0a0716",
+				"frame": "b266ff",
+				"center_bg": "150f28",
+				"center_border": "6a3fb5",
+				"title": "f0c040",
+				"title_dim": "8a6a22",
+				"tile": "1d1633",
+				"tile_alt": "251b3f",
+				"tint": "b266ff",
+				"tint_amt": 0.2,
+				"radius": 0.45,
+				"pattern": "stars",
+				"motif": "f0c040",
+				"motif_a": 0.22,
+				"emblem": "f0c040",
+				"emblem_a": 0.08
+			},
+			"battle": {
+				"frame_bg": "07040f",
+				"frame": "b266ff",
+				"mine_light": "24366e",
+				"mine_dark": "1e2c5e",
+				"foe_light": "5c2a3c",
+				"foe_dark": "4c2230",
+				"radius": 0.45,
+				"line": "f0c040",
+				"highland": "f0c040",
+				"highland_rim": "ffe08a",
+				"wall": "5a5a7a",
+				"wall_rim": "b266ff",
+				"pattern": "stars",
+				"motif": "f0c040",
+				"motif_a": 0.18,
+				"emblem": "f0c040",
+				"emblem_a": 0.07
+			},
+			"backdrop": {
+				"top": "2b1650",
+				"bottom": "07040f"
+			}
+		}
+	}
+}

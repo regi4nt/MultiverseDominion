@@ -70,6 +70,22 @@ static func make_button(text: String, min_h: float = 56.0) -> Button:
 	return b
 
 
+## Rarity colours (same as the cards): Common grey, Rare blue, Epic purple, Legendary gold.
+static func rarity_color(rarity: String) -> Color:
+	return CardView.RARITY_COLORS.get(rarity, Color.GRAY)
+
+
+## Gives a button a rarity-coloured border (normal / hover / pressed / disabled), keeping the normal button fills.
+static func apply_rarity(b: Button, rarity: String) -> void:
+	var c := rarity_color(rarity)
+	b.add_theme_stylebox_override("normal", make_box(Color("222c57"), c, 3, 12, 6))
+	b.add_theme_stylebox_override("hover", make_box(Color("2d3a73"), c.lightened(0.3), 3, 12, 8))
+	var pr := make_box(Color("4d2f8f"), c.lightened(0.3), 3, 12, 0)
+	pr.content_margin_top = 10
+	b.add_theme_stylebox_override("pressed", pr)
+	b.add_theme_stylebox_override("disabled", make_box(Color("111629"), Color(c, 0.4), 3, 12, 0))
+
+
 ## Call-to-action button (Roll Dice, Lock formation, ...): gold fill, dark text.
 static func make_primary(text: String, min_h: float = 60.0) -> Button:
 	var b := make_button(text, min_h)
@@ -133,11 +149,12 @@ static func make_label(text: String, font_size: int = 20, color: Color = COL_TEX
 	return l
 
 
-## Soft radial gradient (lighter centre, dark vignette) instead of a flat fill.
-static func make_background() -> TextureRect:
+## Soft radial gradient (lighter centre, dark vignette) instead of a flat fill: the night-sky texture of a screen. `continent_id` skins it (MapSkin backdrop); "" = the neutral sky of the menus.
+static func backdrop_texture(continent_id: String = "") -> GradientTexture2D:
 	var g := Gradient.new()
-	g.set_color(0, Color("1a2350"))
-	g.set_color(1, Color("060912"))
+	var back: Dictionary = MapSkin.get_skin(continent_id)["backdrop"]
+	g.set_color(0, back["top"])
+	g.set_color(1, back["bottom"])
 	var tex := GradientTexture2D.new()
 	tex.gradient = g
 	tex.fill = GradientTexture2D.FILL_RADIAL
@@ -145,8 +162,13 @@ static func make_background() -> TextureRect:
 	tex.fill_to = Vector2(1.05, 1.0)
 	tex.width = 256
 	tex.height = 256
+	return tex
+
+
+## Full-screen background. `continent_id` skins it for the Territory and Battle screens.
+static func make_background(continent_id: String = "") -> TextureRect:
 	var r := TextureRect.new()
-	r.texture = tex
+	r.texture = backdrop_texture(continent_id)
 	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	r.stretch_mode = TextureRect.STRETCH_SCALE
 	r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -227,12 +249,10 @@ static func make_divider() -> ColorRect:
 ## Touch-friendly ScrollContainer: a small finger wobble while tapping must not scroll the list, and a drag that
 ## starts on a button / card must still scroll it (children let the event bubble up, see `scroll_passthrough`).
 static func make_scroll(deadzone: int = 12) -> ScrollContainer:
-	var sc := ScrollContainer.new()
-	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	sc.scroll_deadzone = deadzone
-	return sc
+	return TouchScroll.new(deadzone)  # also lets swipes that start on buttons / panels scroll (see TouchScroll)
 
 
-## Call on every Button inside a ScrollContainer: PASS keeps the button working but lets the drag reach the scroller.
+## (TouchScroll now does this for every control inside a scroll made by make_scroll; kept for single controls.)
+## PASS keeps the button working but lets the drag reach the scroller.
 static func scroll_passthrough(c: Control) -> void:
 	c.mouse_filter = Control.MOUSE_FILTER_PASS

@@ -56,7 +56,7 @@ static func rent_of(t: BoardTile, tiles: Array[BoardTile]) -> int:
 
 
 static func networth(tiles: Array[BoardTile], p: PlayerState) -> int:
-	var total := p.gold
+	var total := p.gold + p.stock_value
 	for t in tiles:
 		if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id:
 			total += t.price + upgrade_invested(t)

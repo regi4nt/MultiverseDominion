@@ -1,0 +1,495 @@
+{
+	"_doc": "Hidden territory monsters. 4 per continent (one per region, region = index of continents.json regions). Defeating one gives the player a Monster card: the monster joins that player's King when the King enters Last Stand in a Duel. Stats here are the wild stats; allies use balance.json monster_ally_stat_mult. buff.type is one of CardDatabase.BUFF_TYPES.",
+	"continents": {
+		"aetherion": [
+			{
+				"id": "crownstone_golem",
+				"name": "Crownstone Golem",
+				"region": 0,
+				"chess": "rook",
+				"hp": 1110,
+				"atk": 24,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "armor",
+					"value": 0.15,
+					"name": "Crownstone Hide",
+					"desc": "Takes 15% less damage."
+				},
+				"lore": "A guardian of cracked marble that never left the throne road."
+			},
+			{
+				"id": "sunscorch_manticore",
+				"name": "Sunscorch Manticore",
+				"region": 1,
+				"chess": "knight",
+				"hp": 790,
+				"atk": 34,
+				"range": 1,
+				"move": 2,
+				"buff": {
+					"type": "burn",
+					"value": 0.25,
+					"name": "Sunfire Sting",
+					"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
+				},
+				"lore": "Stalks the sun-baked marches and sears whatever it bites."
+			},
+			{
+				"id": "vale_thornstag",
+				"name": "Vale Thornstag",
+				"region": 2,
+				"chess": "knight",
+				"hp": 910,
+				"atk": 29,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "thorns",
+					"value": 0.2,
+					"name": "Briar Antlers",
+					"desc": "Reflects 20% of the damage taken back at the attacker."
+				},
+				"lore": "A stag grown over with thorns; striking it hurts the striker."
+			},
+			{
+				"id": "keep_wraith",
+				"name": "Dusk Keep Wraith",
+				"region": 3,
+				"chess": "bishop",
+				"hp": 710,
+				"atk": 31,
+				"range": 3,
+				"move": 1,
+				"buff": {
+					"type": "lifesteal",
+					"value": 0.2,
+					"name": "Soul Sip",
+					"desc": "Heals itself for 20% of the damage dealt."
+				},
+				"lore": "The last garrison of the Keep, drinking life from the living."
+			}
+		],
+		"arcanum": [
+			{
+				"id": "spire_sentinel",
+				"name": "Spire Arcane Sentinel",
+				"region": 0,
+				"chess": "rook",
+				"hp": 900,
+				"atk": 23,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "ward",
+					"value": 0.25,
+					"name": "Runic Ward",
+					"desc": "Starts with a shield worth 25% of max HP."
+				},
+				"lore": "A construct sealed with wards by the first spellwrights."
+			},
+			{
+				"id": "cinder_phoenix",
+				"name": "Cinder Phoenix",
+				"region": 1,
+				"chess": "bishop",
+				"hp": 600,
+				"atk": 27,
+				"range": 3,
+				"move": 1,
+				"buff": {
+					"type": "second_life",
+					"value": 0.4,
+					"name": "Ashes Reborn",
+					"desc": "The first time it falls, it returns with 40% HP."
+				},
+				"lore": "Burns to cinders and rises again once."
+			},
+			{
+				"id": "rimeclaw_yeti",
+				"name": "Rimeclaw Yeti",
+				"region": 2,
+				"chess": "knight",
+				"hp": 900,
+				"atk": 25,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "chill",
+					"value": 5,
+					"name": "Rime Touch",
+					"desc": "Attacks slow the target for 5 ticks."
+				},
+				"lore": "Its claws leave frost that slows everything it hits."
+			},
+			{
+				"id": "vault_shadehound",
+				"name": "Vault Shadehound",
+				"region": 3,
+				"chess": "knight",
+				"hp": 730,
+				"atk": 33,
+				"range": 1,
+				"move": 2,
+				"buff": {
+					"type": "execute",
+					"value": 0.3,
+					"name": "Finishing Bite",
+					"desc": "Deals +30% damage to enemies below 30% HP."
+				},
+				"lore": "Hunts the wounded through the Umbral Vault."
+			}
+		],
+		"machina": [
+			{
+				"id": "gearwork_behemoth",
+				"name": "Gearwork Behemoth",
+				"region": 0,
+				"chess": "rook",
+				"hp": 1510,
+				"atk": 29,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "mend_self",
+					"value": 0.05,
+					"name": "Self-Repair",
+					"desc": "Heals itself for 5% max HP every 8 ticks."
+				},
+				"lore": "A siege engine whose gears reknit after every blow."
+			},
+			{
+				"id": "arc_hound",
+				"name": "Voltage Arc Hound",
+				"region": 1,
+				"chess": "knight",
+				"hp": 1240,
+				"atk": 53,
+				"range": 1,
+				"move": 2,
+				"buff": {
+					"type": "stun_proc",
+					"value": 4,
+					"name": "Arc Jolt",
+					"desc": "Every 4th attack stuns the target for 1 tick."
+				},
+				"lore": "A dynamo beast that jolts its prey stiff."
+			},
+			{
+				"id": "foundry_drone",
+				"name": "Chrono Foundry Drone",
+				"region": 2,
+				"chess": "bishop",
+				"hp": 1250,
+				"atk": 53,
+				"range": 3,
+				"move": 1,
+				"buff": {
+					"type": "aura_atk",
+					"value": 0.12,
+					"name": "Overclock Field",
+					"desc": "Adjacent allies gain +12% ATK."
+				},
+				"lore": "Hovers over the forge and overclocks its allies."
+			},
+			{
+				"id": "nexus_overseer",
+				"name": "Nexus Grid Overseer",
+				"region": 3,
+				"chess": "queen",
+				"hp": 1360,
+				"atk": 40,
+				"range": 2,
+				"move": 1,
+				"buff": {
+					"type": "splash",
+					"value": 0.35,
+					"name": "Arc Lattice",
+					"desc": "Attacks also deal 35% damage to enemies adjacent to the target."
+				},
+				"lore": "Its beams arc across the grid to hit nearby targets."
+			}
+		],
+		"sylvaris": [
+			{
+				"id": "canopy_treant",
+				"name": "Canopy Elder Treant",
+				"region": 0,
+				"chess": "rook",
+				"hp": 1160,
+				"atk": 22,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "regen",
+					"value": 0.04,
+					"name": "Verdant Pulse",
+					"desc": "Heals its whole side for 4% max HP every 8 ticks."
+				},
+				"lore": "An ancient tree whose sap mends its whole side."
+			},
+			{
+				"id": "petal_dryad",
+				"name": "Petal Dryad",
+				"region": 1,
+				"chess": "bishop",
+				"hp": 820,
+				"atk": 33,
+				"range": 3,
+				"move": 1,
+				"buff": {
+					"type": "regen",
+					"value": 0.05,
+					"name": "Bloom Song",
+					"desc": "Heals its whole side for 5% max HP every 8 ticks."
+				},
+				"lore": "A meadow spirit whose song makes wounds close."
+			},
+			{
+				"id": "hollow_direbear",
+				"name": "Hollowfang Direbear",
+				"region": 2,
+				"chess": "knight",
+				"hp": 1040,
+				"atk": 33,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "rage",
+					"value": 0.3,
+					"name": "Cornered Fury",
+					"desc": "Gains +30% ATK while below 50% HP."
+				},
+				"lore": "Fiercest when it is hurt."
+			},
+			{
+				"id": "rootmaw_behemoth",
+				"name": "Rootmaw Behemoth",
+				"region": 3,
+				"chess": "rook",
+				"hp": 1220,
+				"atk": 27,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "guard",
+					"value": 0.2,
+					"name": "Root Bulwark",
+					"desc": "It and allies within 2 cells take 20% less damage."
+				},
+				"lore": "Roots coil around it and its allies, softening blows."
+			}
+		],
+		"drakmor": [
+			{
+				"id": "spinewing_drake",
+				"name": "Spinewing Drake",
+				"region": 0,
+				"chess": "queen",
+				"hp": 1120,
+				"atk": 46,
+				"range": 2,
+				"move": 1,
+				"buff": {
+					"type": "burn",
+					"value": 0.3,
+					"name": "Dragonfire",
+					"desc": "Attacks burn the target for 30% of ATK every 4 ticks for 12 ticks."
+				},
+				"lore": "A young drake that scorches from the ridge."
+			},
+			{
+				"id": "hellforge_infernal",
+				"name": "Hellforge Infernal",
+				"region": 1,
+				"chess": "rook",
+				"hp": 1480,
+				"atk": 41,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "death_burst",
+					"value": 0.8,
+					"name": "Forge Blast",
+					"desc": "When it falls, deals 80% of its ATK to adjacent enemies."
+				},
+				"lore": "A demon of slag that detonates when it dies."
+			},
+			{
+				"id": "pit_fiend",
+				"name": "Bloodfang Pit Fiend",
+				"region": 2,
+				"chess": "knight",
+				"hp": 1150,
+				"atk": 45,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "frenzy",
+					"value": 0.08,
+					"name": "Blood Frenzy",
+					"desc": "Gains +8% ATK for each enemy defeated (max 5 times)."
+				},
+				"lore": "Every kill in the pits makes it hit harder."
+			},
+			{
+				"id": "bastion_warlord",
+				"name": "Warborn Ogre Warlord",
+				"region": 3,
+				"chess": "rook",
+				"hp": 1450,
+				"atk": 39,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "opener",
+					"value": 0.5,
+					"name": "Warcry Charge",
+					"desc": "The first attack deals +50% damage."
+				},
+				"lore": "Opens every fight with a crushing blow."
+			}
+		],
+		"thalassia": [
+			{
+				"id": "strait_leviathan",
+				"name": "Tempest Strait Leviathan",
+				"region": 0,
+				"chess": "queen",
+				"hp": 1180,
+				"atk": 33,
+				"range": 2,
+				"move": 1,
+				"buff": {
+					"type": "chill",
+					"value": 4,
+					"name": "Tidal Chill",
+					"desc": "Attacks slow the target for 4 ticks."
+				},
+				"lore": "Its wake drags ships and warriors to a crawl."
+			},
+			{
+				"id": "atoll_hydra",
+				"name": "Coral Atoll Hydra",
+				"region": 1,
+				"chess": "bishop",
+				"hp": 880,
+				"atk": 34,
+				"range": 3,
+				"move": 1,
+				"buff": {
+					"type": "splash",
+					"value": 0.3,
+					"name": "Many Heads",
+					"desc": "Attacks also deal 30% damage to enemies adjacent to the target."
+				},
+				"lore": "Several heads strike at once."
+			},
+			{
+				"id": "abyssal_kraken",
+				"name": "Abyssal Kraken",
+				"region": 2,
+				"chess": "rook",
+				"hp": 1180,
+				"atk": 27,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "evade",
+					"value": 4,
+					"name": "Slippery Hide",
+					"desc": "Every 4th hit taken is avoided."
+				},
+				"lore": "Slips away from every fourth blow."
+			},
+			{
+				"id": "cove_ghostcaptain",
+				"name": "Corsair Cove Ghostcaptain",
+				"region": 3,
+				"chess": "knight",
+				"hp": 980,
+				"atk": 37,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "lifesteal",
+					"value": 0.15,
+					"name": "Plundered Vigor",
+					"desc": "Heals itself for 15% of the damage dealt."
+				},
+				"lore": "A drowned captain who steals the life of those he cuts."
+			}
+		],
+		"eclipsia": [
+			{
+				"id": "solstice_chronowyrm",
+				"name": "Solstice Dial Chronowyrm",
+				"region": 0,
+				"chess": "queen",
+				"hp": 1070,
+				"atk": 36,
+				"range": 2,
+				"move": 1,
+				"buff": {
+					"type": "second_life",
+					"value": 0.35,
+					"name": "Rewound Moment",
+					"desc": "The first time it falls, it returns with 35% HP."
+				},
+				"lore": "Rewinds its own death once."
+			},
+			{
+				"id": "paradox_stalker",
+				"name": "Paradox Echo Stalker",
+				"region": 1,
+				"chess": "knight",
+				"hp": 920,
+				"atk": 38,
+				"range": 1,
+				"move": 2,
+				"buff": {
+					"type": "evade",
+					"value": 3,
+					"name": "Echo Step",
+					"desc": "Every 3th hit taken is avoided."
+				},
+				"lore": "Half a second ahead of every blow."
+			},
+			{
+				"id": "hour_sentinel",
+				"name": "Eternal Hour Sentinel",
+				"region": 2,
+				"chess": "rook",
+				"hp": 1340,
+				"atk": 30,
+				"range": 1,
+				"move": 1,
+				"buff": {
+					"type": "ward",
+					"value": 0.3,
+					"name": "Frozen Time Ward",
+					"desc": "Starts with a shield worth 30% of max HP."
+				},
+				"lore": "Shielded by a held breath of time."
+			},
+			{
+				"id": "rim_voidmaw",
+				"name": "Oblivion Rim Voidmaw",
+				"region": 3,
+				"chess": "bishop",
+				"hp": 1130,
+				"atk": 48,
+				"range": 3,
+				"move": 1,
+				"buff": {
+					"type": "execute",
+					"value": 0.35,
+					"name": "Unmaking",
+					"desc": "Deals +35% damage to enemies below 30% HP."
+				},
+				"lore": "Erases whatever is already fading."
+			}
+		]
+	}
+}

@@ -1,5 +1,5 @@
 extends Node
-## Instantiates the merged Collection & Deck screen, clicks through both tabs, checks results.
+## Instantiates the merged Card Hub screen, clicks through its tabs, checks results.
 
 func _ready() -> void:
 	var fails := 0
@@ -29,9 +29,38 @@ func _ready() -> void:
 		fails += 1
 	if not coll._collection_view.visible or coll._deck_view.visible:
 		fails += 1
+	coll._show_tab("info")
+	await get_tree().process_frame
+	if coll._collection_view.visible or coll._deck_view.visible or not coll._info_view.visible or not coll._tab_buttons["info"].button_pressed:
+		fails += 1
+		push_error("the Info tab should be the only visible view")
+	for sec in coll.INFO_SECTIONS:
+		coll._show_info(String(sec[0]))
+		if coll._info_text.text.length() < 100 or not coll._info_buttons[sec[0]].button_pressed:
+			fails += 1
+			push_error("Info section '%s' is empty" % sec[0])
+	coll._show_info("roles")
+	if not coll._info_text.text.contains("Controller") or not coll._info_text.text.contains("stuns"):
+		fails += 1
+		push_error("the Roles section should describe the Controller's crowd-control skill")
+	coll._show_info("territory")
+	for word in ["Tax", "Duel", "Conquest", "Regional Dominion", "Sanctuary", "How to win"]:
+		if not coll._info_text.text.contains(word):
+			fails += 1
+			push_error("the Territory section should explain '%s'" % word)
+	if not coll._info_text.text.contains("%d Dominion Gold" % int(GameData.b("start_gold"))) or coll._info_text.text.contains("%s"):
+		fails += 1
+		push_error("the Territory section should show live numbers from balance.json")
+	coll._show_info("synergy")
+	if not coll._info_text.text.contains("+35%") or not coll._info_text.text.contains("+30%"):
+		fails += 1
+		push_error("the Synergy section should list the faction and role tiers")
+	if GameSession.CARD_HUB_NAME == "Collection & Deck":
+		fails += 1
+		push_error("the screen should have been renamed")
 	coll._show_tab("deck")
 	await get_tree().process_frame
-	if coll._collection_view.visible or not coll._deck_view.visible:
+	if coll._collection_view.visible or not coll._deck_view.visible or coll._info_view.visible:
 		fails += 1
 	var db: Control = coll  # the deck editor is the second tab of the same screen
 	if db.deck.unit_ids.size() != 15 or db.deck.support_ids.size() != 15 or not db._pool_tabs["units"].text.contains("15 / 15") or not db._pool_tabs["supports"].text.contains("15 / 15"):

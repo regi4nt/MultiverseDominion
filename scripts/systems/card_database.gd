@@ -15,7 +15,9 @@ const SHARED := "common"
 ## Allowed deviation of a faction piece from the base values of its slot: HP / ATK (power = HP x ATK stays balanced).
 const STAT_TOLERANCE := 0.16
 const POWER_TOLERANCE := 0.08
-## Per-piece-slot base values (hp, atk) and mechanic: the 7 slots of a faction's own pieces.
+## Base values (hp, atk) and mechanic of the 7 ROLES of a faction's own pieces, listed in the default order of its pieces
+## (Rook, Rook, Knight, Knight, Bishop, Bishop, Queen). Every faction deals the 7 roles to its 7 pieces in its own arrangement: a piece's
+## role, HP / ATK / range and skill come from its role; its move and capacity cost from the chess piece.
 const SLOT_BASE := [
 	{"chess": "rook", "role": "Tank", "hp": 220, "atk": 12, "range": 1, "move": 2, "mechanic": "bulwark"},
 	{"chess": "rook", "role": "Marksman", "hp": 180, "atk": 16, "range": 2, "move": 2, "mechanic": "ballista_volley"},
@@ -23,16 +25,33 @@ const SLOT_BASE := [
 	{"chess": "knight", "role": "Assassin", "hp": 120, "atk": 22, "range": 1, "move": 3, "mechanic": "night_gallop"},
 	{"chess": "bishop", "role": "Mage", "hp": 100, "atk": 20, "range": 4, "move": 2, "mechanic": "arcane_barrage"},
 	{"chess": "bishop", "role": "Support", "hp": 110, "atk": 10, "range": 3, "move": 2, "mechanic": "blessed_mend"},
-	{"chess": "queen", "role": "Fighter", "hp": 260, "atk": 26, "range": 2, "move": 4, "mechanic": "sovereign_decree"}]
+	{"chess": "queen", "role": "Controller", "hp": 260, "atk": 26, "range": 2, "move": 4, "mechanic": "dominion_bind"}]
 ## Per-continent skill numbers (skill.params) the engine reads, by base mechanic (see BattleEngine._p).
 const PARAM_KEYS := {
 	"bulwark": ["taunt_ticks"], "ballista_volley": ["interval", "targets"], "charge": ["stun_ticks"],
-	"night_gallop": ["strike_bonus"], "arcane_barrage": ["every", "splash_pct"], "blessed_mend": ["interval", "heal_pct"]}
+	"night_gallop": ["strike_bonus"], "arcane_barrage": ["every", "splash_pct"], "blessed_mend": ["interval", "heal_pct"],
+	"dominion_bind": ["interval", "targets", "stun_ticks"]}
 ## Effect types of the card buffs (data/card_buffs.json); every unit card has one buff per continent. Implemented in BattleEngine.
 const BUFF_TYPES: Array[String] = [
 	"armor", "evade", "thorns", "execute", "frenzy", "aura_atk", "burn", "stun_proc", "ward", "splash", "lifesteal", "chill",
 	"opener", "rage", "last_rites", "death_burst", "mend_self", "swift", "guard", "opening_shield", "regen", "second_life"]
 const SUPPORT_CATEGORIES: Array[String] = ["Creation", "Transformation", "Magic", "Artifact", "Skill", "Blessing", "Contract"]
+
+
+## Base values of a role (the slot of SLOT_BASE that carries it): {} for an unknown role.
+static func role_base(role: String) -> Dictionary:
+	for b in SLOT_BASE:
+		if b["role"] == role:
+			return b
+	return {}
+
+
+## Movement of a piece type (it follows the chess piece, not its role).
+static func chess_move(chess: String) -> int:
+	for b in SLOT_BASE:
+		if b["chess"] == chess:
+			return int(b["move"])
+	return 1
 
 
 ## Continent whose factions the unit cards currently belong to (set by MatchController.setup, menus).
@@ -341,6 +360,7 @@ static func validate_all_continents() -> Array[String]:
 		ids[raw["id"]] = true
 	var buff_names := {}
 	var piece_sigs := {}  # faction -> signature of its stats, to prove the factions really differ
+	var role_combos := {}  # role arrangement over the 7 pieces -> faction: every faction deals the roles differently
 	var prev := active_continent
 	for cont in GameData.continents:
 		active_continent = String(cont["id"])
@@ -354,16 +374,27 @@ static func validate_all_continents() -> Array[String]:
 				errors.append("%s: %d own pieces, expected 7" % [fid, pieces.size()])
 				continue
 			var sig := []
+			var role_combo := []
 			for i in range(7):
 				var u: Dictionary = pieces[i]
-				var b: Dictionary = SLOT_BASE[i]
-				if u["chess"] != b["chess"] or u["role"] != b["role"] or int(u["range"]) != int(b["range"]) or int(u["move"]) != int(b["move"]) or skill_mechanic(u) != b["mechanic"]:
-					errors.append("%s: not the %s %s of its slot (chess/role/range/move/mechanic)" % [u["id"], b["role"], b["chess"]])
+				var b: Dictionary = role_base(String(u["role"]))  # stats / mechanic follow the ROLE; each faction deals the 7 roles to its 7 pieces differently
+				role_combo.append(String(u["role"]))
+				if b.is_empty() or u["chess"] != FACTION_PIECE_ORDER[i] or int(u["range"]) != int(b["range"]) or int(u["move"]) != chess_move(String(u["chess"])) or skill_mechanic(u) != b["mechanic"]:
+					errors.append("%s: chess / role / range / move / mechanic do not match its role %s" % [u["id"], u["role"]])
+					continue
 				var hp_r := float(u["hp"]) / float(b["hp"])
 				var atk_r := float(u["atk"]) / float(b["atk"])
 				if absf(hp_r - 1.0) > STAT_TOLERANCE or absf(atk_r - 1.0) > STAT_TOLERANCE or absf(hp_r * atk_r - 1.0) > POWER_TOLERANCE:
 					errors.append("%s: HP/ATK out of balance (%d/%d vs base %d/%d)" % [u["id"], u["hp"], u["atk"], b["hp"], b["atk"]])
 				sig.append([u["hp"], u["atk"], str(u["skill"].get("params", {}))])
+			var distinct := {}
+			for r in role_combo:
+				distinct[r] = true
+			if distinct.size() != 7:
+				errors.append("%s: its 7 pieces must hold the 7 different roles (%s)" % [fid, str(role_combo)])
+			if role_combos.has(str(role_combo)):
+				errors.append("%s: same role arrangement as %s" % [fid, role_combos[str(role_combo)]])
+			role_combos[str(role_combo)] = fid
 			if piece_sigs.has(str(sig)):
 				errors.append("%s: pieces identical to those of %s" % [fid, piece_sigs[str(sig)]])
 			piece_sigs[str(sig)] = fid

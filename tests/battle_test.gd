@@ -35,13 +35,65 @@ func _ready() -> void:
 	_test_energy()
 	_test_combo()
 	_test_last_stand_empty()
+	_test_check()
 	_test_manual_king()
 	_test_king_passive()
+	_test_chess_moves()
+	_test_terrain()
 	_test_battles()
 	BattleDeck.supports_in_shop = true
 	_test_shop_supports()
 	print("BATTLE TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(failures)
+
+
+func _test_chess_moves() -> void:
+	var free := func(_c: Vector2i) -> bool: return false
+	var wall := Vector2i(3, 5)
+	var blk := func(c: Vector2i) -> bool: return c == wall
+	var from := Vector2i(3, 3)
+	var rook := ChessMove.move_cells("rook", from, 7, 0, free)
+	check(rook.has(Vector2i(3, 7)) and rook.has(Vector2i(0, 3)) and not rook.has(Vector2i(4, 4)), "rook slides straight only")
+	check(not ChessMove.move_cells("rook", from, 7, 0, blk).has(Vector2i(3, 6)), "rook is stopped by a blocker")
+	check(ChessMove.move_cells("rook", from, 2, 0, free).size() == 8, "rook slide is limited by Mov")
+	var bishop := ChessMove.move_cells("bishop", from, 7, 0, free)
+	check(bishop.has(Vector2i(6, 6)) and not bishop.has(Vector2i(3, 4)), "bishop slides diagonally only")
+	check(ChessMove.move_cells("queen", from, 7, 0, free).size() == rook.size() + bishop.size(), "queen = rook + bishop")
+	check(ChessMove.move_cells("knight", from, 3, 0, free).size() == 8, "knight has 8 L-jumps")
+	check(ChessMove.move_cells("knight", Vector2i(3, 4), 3, 0, func(c: Vector2i) -> bool: return c.x == 3 or c.y == 4).size() == 8, "knight jumps over units (only landing cells matter)")
+	check(ChessMove.move_cells("king", from, 2, 0, free).size() == 8, "king: 1 step any direction")
+	check(ChessMove.move_cells("pawn", from, 1, 0, free).has(Vector2i(3, 2)), "pawn of side 0 moves up")
+	check(ChessMove.move_cells("pawn", from, 1, 1, free).has(Vector2i(3, 4)), "pawn of side 1 moves down")
+	check(ChessMove.attack_cells(Vector2i(0, 0), 2).size() == 8, "attack area is clipped to the board")
+
+
+func _test_terrain() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var t := Terrain.generate(rng)
+	var mirrored := true
+	for c in t:
+		if not t.has(Vector2i(c.x, 7 - c.y)) or c.y == 0 or c.y == 7:
+			mirrored = false
+	check(t.size() >= 2 and mirrored, "terrain: highlands are mirrored and never on the back rows")
+	rng.seed = 10
+	check(Terrain.generate(rng) != t, "terrain: a different duel draws different ground")
+	check(not Terrain.can_stand({Vector2i(2, 5): true}, 1, Vector2i(2, 5)) and Terrain.can_stand({Vector2i(2, 5): true}, 2, Vector2i(2, 5)), "terrain: highland is for ranged units only")
+	# a melee unit never ends a battle on a highland
+	var ground := {Vector2i(3, 4): true, Vector2i(3, 3): true, Vector2i(4, 4): true, Vector2i(4, 3): true}
+	var e := BattleEngine.new()
+	e.setup({"seed": 4, "ai_supports": [false, false], "terrain": ground, "sides": [
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 6)}], "champion": "champion_valdoria", "supports": []},
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 1)}], "champion": "champion_elarion", "supports": []}]})
+	var on_high := false
+	var steps := 0
+	while not e.finished and steps < 300:
+		e.step()
+		steps += 1
+		for u in e.units:
+			if u.alive and u.atk_range < 2 and ground.has(u.cell):
+				on_high = true
+	check(not on_high, "terrain: melee units never step onto a highland")
 
 
 func _test_prep() -> void:
@@ -214,6 +266,25 @@ func _test_last_stand_empty() -> void:
 		steps += 1
 	check(e.finished, "lone Champion vs 1 pawn battle finishes")
 	check(e.king_entry_tick[1] == -1 or e.regulars_alive_at_entry[1] == 0, "enemy Champion only entered after its pawn fell")
+
+
+func _test_check() -> void:
+	var e := BattleEngine.new()
+	e.setup({"seed": 11, "ai_supports": [false, false], "sides": [
+		{"units": [], "champion": "champion_valdoria", "supports": []},
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 6)}], "champion": "champion_elarion", "supports": []}]})
+	var saw_check := false
+	var saw_mate := false
+	var steps := 0
+	while not e.finished and steps < 500:
+		e.step()
+		steps += 1
+		for ev in e.events:
+			saw_check = saw_check or ev["type"] == "check"
+			saw_mate = saw_mate or ev["type"] == "mate"
+	check(saw_check, "Champion under attack is announced as check")
+	check(e.check_shield_used[0], "check gives the one-time shield")
+	check(saw_mate or e.winner == 0, "battle ends (checkmate event when a Champion falls)")
 
 
 func _test_manual_king() -> void:

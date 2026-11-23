@@ -16,12 +16,19 @@ var _vis: Dictionary = {}  # unit uid -> Vector2 (cell units): smoothly follows 
 var _lunge: Dictionary = {}  # uid -> {"dir": Vector2, "t": float}: attack lunge
 var _floaters: Array = []  # floating damage numbers {"cell": Vector2, "text": String, "t": float}
 var _ghosts: Array = []  # fading rings where a unit fell
+var _banner: Dictionary = {}  # {"text", "color", "t"}: big centre text (LAST STAND / CHECK / CHECKMATE / LAST PIECE)
+var terrain: Dictionary = {}  # highland cells (Terrain); drawn as raised peak tiles
+var inspect_unit: BattleUnit  # battle: the unit whose move / attack area is shown (tap a unit)
 var _cell: float = 10.0
 var _origin: Vector2 = Vector2.ZERO
+var _skin: Dictionary = {}  # battle section of the active continent's MapSkin, see _bskin()
+var _skin_id: String = "?"
 
 
 func show_prep(p: BattlePrep) -> void:
 	prep = p
+	terrain = p.terrain
+	inspect_unit = null
 	engine = null
 	queue_redraw()
 
@@ -29,6 +36,8 @@ func show_prep(p: BattlePrep) -> void:
 func show_engine(e: BattleEngine) -> void:
 	engine = e
 	prep = null
+	terrain = e.terrain
+	inspect_unit = null
 	_vis.clear()
 	_lunge.clear()
 	_floaters.clear()
@@ -52,7 +61,22 @@ func notify_tick() -> void:
 					_floaters.append({"cell": Vector2(ev["to"]), "text": str(int(ev["dmg"])), "t": 0.0})
 			"death":
 				_ghosts.append({"cell": Vector2(ev["cell"]), "t": 0.0})
+			"last_stand":
+				_show_banner("LAST STAND" if int(ev["side"]) == 0 else "ENEMY LAST STAND", Color("ff8a3d"))
+			"last_piece":
+				if int(ev["side"]) == 0:
+					_show_banner("LAST PIECE", Color("e8c547"))
+			"check":
+				_show_banner("CHECK!", Color("ff4a4a") if int(ev["side"]) == 0 else Color("ffd35a"))
+			"mate":
+				_show_banner("CHECKMATE", Color("ff4a4a") if int(ev["side"]) == 0 else Color("59cd90"))
 	set_process(true)
+
+
+func _show_banner(text: String, col: Color) -> void:
+	if not _banner.is_empty() and String(_banner["text"]) == "CHECKMATE":
+		return
+	_banner = {"text": text, "color": col, "t": 0.0}
 
 
 func _process(delta: float) -> void:
@@ -90,7 +114,15 @@ func _process(delta: float) -> void:
 		if float(g["t"]) < 1.0:
 			keep_g.append(g)
 	_ghosts = keep_g
-	busy = busy or not _floaters.is_empty() or not _ghosts.is_empty()
+	if not _banner.is_empty():
+		var hold := String(_banner["text"]) == "CHECKMATE"  # checkmate stays until the result screen opens
+		_banner["t"] = float(_banner["t"]) + delta * 0.8 * k
+		if float(_banner["t"]) >= 1.0:
+			if hold:
+				_banner["t"] = 0.5
+			else:
+				_banner = {}
+	busy = busy or not _floaters.is_empty() or not _ghosts.is_empty() or not _banner.is_empty() or _any_check()
 	queue_redraw()
 	if not busy:
 		set_process(false)
@@ -142,32 +174,49 @@ func _rr(r: Rect2, fill: Color, radius: float, border: Color = Color(0, 0, 0, 0)
 	draw_style_box(_sb, r)
 
 
+## Battle section of the MapSkin of the continent being played (cached).
+func _bskin() -> Dictionary:
+	if _skin.is_empty() or CardDatabase.active_continent != _skin_id:
+		_skin_id = CardDatabase.active_continent
+		_skin = MapSkin.get_skin(_skin_id)["battle"]
+	return _skin
+
+
 func _draw() -> void:
 	_layout()
 	var font := ThemeDB.fallback_font
-	_rr(Rect2(_origin, Vector2(_cell * 8, _cell * 8)).grow(_cell * 0.06), Color("090d1c"), _cell * 0.22, Color("4a4126"), 2.0, _cell * 0.3)
+	var sk := _bskin()
+	var crad := _cell * float(sk["radius"])
+	_rr(Rect2(_origin, Vector2(_cell * 8, _cell * 8)).grow(_cell * 0.06), sk["frame_bg"], _cell * 0.22, sk["frame"], 2.0, _cell * 0.3)
 	var gap := maxf(1.5, _cell * 0.03)
+	var motif := MapSkin.motif_color(sk)
 	for y in range(8):
 		for x in range(8):
 			var r := Rect2(_origin + Vector2(x, y) * _cell, Vector2(_cell, _cell)).grow(-gap)
 			var light := (x + y) % 2 == 0
 			var base: Color
 			if y >= 4:
-				base = Color("1b2c52") if light else Color("182647")  # your half: blue
+				base = sk["mine_light"] if light else sk["mine_dark"]  # your half: cool tones of the continent
 			else:
-				base = Color("3a2040") if light else Color("311a38")  # enemy half: red-violet
-			_rr(r, base, _cell * 0.12, base.lightened(0.12), 1.0)
+				base = sk["foe_light"] if light else sk["foe_dark"]  # enemy half: warm red-violet tones
+			_rr(r, base, crad, base.lightened(0.12), 1.0)
+			MapSkin.draw_motif(self, String(sk["pattern"]), r, motif, x * 8 + y)
+			if terrain.has(Vector2i(x, y)):
+				_draw_highland(r)
+	MapSkin.draw_watermark(self, CardDatabase.active_continent, Rect2(_origin + Vector2(_cell * 1.5, _cell * 1.5), Vector2(_cell * 5.0, _cell * 5.0)), sk, sk["frame_bg"])
 	# deploy line: dashed gold
 	var ly := _origin.y + _cell * 4.0
 	var dash := _cell * 0.3
 	var dx := 0.0
 	while dx < _cell * 8:
-		draw_line(Vector2(_origin.x + dx, ly), Vector2(_origin.x + minf(dx + dash, _cell * 8), ly), Color("c9a73a"), 3.0)
+		draw_line(Vector2(_origin.x + dx, ly), Vector2(_origin.x + minf(dx + dash, _cell * 8), ly), sk["line"], 3.0)
 		dx += dash * 1.8
+	_draw_areas(font, gap)
+	_draw_check(gap)
 	if engine != null:
 		for wc in engine.walls:
 			var wr := Rect2(_origin + Vector2(wc.x, wc.y) * _cell, Vector2(_cell, _cell)).grow(-gap - _cell * 0.06)
-			_rr(wr, Color("5d6178"), _cell * 0.14, Color("a9aec6"), 2.0, _cell * 0.1)
+			_rr(wr, sk["wall"], _cell * 0.14, sk["wall_rim"], 2.0, _cell * 0.1)
 		for u in engine.units:
 			if u.alive:
 				_draw_token(font, _visual_cell(u), u.side, u.chess, u.faction, u.stars, u.hp, u.max_hp, u.shield, u.is_king, false)
@@ -181,6 +230,7 @@ func _draw() -> void:
 				"fx":
 					for c in ev["cells"]:
 						draw_rect(Rect2(_origin + Vector2(c.x, c.y) * _cell, Vector2(_cell, _cell)), Color(1, 0.6, 0.1, 0.45))
+		_draw_banner(font)
 		for g in _ghosts:
 			var gt := float(g["t"])
 			draw_arc(_center(g["cell"]), _cell * (0.25 + 0.35 * gt), 0.0, TAU, 24, Color(1, 0.3, 0.25, 1.0 - gt), 4.0)
@@ -221,3 +271,122 @@ func _draw_token(font: Font, c: Vector2, side: int, chess: String, faction: Stri
 		_rr(Rect2(bar.position, Vector2(maxf(bar.size.y, bar.size.x * frac), bar.size.y)), hc, bar.size.y)
 	if shield > 0:
 		_rr(Rect2(bar.position + Vector2(0, -4), Vector2(bar.size.x, 3)), Color("8fd0ff"), 2.0)
+
+
+## Move area (blue dots / tint) and attack area (red tint + border) of the selected piece, under the tokens.
+func _draw_areas(font: Font, gap: float) -> void:
+	var chess := ""
+	var from := Vector2i(-1, -1)
+	var mv := 1
+	var rng := 1
+	var side := 0
+	var blocked: Callable
+	if engine != null and inspect_unit != null and inspect_unit.alive:
+		var u := inspect_unit
+		chess = u.chess
+		from = u.cell
+		mv = u.move
+		rng = u.atk_range
+		side = u.side
+		var ur := u.atk_range
+		blocked = func(c: Vector2i) -> bool: return engine.grid.has(c) or engine.walls.has(c) or not Terrain.can_stand(terrain, ur, c)
+	elif prep != null and selected != null and selected.cell.x >= 0:
+		chess = selected.chess()
+		from = selected.cell
+		mv = int(CardDatabase.get_unit(selected.card_id)["move"])
+		rng = int(CardDatabase.get_unit(selected.card_id)["range"])
+		var occupied := {}
+		for o in prep.deployed_units():
+			occupied[o.cell] = true
+		blocked = func(c: Vector2i) -> bool: return occupied.has(c) or not Terrain.can_stand(terrain, rng, c)
+	else:
+		return
+	var atk_col := Color("ff5a4a")
+	var mov_col := Color("4fd6ff")
+	for c in ChessMove.attack_cells(from, rng):
+		var r := Rect2(_origin + Vector2(c.x, c.y) * _cell, Vector2(_cell, _cell)).grow(-gap)
+		_rr(r, Color(atk_col, 0.16), _cell * 0.12, Color(atk_col, 0.55), 2.0)
+	for c in ChessMove.move_cells(chess, from, mv, side, blocked):
+		var r2 := Rect2(_origin + Vector2(c.x, c.y) * _cell, Vector2(_cell, _cell)).grow(-gap)
+		_rr(r2, Color(mov_col, 0.28), _cell * 0.12, Color(mov_col, 0.9), 2.0)
+		draw_circle(_center(Vector2(c)), _cell * 0.1, Color(mov_col, 0.95))
+	draw_arc(_center(Vector2(from)), _cell * 0.44, 0.0, TAU, 28, UiTheme.COL_GOLD, 3.0)
+	# legend
+	var lw := _cell * 3.4
+	var lr := Rect2(_origin + Vector2((_cell * 8 - lw) * 0.5, _cell * 8 + 4.0), Vector2(lw, _cell * 0.42))
+	if lr.end.y > size.y:
+		lr.position.y = _origin.y + _cell * 8 - lr.size.y - 2.0
+	_rr(lr, Color(0, 0, 0, 0.6), 6.0)
+	var fs := int(_cell * 0.26)
+	draw_circle(lr.position + Vector2(_cell * 0.22, lr.size.y * 0.5), _cell * 0.09, mov_col)
+	draw_string(font, lr.position + Vector2(_cell * 0.38, lr.size.y * 0.5 + fs * 0.35), "Move", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiTheme.COL_TEXT)
+	_rr(Rect2(lr.position + Vector2(_cell * 1.75, lr.size.y * 0.5 - _cell * 0.09), Vector2(_cell * 0.18, _cell * 0.18)), Color(atk_col, 0.5), 2.0, atk_col, 1.5)
+	draw_string(font, lr.position + Vector2(_cell * 2.0, lr.size.y * 0.5 + fs * 0.35), "Attack", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiTheme.COL_TEXT)
+
+
+func _any_check() -> bool:
+	return engine != null and (engine.in_check[0] or engine.in_check[1]) and not engine.finished
+
+
+## "Check": the threatened Champion pulses red, a red line runs from every enemy that can hit it, and the board edge glows.
+func _draw_check(gap: float) -> void:
+	if engine == null or engine.finished:
+		return
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.008)
+	for side in range(2):
+		if not engine.in_check[side]:
+			continue
+		var k: BattleUnit = engine.kings[side]
+		if k == null or not k.alive:
+			continue
+		var kc := _visual_cell(k)
+		var red := Color("ff3b30")
+		var kr := Rect2(_origin + Vector2(kc.x, kc.y) * _cell, Vector2(_cell, _cell)).grow(-gap)
+		_rr(kr, Color(red, 0.18 + 0.22 * pulse), _cell * 0.12, Color(red, 0.9), 3.0)
+		for t in engine.king_threats(side):
+			var tc := _visual_cell(t)
+			var a := _center(tc)
+			var b := _center(kc)
+			var dir := (b - a).normalized()
+			var dist := a.distance_to(b)
+			var d := 0.0
+			while d < dist:  # dashed line threatener -> Champion
+				draw_line(a + dir * d, a + dir * minf(d + _cell * 0.16, dist), Color(red, 0.85), 2.5)
+				d += _cell * 0.3
+			draw_arc(a, _cell * 0.42, 0.0, TAU, 24, Color(red, 0.8), 2.5)
+		if side == 0:  # your Champion: glowing red board edge
+			var br := Rect2(_origin, Vector2(_cell * 8, _cell * 8))
+			draw_rect(br, Color(red, 0.25 + 0.45 * pulse), false, 4.0)
+
+
+func _draw_banner(font: Font) -> void:
+	if _banner.is_empty():
+		return
+	var t := float(_banner["t"])
+	var col: Color = _banner["color"]
+	var mate := String(_banner["text"]) == "CHECKMATE"
+	var a := 1.0 if mate else clampf(minf(t * 6.0, (1.0 - t) * 3.0), 0.0, 1.0)  # quick fade in, fade out near the end
+	var board := Rect2(_origin, Vector2(_cell * 8, _cell * 8))
+	draw_rect(board, Color(0, 0, 0, 0.38 * a))  # dim the board behind the text
+	var h := _cell * 1.3
+	var band := Rect2(board.position.x, board.position.y + (board.size.y - h) * 0.5, board.size.x, h)
+	draw_rect(band, Color(col.darkened(0.75), 0.82 * a))
+	draw_rect(Rect2(band.position, Vector2(band.size.x, 3)), Color(col, a))
+	draw_rect(Rect2(band.position + Vector2(0, band.size.y - 3), Vector2(band.size.x, 3)), Color(col, a))
+	var fs := int(_cell * (0.78 + 0.12 * (1.0 - minf(t * 5.0, 1.0))))  # a small "pop" on entry
+	var txt := String(_banner["text"])
+	var p := Vector2(band.position.x, band.position.y + band.size.y * 0.5 + fs * 0.35)
+	draw_string_outline(font, p, txt, HORIZONTAL_ALIGNMENT_CENTER, band.size.x, fs, 6, Color(0, 0, 0, a))
+	draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_CENTER, band.size.x, fs, Color(col.lightened(0.25), a))
+
+
+## Highland: a raised, lighter tile with two small peaks and a bright rim.
+func _draw_highland(r: Rect2) -> void:
+	var sk := _bskin()
+	var rim: Color = sk["highland_rim"]
+	_rr(r, Color(sk["highland"], 0.30), _cell * float(sk["radius"]), Color(rim, 0.85), 2.0, _cell * 0.1)
+	var cx := r.position.x + r.size.x * 0.5
+	var by := r.position.y + r.size.y * 0.72
+	var w := r.size.x * 0.34
+	draw_colored_polygon(PackedVector2Array([Vector2(cx - w * 1.1, by), Vector2(cx - w * 0.35, by - r.size.y * 0.34), Vector2(cx + w * 0.2, by)]), Color(rim, 0.55))
+	draw_colored_polygon(PackedVector2Array([Vector2(cx - w * 0.2, by), Vector2(cx + w * 0.5, by - r.size.y * 0.46), Vector2(cx + w * 1.2, by)]), Color(rim, 0.8))
