@@ -25,6 +25,8 @@ func _ready() -> void:
 		if t.type == BoardTile.Type.TERRITORY:
 			tile = t
 			break
+	c.monsters = []  # hidden monsters / deposits are placed at random: keep the scripted landing deterministic
+	c.deposits = []
 	tile.owner_id = 1
 	c.players[0].position = tile.index
 	c.current = 0

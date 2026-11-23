@@ -38,6 +38,10 @@ func _ready() -> void:
 		if frames % 20 == 0:
 			await get_tree().process_frame
 	await get_tree().process_frame
+	var waited := 0.0  # a checkmate delays the result screen by ~1.4 s so the CHECKMATE banner can be seen
+	while not scene._result_shown and waited < 5.0:
+		await get_tree().create_timer(0.1).timeout
+		waited += 0.1
 	print("battle finished=", scene.engine.finished, " winner=", scene.engine.winner, " ticks=", scene.engine.tick, " result shown=", scene._result_shown)
 	if not scene.engine.finished or not scene._result_shown:
 		fails += 1
