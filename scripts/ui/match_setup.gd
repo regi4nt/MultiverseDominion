@@ -170,7 +170,7 @@ func _offline_cards() -> Array:
 			"desc": "Play a free match against AI on any unlocked continent. Nothing to unlock, just fight for the crown.",
 			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "%d of %d continents open" % [_open_continent_count(), GameData.continents.size()]},
 		{"id": "battle_chess", "icon": "rook", "title": "BATTLE CHESS", "sub": "8 x 8 auto battle",
-			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle. Every battle earns Aether Coins.",
+			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle.",
 			"chips": ["8 x 8", "Auto battle", "Earns coins"],
 			"status": "Win +%d  -  Loss +%d Aether Coins" % [ShopSystem.PRACTICE_WIN_REWARD, ShopSystem.PRACTICE_LOSS_REWARD]},
 		{"id": "tutorial", "icon": "pawn", "title": "TUTORIAL", "sub": "10 rounds  ·  1 vs 1",

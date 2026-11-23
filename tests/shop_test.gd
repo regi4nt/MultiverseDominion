@@ -30,12 +30,14 @@ func _ready() -> void:
 	check(all_have, "every playable continent has a random-map bonus")
 	var c0 := SaveManager.coins()
 	var f0 := SaveManager.fragments()
+	var col0: Dictionary = SaveManager.data["collection"].duplicate(true)  # a win unlocks the next Support card: undo that below
 	SaveManager.record_match(true, 5, 100, "arcanum", false, "", ShopSystem.random_bonus("arcanum"))
 	check(SaveManager.fragments() == f0 + 20 and SaveManager.last_bonus_text != "", "Arcanum bonus: +20 fragments on a win")
 	SaveManager.record_match(false, 5, 100, "arcanum", false, "", ShopSystem.random_bonus("arcanum"))
 	check(SaveManager.fragments() == f0 + 20 and SaveManager.last_bonus_text == "", "no random-map bonus on a loss")
 	SaveManager.data["wallet"]["coins"] = c0
 	SaveManager.data["wallet"]["fragments"] = f0
+	SaveManager.data["collection"] = col0
 	# in-game bonus: human only, random map only
 	var mc := MatchController.new()
 	mc.setup({"mode": "custom_ai", "continent_id": "arcanum", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 3, "random_map": true})
