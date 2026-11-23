@@ -260,8 +260,8 @@ func level_up() -> String:
 	return ""
 
 
-func to_side_cfg(champion_id: String, supports: Array) -> Dictionary:
+func to_side_cfg(champion_id: String, supports: Array, champion_star: int = 1) -> Dictionary:
 	var list: Array = []
 	for u in deployed_units():
 		list.append({"card_id": u.card_id, "stars": u.stars, "cell": u.cell})
-	return {"units": list, "champion": champion_id, "supports": supports}
+	return {"units": list, "champion": champion_id, "supports": supports, "champion_star": champion_star}

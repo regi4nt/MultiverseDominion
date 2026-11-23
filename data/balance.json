@@ -9,6 +9,50 @@
 	"territory_base_price": 60,
 	"territory_price_step": 12,
 	"rent_rate": 0.4,
+	"commander_max_star": 3,
+	"commander_star_hp_mult": [
+		1.0,
+		1.35,
+		1.8
+	],
+	"commander_star_atk_mult": [
+		1.0,
+		1.25,
+		1.5
+	],
+	"commander_missions": [
+		{
+			"id": "proven_in_battle",
+			"name": "Proven in Battle",
+			"desc": "Win 2 Duels",
+			"metric": "duel_wins",
+			"target": 2
+		},
+		{
+			"id": "monument_of_power",
+			"name": "Monument of Power",
+			"desc": "Raise a Landmark",
+			"metric": "landmarks",
+			"target": 1
+		}
+	],
+	"max_tile_level": 3,
+	"upgrade_cost_ratio": [
+		0.5,
+		0.75,
+		1.0
+	],
+	"upgrade_rent_mult": [
+		1.0,
+		1.5,
+		2.25,
+		3.5
+	],
+	"ai_upgrade_reserve": {
+		"easy": 600,
+		"normal": 350,
+		"hard": 200
+	},
 	"majority_threshold": 6,
 	"majority_rent_mult": 1.5,
 	"dominion_rent_mult": 2.5,
@@ -86,5 +130,17 @@
 		"epic": 7,
 		"legendary": 9
 	},
-	"hand_max": 5
+	"hand_max": 5,
+	"combo_window_ticks": 20,
+	"combo_refund_max": 2,
+	"king_skill_energy": 6,
+	"energy_max": 10,
+	"energy_start": 2,
+	"energy_regen_ticks": 8,
+	"support_energy_cost": {
+		"common": 3,
+		"rare": 5,
+		"epic": 7,
+		"legendary": 9
+	}
 }

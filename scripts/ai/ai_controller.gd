@@ -44,6 +44,8 @@ static func _decide(c: MatchController, p: PlayerState) -> void:
 		"buy":
 			var t: BoardTile = c.tiles[int(pend["tile"])]
 			c.decide("buy" if _wants_to_buy(c, p, t, int(pend["price"])) else "skip")
+		"upgrade":
+			c.decide("upgrade" if _wants_to_upgrade(p, int(pend["price"])) else "skip")
 		"auction":
 			c.decide(_auction_choice(c, p))
 		"portal":
@@ -99,6 +101,12 @@ static func _choose_portal(c: MatchController, p: PlayerState, options: Array) -
 			best_score = s
 			best = int(idx)
 	return best
+
+
+## Upgrade only while a gold cushion (by difficulty) stays in the purse after paying.
+static func _wants_to_upgrade(p: PlayerState, cost: int) -> bool:
+	var reserve: Dictionary = GameData.b("ai_upgrade_reserve")
+	return p.gold - cost >= int(reserve.get(p.difficulty, 350))
 
 
 ## Expected value of the next dice roll when standing on tile `from`.

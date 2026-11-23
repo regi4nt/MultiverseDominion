@@ -35,6 +35,7 @@ var units: Array[BattleUnit] = []
 var grid: Dictionary = {}  # Vector2i -> BattleUnit
 var kings: Array = [null, null]
 var king_data: Array = ["", ""]
+var king_star: Array = [1, 1]  # Commander stars of each side (multiply the King's HP / ATK)
 var king_entered: Array = [false, false]
 var side_passive: Array = [{}, {}]  # battle passive of each side's King (data/king_passives.json), active from the start on any continent
 var king_skill_used: Array = [false, false]
@@ -43,6 +44,15 @@ var king_entry_tick: Array = [-1, -1]
 var regulars_alive_at_entry: Array = [-1, -1]  # test hook: must always be 0
 var hands: Array = [[], []]
 var used_supports: Array = [[], []]
+## Support energy: fills by 1 every `energy_regen_ticks` ticks up to `energy_max` (overflow is wasted), each Support card costs energy by rarity.
+var energy: Array = [0, 0]
+var energy_timer: Array = [0, 0]
+var free_supports: bool = false  # test hook: Support cards cost no energy
+## Support combo: playing the same category again within `combo_window_ticks` of the last card extends the chain;
+## chain length n refunds min(n-1, combo_refund_max) energy on that card. A different category or a late card restarts at 1.
+var combo_category: Array = ["", ""]
+var combo_count: Array = [0, 0]
+var combo_last_tick: Array = [-9999, -9999]
 var ai_supports: Array = [false, true]
 var bonus_gold: Array = [0, 0]
 var gold_delta: Array = [0, 0]  # gold gained/lost by Support cards (e.g. Blood Oath), applied after the duel
@@ -69,9 +79,12 @@ func setup(cfg: Dictionary) -> void:
 	rng.seed = int(cfg.get("seed", 1))
 	ai_supports = cfg.get("ai_supports", [false, true])
 	manual_king = cfg.get("manual_king", [false, false])
+	free_supports = bool(cfg.get("free_supports", false))
+	energy = [mini(int(GameData.b("energy_start", 2)), energy_max()), mini(int(GameData.b("energy_start", 2)), energy_max())]
 	for side in range(2):
 		var sc: Dictionary = cfg["sides"][side]
 		king_data[side] = String(sc.get("champion", ""))
+		king_star[side] = clampi(int(sc.get("champion_star", 1)), 1, CommanderSystem.max_star())
 		side_passive[side] = GameData.king_passives.get(king_data[side], {})
 		hands[side] = (sc.get("supports", []) as Array).duplicate()
 		for sid in hands[side]:
@@ -335,6 +348,7 @@ func step() -> void:
 		return
 	tick += 1
 	events.clear()
+	_regen_energy()
 	for wc in walls.keys():
 		if int(walls[wc]) <= tick:
 			walls.erase(wc)
@@ -349,6 +363,8 @@ func step() -> void:
 	for u in order:
 		if u.alive:
 			_act(u)
+	for side in range(2):
+		_auto_king_skill(side)
 	if ai_supports[0] or ai_supports[1]:
 		_ai_use_supports()
 	_check_king_entries()
@@ -687,9 +703,9 @@ func _enter_king(side: int) -> void:
 	var kp: Dictionary = side_passive[side]
 	var kp_hp := float(kp.get("value", 0.0)) if kp.get("type", "") == "king_hp" else 0.0
 	var kp_atk := float(kp.get("value", 0.0)) if kp.get("type", "") == "king_atk" else 0.0
-	u.max_hp = int(round(float(ch["hp"]) * float(GameData.b("champion_hp_mult")) * (1.0 + kp_hp)))
+	u.max_hp = int(round(float(ch["hp"]) * float(GameData.b("champion_hp_mult")) * (1.0 + kp_hp) * CommanderSystem.hp_mult(int(king_star[side]))))
 	u.hp = u.max_hp
-	u.base_atk = int(round(float(ch["atk"]) * (1.0 + kp_atk) * WorldMods.atk_mult))
+	u.base_atk = int(round(float(ch["atk"]) * (1.0 + kp_atk) * WorldMods.atk_mult * CommanderSystem.atk_mult(int(king_star[side]))))
 	u.atk_range = 1
 	u.move = 2
 	u.skill_id = String(ch.get("skill_id", ""))
@@ -712,7 +728,17 @@ func _enter_king(side: int) -> void:
 	if manual_king[side]:
 		_log("%s waits for the King skill (%s)." % [u.display_name, String(ch.get("active_name", "skill"))])
 	else:
-		_cast_king_skill(side)  # AI / auto sides cast it on entry
+		_auto_king_skill(side)  # AI / auto sides cast it on entry, or as soon as they can pay for it
+
+
+func _auto_king_skill(side: int) -> void:
+	if not _king_waiting(side):
+		return
+	var cost := king_energy_cost()
+	if int(energy[side]) < cost:
+		return
+	energy[side] = int(energy[side]) - cost
+	_cast_king_skill(side)
 
 
 ## King active skill, used once. Human sides cast it by hand (use_king_skill); AI sides cast it on entry.
@@ -775,7 +801,8 @@ func _cast_king_skill(side: int) -> void:
 
 ## True while the side's King is in the arena and its active skill is still unused.
 func can_use_king_skill(side: int) -> bool:
-	return not finished and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive
+	return not finished and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive \
+			and int(energy[side]) >= king_energy_cost()
 
 
 ## Manual King skill. Returns "" on success or the reason it failed.
@@ -788,6 +815,10 @@ func use_king_skill(side: int) -> String:
 		return "The King skill was already used."
 	if not (kings[side] as BattleUnit).alive:
 		return "The King has fallen."
+	var cost := king_energy_cost()
+	if int(energy[side]) < cost:
+		return "Not enough energy for the King skill (%d/%d)." % [int(energy[side]), cost]
+	energy[side] = int(energy[side]) - cost
 	_cast_king_skill(side)
 	return ""
 
@@ -818,6 +849,61 @@ func _finish(w: int, reason: String) -> void:
 
 # ------------------------------------------------------------------ support cards
 
+func energy_max() -> int:
+	return maxi(1, int(GameData.b("energy_max", 10)))
+
+
+func energy_regen_ticks() -> int:
+	return maxi(1, int(GameData.b("energy_regen_ticks", 8)))
+
+
+## Energy a Support card costs to play (by rarity, data/balance.json `support_energy_cost`).
+func support_energy_cost(support_id: String) -> int:
+	if free_supports:
+		return 0
+	var costs: Dictionary = GameData.b("support_energy_cost", {})
+	return int(costs.get(String(CardDatabase.get_support(support_id).get("rarity", "common")), 3))
+
+
+## 0..1: how far the next energy point is (1.0 while the bar is full).
+func energy_progress(side: int) -> float:
+	if int(energy[side]) >= energy_max():
+		return 1.0
+	return float(int(energy_timer[side])) / float(energy_regen_ticks())
+
+
+func combo_window() -> int:
+	return maxi(1, int(GameData.b("combo_window_ticks", 20)))
+
+
+## Current chain length of a side (0 if the window has run out).
+func combo_active(side: int) -> int:
+	if int(combo_count[side]) > 0 and tick - int(combo_last_tick[side]) <= combo_window():
+		return int(combo_count[side])
+	return 0
+
+
+## Energy the King's active skill costs (data/balance.json `king_skill_energy`).
+func king_energy_cost() -> int:
+	return 0 if free_supports else clampi(int(GameData.b("king_skill_energy", 6)), 0, energy_max())
+
+
+## An auto (AI) King that has entered but is still saving energy for its skill.
+func _king_waiting(side: int) -> bool:
+	return not manual_king[side] and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive
+
+
+func _regen_energy() -> void:
+	for side in range(2):
+		if int(energy[side]) >= energy_max():
+			energy_timer[side] = 0  # a full bar wastes time: use it or lose it
+			continue
+		energy_timer[side] = int(energy_timer[side]) + 1
+		if int(energy_timer[side]) >= energy_regen_ticks():
+			energy_timer[side] = 0
+			energy[side] = int(energy[side]) + 1
+
+
 func available_supports(side: int) -> Array:
 	var out: Array = []
 	for id in hands[side]:
@@ -839,6 +925,9 @@ func use_support(side: int, support_id: String) -> String:
 	if (used_supports[side] as Array).has(support_id):
 		return "Card already used."
 	var s := CardDatabase.get_support(support_id)
+	var cost := support_energy_cost(support_id)
+	if int(energy[side]) < cost:
+		return "Not enough energy (%d/%d)." % [int(energy[side]), cost]
 	var value := int(s.get("value", 0))
 	var enemy_side := 1 - side
 	match String(s.get("effect", "")):
@@ -1000,8 +1089,20 @@ func use_support(side: int, support_id: String) -> String:
 			return "This card applies automatically during preparation."
 		_:
 			return "Effect '%s' is not implemented yet (TODO)." % s.get("effect", "?")
+	var category := String(s.get("category", ""))
+	var chain := 1
+	if combo_active(side) > 0 and String(combo_category[side]) == category:
+		chain = int(combo_count[side]) + 1
+	combo_category[side] = category
+	combo_count[side] = chain
+	combo_last_tick[side] = tick
+	var refund := mini(chain - 1, int(GameData.b("combo_refund_max", 2))) if cost > 0 else 0
+	energy[side] = mini(int(energy[side]) - cost + refund, energy_max())
 	(used_supports[side] as Array).append(support_id)
-	_log("Side %d plays %s." % [side, s["name"]])
+	if refund > 0:
+		_log("Side %d plays %s (-%d energy). %s combo x%d: +%d energy back!" % [side, s["name"], cost, category.capitalize(), chain, refund])
+	else:
+		_log("Side %d plays %s (-%d energy)." % [side, s["name"], cost])
 	return ""
 
 
@@ -1009,12 +1110,20 @@ func _ai_use_supports() -> void:
 	if tick % 30 != 0:
 		return
 	for side in range(2):
-		if not ai_supports[side]:
-			continue
+		if not ai_supports[side] or _king_waiting(side):
+			continue  # a King that is waiting for its skill gets the energy first
+		# The AI plays the most expensive card it can afford right now (so it does not waste the bar).
+		var best := ""
+		var chain_cat := String(combo_category[side]) if combo_active(side) > 0 else ""
 		for id in available_supports(side):
-			if is_support_implemented(id):
-				use_support(side, id)
-				break
+			if not is_support_implemented(id) or support_energy_cost(id) > int(energy[side]):
+				continue
+			var on_chain := chain_cat != "" and String(CardDatabase.get_support(id).get("category", "")) == chain_cat
+			var best_on_chain := best != "" and chain_cat != "" and String(CardDatabase.get_support(best).get("category", "")) == chain_cat
+			if best == "" or (on_chain and not best_on_chain) or (on_chain == best_on_chain and support_energy_cost(id) > support_energy_cost(best)):
+				best = id
+		if best != "":
+			use_support(side, best)
 
 
 func _log(text: String) -> void:

@@ -9,7 +9,6 @@ var round_label: Label
 var turn_label: Label
 var player_box: VBoxContainer
 var action_box: HFlowContainer
-var tile_info: Label
 var log_view: RichTextLabel
 var tick: Timer
 var _leave_dialog: UiDialog
@@ -43,14 +42,15 @@ func _ready() -> void:
 	ctrl.game_over.connect(_on_game_over)
 	board_view.bind(ctrl)
 	board_view.speed_changed.connect(_on_speed_changed)
-	board_view.tile_pressed.connect(func(i: int): tile_info.text = ctrl.describe_tile(i))
+	board_view.tile_pressed.connect(func(i: int): board_view.info_text = ctrl.describe_tile(i))
 	for line in ctrl.recent_log:  # lines logged before the UI was connected (match start / resumed match)
 		log_view.add_text(line + "\n")
 	SaveManager.app_paused.connect(_autosave)
 	_refresh_players()
 	_on_state_changed()
+	board_view.info_text = "Tap a tile to inspect it.  RR = reroll tokens, SD = special dice."
 	if WorldMods.modifier_name != "":
-		tile_info.text = "World modifier - %s: %s" % [WorldMods.modifier_name, ctrl.continent["modifier"].get("description", "")]
+		board_view.info_text = "World modifier - %s: %s" % [WorldMods.modifier_name, ctrl.continent["modifier"].get("description", "")]
 	if ctrl.tutorial:
 		_guide = TutorialGuide.new(ctrl)
 		_guide.hint.connect(_on_hint)
@@ -140,13 +140,6 @@ func _build_ui() -> void:
 	hv.add_child(hide_btn)
 
 	# --- right column
-	var info_panel := PanelContainer.new()
-	info_panel.custom_minimum_size = Vector2(0, 84)
-	right.add_child(info_panel)
-	tile_info = UiTheme.make_label("Tap a tile to inspect it.  RR = reroll tokens, SD = special dice.", 16, UiTheme.COL_MUTED)
-	tile_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info_panel.add_child(tile_info)
-
 	var log_panel := PanelContainer.new()
 	log_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(log_panel)
@@ -233,7 +226,7 @@ func _on_moved(pid: int, _from: int, to_i: int, _warped: bool) -> void:
 	Sfx.play("portal" if _warped else "step")
 	if pid == ctrl.current:
 		board_view.selected_index = to_i
-		tile_info.text = ctrl.describe_tile(to_i)
+		board_view.info_text = ctrl.describe_tile(to_i)
 
 
 func _on_speed_changed(mult: float) -> void:
@@ -289,6 +282,8 @@ func _refresh_players() -> void:
 		var nm := String(p.display_name)
 		if ctrl.team_mode:
 			nm += "  [%s]" % ctrl.team_label(p)
+		if p.alive:
+			nm += "  Cmdr " + CommanderSystem.star_text(p.commander_star)
 		var name_l := UiTheme.make_label(nm, 17, UiTheme.COL_TEXT if p.alive else UiTheme.COL_MUTED)
 		name_l.clip_text = true
 		col.add_child(name_l)
@@ -301,6 +296,12 @@ func _refresh_players() -> void:
 			sl.tooltip_text = "Life | Land owned | RR = reroll tokens | SD = special dice"
 			sl.clip_text = true
 			col.add_child(sl)
+			if not p.is_ai:  # the player's active Commander mission
+				var ml := UiTheme.make_label("Mission: " + CommanderSystem.mission_text(p), 13, UiTheme.COL_GOLD)
+				ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				var mm := CommanderSystem.mission_of(p)
+				ml.tooltip_text = "Commander mission: %s. Completing it gives your Commander its next star (more HP and ATK in Last Stand)." % (String(mm["name"]) if not mm.is_empty() else "complete")
+				col.add_child(ml)
 		else:
 			col.add_child(UiTheme.make_label("OUT", 18, UiTheme.COL_DANGER))
 		player_box.add_child(card)

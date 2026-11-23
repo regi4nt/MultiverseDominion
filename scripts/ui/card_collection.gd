@@ -112,13 +112,22 @@ func _rebuild() -> void:
 		c.queue_free()
 	_views.clear()
 	var entries: Array = []  # [card, is_support]
+	var order: Array = _continents_active_first()
 	if _filter != "support" and _filter != "king":
-		for u in CardDatabase.all_units():
-			if _filter == "all" or u["chess"] == _filter:
-				entries.append([u, false])
+		var seen := {}  # the 8 Pawns exist on every continent: listed once (as the active continent's)
+		for cid in order:
+			for u in CardDatabase.units_of_continent(String(cid)):
+				if seen.has(u["id"]):
+					continue
+				seen[u["id"]] = true
+				if _filter == "all" or u["chess"] == _filter:
+					entries.append([u, false])
 	if _filter == "all" or _filter == "king":
-		for k in CardDatabase.all_kings():  # the King of every faction of the continent (Legendary)
-			entries.append([k, false])
+		for cid in order:  # the King of every faction of every continent (Legendary); locked until the faction is open
+			for f in GameData.get_continent(String(cid)).get("factions", []):
+				var k := CardDatabase.king_card(String(f["champion"]))
+				if not k.is_empty():
+					entries.append([k, false])
 	if _filter == "all" or _filter == "support":
 		for s in CardDatabase.all_supports():
 			entries.append([s, true])
@@ -129,14 +138,50 @@ func _rebuild() -> void:
 		_add_card(e[0], e[1])
 
 
-## Kings are always selectable; units and Support cards need at least one copy.
+## The active continent first, then the others in their normal order (the collection shows every continent).
+func _continents_active_first() -> Array:
+	var out: Array = [CardDatabase.active_continent]
+	for c in GameData.continents:
+		if String(c["id"]) != CardDatabase.active_continent:
+			out.append(String(c["id"]))
+	return out
+
+
+## A faction piece / King is only usable once its faction is open (its continent unlocked in Journey).
+func _faction_open(c: Dictionary) -> bool:
+	var id := String(c["id"])
+	var fac := String(GameData.get_champion(id).get("faction", "")) if CardDatabase.is_king(id) else String(c.get("faction", ""))
+	if fac == "" or fac == CardDatabase.SHARED:
+		return true
+	return SaveManager.can_use_faction(fac)
+
+
+## Kings and unit pieces need their faction to be open; units and Support cards also need at least one copy.
 func _is_owned(c: Dictionary) -> bool:
-	return CardDatabase.is_king(String(c["id"])) or SaveManager.owned_count(String(c["id"])) > 0
+	var id := String(c["id"])
+	if CardDatabase.is_king(id):
+		return _faction_open(c)
+	if not CardDatabase.is_support(id) and not _faction_open(c):
+		return false
+	return SaveManager.owned_count(id) > 0
+
+
+func _lock_note(c: Dictionary) -> String:
+	var id := String(c["id"])
+	var fac := String(GameData.get_champion(id).get("faction", "")) if CardDatabase.is_king(id) else String(c.get("faction", ""))
+	for cont in GameData.continents:
+		for f in cont.get("factions", []):
+			if String(f["id"]) == fac:
+				return "\n\n[color=#ff7a7a]Locked - unlock %s in Journey to use this faction.[/color]" % cont["name"]
+	return ""
 
 
 func _add_card(c: Dictionary, support: bool) -> void:
 	var v := CardView.new()
-	v.setup(c, support, 1 if CardDatabase.is_king(String(c["id"])) else SaveManager.owned_count(c["id"]))  # every King can be picked as Champion
+	var cnt := 0
+	if _is_owned(c):
+		cnt = 1 if CardDatabase.is_king(String(c["id"])) else SaveManager.owned_count(c["id"])  # a King is one card; 0 = drawn locked
+	v.setup(c, support, cnt)
 	v.pressed.connect(_on_card)
 	v.set_selected(c["id"] == _selected_id)
 	_grid.add_child(v)
@@ -153,13 +198,17 @@ func _on_card(id: String) -> void:
 
 func _describe(id: String) -> String:
 	if CardDatabase.is_king(id):
-		return _describe_king(id)
+		var kc := CardDatabase.king_card(id)
+		return _describe_king(id) + (_lock_note(kc) if not _is_owned(kc) else "")
 	var owned := SaveManager.owned_count(id)
 	if CardDatabase.is_support(id):
 		var s := CardDatabase.get_support(id)
 		return "[color=#d4af37][b]%s[/b][/color]\n%s - %s\nUses per battle: %d\n\n%s\n\n[color=#8d93ad]Effect '%s' is applied in battles (TODO Phase 4).[/color]\n\nOwned: %d" % [
 			s["name"], s["category"], String(s["rarity"]).capitalize(), s["uses"], s["description"], s["effect"], owned]
 	var u := CardDatabase.get_unit(id)
+	var lock_note := ""
+	if not CardDatabase.is_support(id) and not _faction_open(u):
+		lock_note = _lock_note(u)
 	var copies: Array = GameData.b("star_copies")
 	var lines := ""
 	for st in range(1, 4):
@@ -167,7 +216,7 @@ func _describe(id: String) -> String:
 		lines += "%d-star (%d cards): HP %d  ATK %d\n" % [st, copies[st - 1], stt["hp"], stt["atk"]]
 	return "[color=#d4af37][b]%s[/b][/color]\n%s %s - %s - %s\nCapacity cost: %d\nRange %d   Movement %d\n\n%s\n\n[b]%s:[/b] %s%s\n\nOwned copies: %d / %d" % [
 		u["name"], "All factions" if CardDatabase.is_shared(u) else String(u["faction"]).capitalize(), String(u["chess"]).capitalize(), u["role"], String(u["rarity"]).capitalize(),
-		CardDatabase.capacity_cost(u["chess"]), u["range"], u["move"], lines, u["skill"]["name"], u["skill"]["desc"], _buff_text(id), owned, int(GameData.b("unit_copies"))]
+		CardDatabase.capacity_cost(u["chess"]), u["range"], u["move"], lines, u["skill"]["name"], u["skill"]["desc"], _buff_text(id), owned if _faction_open(u) else 0, int(GameData.b("unit_copies"))] + lock_note
 
 
 
@@ -185,7 +234,7 @@ func _king_buff_text(id: String) -> String:
 
 func _describe_king(id: String) -> String:
 	var ch := GameData.get_champion(id)
-	var fac := GameData.get_faction(CardDatabase.active_continent, String(ch.get("faction", "")))
+	var fac := GameData.find_faction(String(ch.get("faction", "")))  # a King of any continent
 	return "[color=#d4af37][b]%s[/b][/color]\n%s - King - %s\nCapacity cost: %d (enters only in Last Stand)\nHP %d (x%d in battle)   ATK %d\n\n[b]%s:[/b] %s\n[b]%s:[/b] %s%s\n\nPiece 8 of 8 of the %s faction." % [
 		ch["name"], String(fac.get("name", ch.get("faction", ""))), String(ch.get("rarity", "legendary")).capitalize(), CardDatabase.capacity_cost("king"),
 		int(ch["hp"]), int(GameData.b("champion_hp_mult")), int(ch["atk"]), ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"], _king_buff_text(id), String(fac.get("name", ""))]

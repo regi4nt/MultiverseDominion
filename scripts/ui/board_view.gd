@@ -29,6 +29,11 @@ var _pressing: bool = false
 var _dragged: bool = false
 var _pan_tw: Tween
 var _roll_tw: Tween
+## Explanation shown in the centre of the map, under the region counts (tile info / world modifier).
+var info_text: String = "":
+	set(v):
+		info_text = v
+		queue_redraw()
 var _roll_t: float = 1.0  # dice tumble progress 0..1 (1 = settled on the real result)
 var _roll_seed: int = 0
 var _inertia_tw: Tween
@@ -490,6 +495,7 @@ func _draw() -> void:
 		_draw_tile(t, font)
 	_draw_center(font)
 	_draw_tokens()
+	_draw_dice()
 
 
 func _draw_tile(t: BoardTile, _font: Font) -> void:
@@ -512,6 +518,8 @@ func _draw_tile(t: BoardTile, _font: Font) -> void:
 		if t.owner_id >= 0:
 			var c: Color = ctrl.players[t.owner_id].color
 			draw_circle(r.get_center() + Vector2(0, r.size.y * 0.12), _cell * 0.12, c.lightened(0.3))
+			if t.level > 0:
+				_draw_level_marks(t, r)
 	var ik := _icon_kind(t)
 	if ik != "":
 		_draw_icon(ik, r.get_center(), minf(r.size.x, r.size.y) * (0.3 if t.type != BoardTile.Type.CORNER else 0.34), _icon_color(ik))
@@ -524,6 +532,21 @@ func _draw_tile(t: BoardTile, _font: Font) -> void:
 			draw_arc(c, _cell * 0.26, 0.0, TAU, 16, Color("4a4f75"), 1.5)
 	if t.index == selected_index:
 		_rr(r.grow(1.5), Color(0, 0, 0, 0), rad, UiTheme.COL_GOLD, 3.0, _cell * 0.4)
+
+
+## Upgrade marks along the bottom of an owned land: one gold pip per level, a gold diamond for the Landmark.
+func _draw_level_marks(t: BoardTile, r: Rect2) -> void:
+	var y := r.end.y - maxf(3.0, r.size.y * 0.14)
+	var cx := r.get_center().x
+	if t.is_landmark():
+		var d := maxf(3.0, _cell * 0.16)
+		draw_colored_polygon(PackedVector2Array([Vector2(cx, y - d), Vector2(cx + d, y), Vector2(cx, y + d), Vector2(cx - d, y)]), UiTheme.COL_GOLD)
+		return
+	var pr := maxf(1.5, _cell * 0.07)
+	var step := pr * 2.8
+	var x0 := cx - step * (t.level - 1) * 0.5
+	for i in range(t.level):
+		draw_circle(Vector2(x0 + step * i, y), pr, UiTheme.COL_GOLD)
 
 
 func _draw_center(font: Font) -> void:
@@ -551,29 +574,56 @@ func _draw_center(font: Font) -> void:
 			var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 			draw_string(font, Vector2(x - w, y), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, p.color.lightened(0.25))
 			x -= w + _cell * 0.9
-	# Dice with pips (tumbling while _roll_t < 1)
-	if ctrl.last_dice.x > 0:
-		var rolling := _roll_t < 1.0
-		var decay := 1.0 - _roll_t
-		for i in range(2):
-			var v := ctrl.last_dice.x if i == 0 else ctrl.last_dice.y
-			var d := _cell * 3.0
-			var dr := Rect2(inner.position + Vector2(inner.size.x * 0.5 - _cell * 3.3 + i * _cell * 3.6, _cell * 11.6), Vector2(d, d))
-			if not rolling:
-				_rr(dr, Color("f1ead4"), d * 0.2, Color("b8962e"), 2.0, _cell * 0.4)
-				_draw_pips(dr, v)
-				continue
-			v = 1 + posmod(int(_roll_t * 16.0) * 5 + i * 3 + _roll_seed, 6)  # a new random face ~16 times, never the same twice in a row
-			var bounce := absf(sin(_roll_t * PI * 3.0)) * decay  # three hops that die out
-			var sway := sin(_roll_t * 21.0 + float(i) * 2.1) * decay * 0.35
-			var spin := decay * decay * TAU * (1.0 + 0.5 * float(i)) * (1.0 if i == 0 else -1.0)
-			# a soft ground shadow that shrinks while the die is in the air
-			draw_circle(dr.get_center() + Vector2(0, d * 0.55), d * (0.5 - 0.15 * bounce), Color(0, 0, 0, 0.28 * (1.0 - 0.6 * bounce)))
-			draw_set_transform(dr.get_center() + Vector2(sway * _cell, -bounce * _cell * 1.1), spin, Vector2.ONE * (1.0 + 0.12 * bounce))
-			var local := Rect2(Vector2(-d, -d) * 0.5, Vector2(d, d))
-			_rr(local, Color("f1ead4"), d * 0.2, Color("b8962e"), 2.0, _cell * 0.4)
-			_draw_pips(local, v)
-			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_draw_info(font, inner)
+
+
+## The explanation (inspected tile / world modifier) sits in the centre of the map, right under the four region rows.
+## The dice plate (drawn in view space, bottom-centre of the map) stays below it.
+func _draw_info(font: Font, inner: Rect2) -> void:
+	if info_text == "":
+		return
+	var box := Rect2(inner.position.x + _cell * 1.2, inner.position.y + _cell * 12.4, inner.size.x - _cell * 2.4, _cell * 5.3)
+	_rr(box, Color(1, 1, 1, 0.045), _cell * 0.3)
+	var fs := int(_cell * 0.6)
+	var line_h := font.get_height(fs)
+	var pad := _cell * 0.5
+	var lines := maxi(1, int(floor((box.size.y - pad * 1.2) / line_h)))
+	draw_multiline_string(font, Vector2(box.position.x + pad, box.position.y + pad + font.get_ascent(fs)), info_text,
+		HORIZONTAL_ALIGNMENT_LEFT, box.size.x - pad * 2.0, fs, lines, UiTheme.COL_TEXT)
+
+
+## The dice are drawn in VIEW space (fixed at the bottom-centre of the map, above the bottom tile row), not on the board, so they stay visible
+## wherever the camera is panned or zoomed (the camera follows the pawn, which used to carry the board centre off-screen).
+func _draw_dice() -> void:
+	if ctrl.last_dice.x <= 0:
+		return
+	var d := clampf(minf(size.x, size.y) * 0.09, 44.0, 96.0)
+	var gap := d * 0.28
+	# bottom of the plate: 2.4 fitted cells above the board's bottom edge = inside the centre panel when the board is fitted
+	var fit_cell := minf(size.x, size.y) / float(BoardBuilder.GRID)
+	var plate_bottom := minf(size.y * 0.5 + minf(size.x, size.y) * 0.5 - fit_cell * 2.4, size.y - 8.0)
+	var top := Vector2(size.x * 0.5 - d - gap * 0.5, plate_bottom - d * 1.3)
+	var rolling := _roll_t < 1.0
+	var decay := 1.0 - _roll_t
+	# a soft plate so the dice read against any tile colour
+	_rr(Rect2(top - Vector2(d * 0.3, d * 0.3), Vector2(d * 2.0 + gap + d * 0.6, d * 1.6)), Color(0.04, 0.06, 0.13, 0.72), d * 0.25, Color("3d3822"), 1.5)
+	for i in range(2):
+		var v := ctrl.last_dice.x if i == 0 else ctrl.last_dice.y
+		var dr := Rect2(top + Vector2(i * (d + gap), 0), Vector2(d, d))
+		if not rolling:
+			_rr(dr, Color("f1ead4"), d * 0.2, Color("b8962e"), 2.0, d * 0.13)
+			_draw_pips(dr, v)
+			continue
+		v = 1 + posmod(int(_roll_t * 16.0) * 5 + i * 3 + _roll_seed, 6)  # a new random face ~16 times, never the same twice in a row
+		var bounce := absf(sin(_roll_t * PI * 3.0)) * decay  # three hops that die out
+		var sway := sin(_roll_t * 21.0 + float(i) * 2.1) * decay * 0.35
+		var spin := decay * decay * TAU * (1.0 + 0.5 * float(i)) * (1.0 if i == 0 else -1.0)
+		draw_circle(dr.get_center() + Vector2(0, d * 0.55), d * (0.5 - 0.15 * bounce), Color(0, 0, 0, 0.28 * (1.0 - 0.6 * bounce)))
+		draw_set_transform(dr.get_center() + Vector2(sway * d * 0.33, -bounce * d * 0.37), spin, Vector2.ONE * (1.0 + 0.12 * bounce))
+		var local := Rect2(Vector2(-d, -d) * 0.5, Vector2(d, d))
+		_rr(local, Color("f1ead4"), d * 0.2, Color("b8962e"), 2.0, d * 0.13)
+		_draw_pips(local, v)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_pips(dr: Rect2, v: int) -> void:

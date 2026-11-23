@@ -171,12 +171,12 @@ func _test_champions() -> void:
 		ok = ok and e.finished and e.king_entered[0] and e.king_entry_tick[0] == 0
 	check(ok, "all 28 champions enter Last Stand, cast their active and finish a battle")
 	var e := BattleEngine.new()
-	e.setup({"seed": 3, "ai_supports": [false, false], "sides": [
+	e.setup({"seed": 3, "ai_supports": [false, false], "free_supports": true, "sides": [
 		{"units": [], "champion": "champion_cryndel", "supports": []},
 		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(2, 2)}], "champion": "champion_solvaris", "supports": []}]})
 	check(e.units_of(1)[0].slow_until > 0, "Frost Veil slows enemies on entry")
 	e = BattleEngine.new()
-	e.setup({"seed": 3, "ai_supports": [false, false], "sides": [
+	e.setup({"seed": 3, "ai_supports": [false, false], "free_supports": true, "sides": [
 		{"units": [], "champion": "champion_chronex", "supports": []},
 		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(2, 2)}], "champion": "champion_solvaris", "supports": []}]})
 	check(e.units_of(1)[0].stun_until > 0, "Chrono Stasis stuns enemies on entry")
@@ -184,7 +184,7 @@ func _test_champions() -> void:
 
 func _make_support_engine(hand: Array) -> BattleEngine:
 	var e := BattleEngine.new()
-	e.setup({"seed": 4, "ai_supports": [false, false], "sides": [
+	e.setup({"seed": 4, "ai_supports": [false, false], "free_supports": true, "sides": [
 		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 5)}, {"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(4, 5)}, {"card_id": "bishop_valdoria_chaplain", "stars": 1, "cell": Vector2i(2, 6)}], "champion": "champion_solvaris", "supports": hand},
 		{"units": [{"card_id": "pawn_iron_pikeman", "stars": 1, "cell": Vector2i(3, 2)}, {"card_id": "pawn_dusk_cutpurse", "stars": 1, "cell": Vector2i(4, 2)}, {"card_id": "rook_citadel_warden", "stars": 1, "cell": Vector2i(3, 1)}], "champion": "champion_nocthyr", "supports": []}]})
 	return e

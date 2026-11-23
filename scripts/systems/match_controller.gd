@@ -46,7 +46,7 @@ var recent_log: Array[String] = []  # last lines, shown again after resuming a s
 ## Counters (used by tests and the result screen).
 var stats: Dictionary = {"tax": 0, "duels_offered": 0, "refused": 0, "duels": 0,
 	"attacker_wins": 0, "defender_wins": 0, "conquests": 0, "rewards": 0, "bankrupt": 0, "heals": 0,
-	"auctions": 0, "special_dice": 0}
+	"auctions": 0, "special_dice": 0, "upgrades": 0}
 
 var _roll_was_double: bool = false
 var _extra_roll: bool = false
@@ -269,6 +269,13 @@ func get_decision_options() -> Array:
 			var price := int(pending["price"])
 			out.append({"id": "buy", "label": "Buy %s (%d G)" % [t.name, price], "enabled": p.gold >= price})
 			out.append({"id": "skip", "label": "Skip", "enabled": true})
+		"upgrade":
+			var ut: BoardTile = tiles[int(pending["tile"])]
+			var ucost := int(pending["price"])
+			var nxt := ut.level + 1
+			var what := "Landmark" if nxt >= int(GameData.b("max_tile_level")) else "Level %d" % nxt
+			out.append({"id": "upgrade", "label": "Upgrade to %s (%d G)" % [what, ucost], "enabled": p.gold >= ucost})
+			out.append({"id": "skip", "label": "Not now", "enabled": true})
 		"auction":
 			var bidder := players[int(pending["actor"])]
 			var nb := auction_next_bid()
@@ -307,6 +314,8 @@ func describe_tile(idx: int) -> String:
 		BoardTile.Type.TERRITORY:
 			var region_name: String = continent["regions"][t.region]["name"] if continent.has("regions") else str(t.region)
 			s += "\nRegion: %s | Price: %d G" % [region_name, t.price]
+			if t.level > 0:
+				s += " | %s" % t.level_label()
 			if t.owner_id >= 0:
 				s += " | Rent: %d G\nOwner: %s" % [EconomySystem.rent_of(t, tiles), players[t.owner_id].display_name]
 			else:
@@ -389,6 +398,15 @@ func decide(choice: Variant) -> void:
 				if p.gold < price:
 					return
 				_do_buy(p, tiles[int(pending["tile"])], price)
+			pending = {}
+			_finish_landing()
+		"upgrade":
+			if typeof(choice) == TYPE_STRING and choice == "upgrade":
+				var ut: BoardTile = tiles[int(pending["tile"])]
+				var ucost := int(pending["price"])
+				if p.gold < ucost:
+					return
+				_do_upgrade(p, ut, ucost)
 			pending = {}
 			_finish_landing()
 		"portal":
@@ -651,7 +669,13 @@ func _resolve_territory(p: PlayerState, t: BoardTile) -> void:
 		else:
 			_log("%s cannot afford %s (%d G)." % [p.display_name, t.name, price])
 	elif t.owner_id == p.id:
-		_log("%s visits their own land %s. TODO (later): upgrades." % [p.display_name, t.name])
+		var ucost := EconomySystem.upgrade_cost(t)
+		if ucost < 0:
+			_log("%s visits their own Landmark %s." % [p.display_name, t.name])
+		elif p.gold >= ucost:
+			_set_pending({"type": "upgrade", "tile": t.index, "price": ucost})
+		else:
+			_log("%s visits their own land %s (upgrade costs %d G)." % [p.display_name, t.name, ucost])
 	elif is_ally(t.owner_id, p.id):
 		_log("%s visits the allied land %s: no rent, no duel." % [p.display_name, t.name])
 	else:
@@ -831,6 +855,28 @@ func _do_buy(p: PlayerState, t: BoardTile, price: int) -> void:
 	players_changed.emit()
 
 
+## Commander missions: counts an event for the player's active mission and announces a new star.
+func _mission_progress(p: PlayerState, metric: String, amount: int = 1) -> void:
+	if CommanderSystem.add_progress(p, metric, amount):
+		var cname := String(GameData.get_champion(p.champion_id).get("name", "Commander"))
+		_log("COMMANDER UP! %s's %s reaches %d stars (mission complete)." % [p.display_name, cname, p.commander_star])
+	players_changed.emit()
+
+
+func _do_upgrade(p: PlayerState, t: BoardTile, cost: int) -> void:
+	p.gold -= cost
+	t.level += 1
+	stats["upgrades"] = int(stats.get("upgrades", 0)) + 1
+	if t.is_landmark():
+		_log("%s raises a LANDMARK on %s (%d G). Rent is now %d G." % [p.display_name, t.name, cost, EconomySystem.rent_of(t, tiles)])
+	else:
+		_log("%s upgrades %s to Level %d (%d G). Rent is now %d G." % [p.display_name, t.name, t.level, cost, EconomySystem.rent_of(t, tiles)])
+	tiles_changed.emit()
+	players_changed.emit()
+	if t.is_landmark():
+		_mission_progress(p, "landmarks")
+
+
 func _announce_region(p: PlayerState, t: BoardTile) -> void:
 	var owned := EconomySystem.region_count(tiles, t.region, p.id)
 	if owned == 10:
@@ -863,8 +909,9 @@ func _pay(p: PlayerState, amount: int, creditor_id: int, reason: String) -> void
 		var t := _cheapest_owned(p)
 		if t == null:
 			break
-		var refund := int(t.price * float(GameData.b("sell_ratio")))
+		var refund := int((t.price + EconomySystem.upgrade_invested(t)) * float(GameData.b("sell_ratio")))
 		t.owner_id = -1
+		t.level = 0
 		p.gold += refund
 		_log("%s is forced to sell %s for %d G." % [p.display_name, t.name, refund])
 		tiles_changed.emit()
@@ -897,6 +944,7 @@ func _eliminate(p: PlayerState) -> void:
 	for t in tiles:
 		if t.owner_id == p.id:
 			t.owner_id = -1
+			t.level = 0
 	_log("%s has been ELIMINATED." % p.display_name)
 	if p.id == current:
 		pending = {}
@@ -1006,6 +1054,9 @@ func get_decision_prompt() -> String:
 				lot.name, lot.price,
 				("Highest bid %d G by %s." % [int(pending["bid"]), players[lead].display_name]) if lead >= 0 else "No bids yet.",
 				auction_next_bid()]
+		"upgrade":
+			var ut: BoardTile = tiles[int(pending["tile"])]
+			return "Your land %s (rent %d G). Upgrade it for %d G to raise the rent?" % [ut.name, EconomySystem.rent_of(ut, tiles), int(pending["price"])]
 		"portal":
 			return "Active portal: choose a destination."
 		"shop":
@@ -1071,6 +1122,9 @@ func finish_duel(result: Dictionary) -> void:
 	for k in deltas:
 		players[int(k)].gold = maxi(0, players[int(k)].gold + int(deltas[k]))
 	stats["duels"] += 1
+	var duel_winner := int(result.get("winner", -1))
+	if duel_winner >= 0 and duel_winner < players.size():
+		_mission_progress(players[duel_winner], "duel_wins")
 	if int(result.get("winner", -1)) != attacker.id:
 		stats["defender_wins"] += 1
 		defender.gold += bonus + (int(defender.passive_value) if defender.has_passive("spoils") else 0)
@@ -1124,6 +1178,7 @@ func _player_to_dict(p: PlayerState) -> Dictionary:
 		"champion": p.champion_id, "passive": p.passive, "passive_value": p.passive_value, "color": p.color.to_html(),
 		"position": p.position, "gold": p.gold, "life": p.life, "level": p.level, "capacity": p.capacity,
 		"tokens": p.reroll_tokens, "skip": p.skip_turns, "alive": p.alive, "team": p.team, "dice": p.special_dice.duplicate(), "move_bonus": p.move_bonus,
+		"cstar": p.commander_star, "mprog": p.mission_progress,
 		"deck": p.deck.to_dict(), "pile": p.battle_deck.pool.duplicate(), "spile": p.battle_deck.support_pool.duplicate(), "hand": p.hand.duplicate(), "units": units}
 
 
@@ -1137,7 +1192,7 @@ func to_dict() -> Dictionary:
 		plist.append(_player_to_dict(p))
 	var tl: Array = []
 	for t in tiles:
-		tl.append([t.owner_id, t.portal_active])
+		tl.append([t.owner_id, t.portal_active, t.level])
 	return {
 		"version": SAVE_FORMAT, "continent_id": continent["id"], "round": round_number, "current": current,
 		"state": int(state), "last_dice": [last_dice.x, last_dice.y], "winner_id": winner_id,
@@ -1158,6 +1213,8 @@ static func from_dict(d: Dictionary) -> MatchController:
 	for i in range(mini(tl.size(), c.tiles.size())):
 		c.tiles[i].owner_id = int(tl[i][0])
 		c.tiles[i].portal_active = bool(tl[i][1])
+		if (tl[i] as Array).size() > 2:  # older saves have no upgrade level
+			c.tiles[i].level = int(tl[i][2])
 	c.human_present = bool(d["human_present"])
 	c.team_mode = bool(d.get("team_mode", false))
 	c.winner_team = int(d.get("winner_team", -1))
@@ -1184,6 +1241,8 @@ static func from_dict(d: Dictionary) -> MatchController:
 		for did in pd.get("dice", []):
 			p.special_dice.append(String(did))
 		p.move_bonus = int(pd.get("move_bonus", 0))
+		p.commander_star = int(pd.get("cstar", 1))
+		p.mission_progress = int(pd.get("mprog", 0))
 		p.deck = Deck.from_dict(pd["deck"])
 		p.battle_deck = BattleDeck.new(p.deck, c.rng)
 		p.battle_deck.pool.clear()

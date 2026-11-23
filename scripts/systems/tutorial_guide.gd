@@ -11,6 +11,7 @@ const HINTS := {
 	"roll": "Your turn: tap ROLL DICE.",
 	"rolled": "Dice rolled. Tap MOVE. (A Reroll Token lets you roll again first; doubles give a bonus roll.)",
 	"buy": "Free territory! Buy it with Dominion Gold: rivals landing on it pay you rent. Owning 6 of the 10 lands of a region raises rent; all 10 give Regional Dominion.",
+	"upgrade": "Your own land! Pay gold to upgrade it (Level 1-3, the last level is a Landmark): every level raises the rent rivals pay you.",
 	"auction": "Auction House: a free territory is sold to the highest bidder. Bid, or pass. Every ruler can join.",
 	"portal": "An active portal (purple)! Warp to another active portal. Portals move every round.",
 	"shop": "Territory Shop: buy Reroll Tokens, a Special Die, or restore a lost Life.",
@@ -32,7 +33,7 @@ const HINTS := {
 ## Texts shown inside the Battle scene during a tutorial duel.
 const BATTLE := {
 	"prep": "Buy units with the gold you may spend (Budget). Tap a unit, then a cell on the BLUE half. Capacity limits how many fit; Level Up raises it. Auto Deploy picks a good formation. Then LOCK FORMATION.",
-	"fight": "Units fight on their own. Your Champion joins only when all your units have fallen (Last Stand). Tap a Support card to play it.",
+	"fight": "Units fight on their own. Your Champion joins only when all your units have fallen (Last Stand). Support cards cost Energy, which refills over time - tap a card to play it when you can afford it (the King skill uses Energy too). Same-category cards played back to back give energy back (combo).",
 	"result": "Win: the attacker may take the land. Lose: -1 Life. A draw goes to the defender.",
 }
 
@@ -92,6 +93,9 @@ func _on_decision(p: PlayerState) -> void:
 		"buy":
 			if _human_actor():
 				_show("buy")
+		"upgrade":
+			if _human_actor():
+				_show("upgrade")
 		"auction":
 			if _human_actor():
 				_show("auction")

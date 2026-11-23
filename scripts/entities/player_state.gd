@@ -23,6 +23,8 @@ var alive: bool = true
 var team: int = -1  # 2vs2: 0 = Team A, 1 = Team B; -1 = free-for-all (no team)
 var special_dice: Array[String] = []  # ids from data/special_dice.json, used before rolling
 var move_bonus: int = 0  # Swift Die: added to the next move
+var commander_star: int = 1  # Commander stars 1..3, raised by missions (see CommanderSystem)
+var mission_progress: int = 0  # progress of the ACTIVE Commander mission
 
 # Persistent army (Phase 5): units bought with Dominion Gold stay between duels.
 var deck: Deck

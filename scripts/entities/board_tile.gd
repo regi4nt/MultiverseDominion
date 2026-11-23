@@ -13,6 +13,7 @@ var price: int = 0
 var owner_id: int = -1
 var portal_active: bool = false
 var corner_kind: String = ""  # start | sanctuary | rift | crossroads
+var level: int = 0  # 0 = plain land, 1..max_tile_level = upgraded; the last level is the Landmark
 
 
 func type_name() -> String:
@@ -21,3 +22,13 @@ func type_name() -> String:
 
 func is_territory() -> bool:
 	return type == Type.TERRITORY
+
+
+func is_landmark() -> bool:
+	return type == Type.TERRITORY and level >= int(GameData.b("max_tile_level"))
+
+
+func level_label() -> String:
+	if level <= 0:
+		return ""
+	return "Landmark" if is_landmark() else "Lv %d" % level

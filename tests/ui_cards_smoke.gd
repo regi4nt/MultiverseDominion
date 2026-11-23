@@ -12,12 +12,20 @@ func _ready() -> void:
 		await get_tree().process_frame
 	coll._on_card(String(CardDatabase.units_of_chess("queen")[0]["id"]))
 	print("collection cards shown (all): ", coll._grid.get_child_count(), " detail: ", coll._detail.text.substr(0, 40).replace("\n", " "))
-	if coll._grid.get_child_count() != CardDatabase.all_units().size() + CardDatabase.all_kings().size() + CardDatabase.all_supports().size():
+	# The collection lists the units and Kings of EVERY continent (locked until the faction opens); the 8 Pawns once.
+	var uniq := {}
+	var king_total := 0
+	for c in GameData.continents:
+		for u in CardDatabase.units_of_continent(String(c["id"])):
+			uniq[u["id"]] = true
+		king_total += c.get("factions", []).size()
+	if coll._grid.get_child_count() != uniq.size() + king_total + CardDatabase.all_supports().size():
 		fails += 1
+		push_error("collection should show every continent's cards: %d" % coll._grid.get_child_count())
 	coll._filter = "king"
 	coll._rebuild()
 	coll._on_card(String(CardDatabase.all_kings()[0]["id"]))
-	if coll._grid.get_child_count() != 4 or not coll._detail.text.contains("King"):
+	if coll._grid.get_child_count() != king_total or not coll._detail.text.contains("King"):
 		fails += 1
 	if not coll._collection_view.visible or coll._deck_view.visible:
 		fails += 1

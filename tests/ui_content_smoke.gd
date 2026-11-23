@@ -53,7 +53,7 @@ func _ready() -> void:
 				AIController.step(m)
 			elif not m.current_player().is_ai and m.state != MatchController.State.AWAIT_DECISION and not board.board_view.is_busy():
 				AIController.step(m)
-		print("%-10s modifier=%-18s round=%d duels=%d tile_info='%s'" % [c["id"], WorldMods.modifier_name, m.round_number, m.stats["duels"], board.tile_info.text.substr(0, 28).replace("\n", " ")])
+		print("%-10s modifier=%-18s round=%d duels=%d tile_info='%s'" % [c["id"], WorldMods.modifier_name, m.round_number, m.stats["duels"], board.board_view.info_text.substr(0, 28).replace("\n", " ")])
 		if m.round_number < 2:
 			fails += 1
 		board.queue_free()

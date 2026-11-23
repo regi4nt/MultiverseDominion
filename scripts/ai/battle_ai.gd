@@ -24,7 +24,7 @@ static func army_power(p: PlayerState) -> float:
 			used += cost
 			total += power(u)
 	var ch := GameData.get_champion(p.champion_id)
-	total += (float(ch.get("hp", 100)) * float(GameData.b("champion_hp_mult")) + float(ch.get("atk", 10)) * 6.0) * 0.5
+	total += (float(ch.get("hp", 100)) * float(GameData.b("champion_hp_mult")) * CommanderSystem.hp_mult(p.commander_star) + float(ch.get("atk", 10)) * 6.0 * CommanderSystem.atk_mult(p.commander_star)) * 0.5
 	return total + float(p.gold) * 0.4
 
 
@@ -134,7 +134,7 @@ static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: in
 	p.gold = prep.gold
 	p.level = prep.level
 	p.capacity = prep.capacity()
-	return prep.to_side_cfg(p.champion_id, p.hand)
+	return prep.to_side_cfg(p.champion_id, p.hand, p.commander_star)
 
 
 static func pick_champion(rng: RandomNumberGenerator, exclude: String = "") -> String:

@@ -33,6 +33,8 @@ func _ready() -> void:
 	_test_auction()
 	_test_dice()
 	_test_unlocks()
+	_test_upgrades()
+	_test_commander()
 	_test_games()
 	print("RULES TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(failures)
@@ -114,6 +116,150 @@ func _test_auction() -> void:
 			steps += 1
 		lots += int(g.stats["auctions"])
 	check(lots > 0, "AI players win auctions in full games (%d sold in 12 games)" % lots)
+
+
+## First free territory of a region, handed to `pid`.
+func give_land(c: MatchController, pid: int, region: int = 0) -> BoardTile:
+	for t in c.tiles:
+		if t.type == BoardTile.Type.TERRITORY and t.owner_id == -1 and t.region == region:
+			t.owner_id = pid
+			return t
+	return null
+
+
+func _test_upgrades() -> void:
+	var c := new_match(21)
+	var t := give_land(c, 0)
+	var base := EconomySystem.rent_of(t, c.tiles)
+	var max_level := int(GameData.b("max_tile_level"))
+	check(t.level == 0 and EconomySystem.upgrade_cost(t) > 0, "a fresh land is level 0 and can be upgraded (%d G)" % EconomySystem.upgrade_cost(t))
+	# landing on own land opens the upgrade decision
+	c.current = 0
+	c.players[0].position = t.index
+	c.players[0].gold = 5000
+	c.state = MatchController.State.ROLLED
+	c._resolve_landing(c.players[0])
+	check(String(c.pending.get("type", "")) == "upgrade", "visiting your own land offers an upgrade")
+	var opts := c.get_decision_options()
+	check(opts.size() == 2 and opts[0]["id"] == "upgrade" and opts[1]["id"] == "skip", "options: Upgrade / Not now")
+	var gold0 := c.players[0].gold
+	var cost1 := int(c.pending["price"])
+	c.decide("upgrade")
+	check(t.level == 1 and c.players[0].gold == gold0 - cost1 and c.pending.is_empty(), "upgrade costs gold and raises the level")
+	var r1 := EconomySystem.rent_of(t, c.tiles)
+	check(r1 > base, "level 1 rent (%d G) is higher than plain rent (%d G)" % [r1, base])
+	# declining keeps the level
+	c.state = MatchController.State.ROLLED
+	c._resolve_landing(c.players[0])
+	c.decide("skip")
+	check(t.level == 1, "'Not now' leaves the level unchanged")
+	# climb to the Landmark
+	while t.level < max_level:
+		c.state = MatchController.State.ROLLED
+		c._resolve_landing(c.players[0])
+		c.decide("upgrade")
+	check(t.is_landmark() and t.level_label() == "Landmark", "the last level is the Landmark")
+	check(EconomySystem.rent_of(t, c.tiles) > r1, "Landmark rent is the highest")
+	check(EconomySystem.upgrade_cost(t) == -1, "a Landmark cannot be upgraded further")
+	c.state = MatchController.State.ROLLED
+	c._resolve_landing(c.players[0])
+	check(c.pending.is_empty(), "visiting your own Landmark opens no decision")
+	# too poor: no prompt
+	var t2 := give_land(c, 0)
+	c.players[0].position = t2.index
+	c.players[0].gold = 0
+	c.state = MatchController.State.ROLLED
+	c._resolve_landing(c.players[0])
+	check(c.pending.is_empty() and t2.level == 0, "no upgrade prompt when the owner cannot pay")
+	# net worth counts the investment
+	var nw := c.networth(c.players[0])
+	check(nw >= t.price + EconomySystem.upgrade_invested(t) + t2.price, "net worth includes gold sunk into upgrades")
+	# save / resume keeps levels
+	c.state = MatchController.State.AWAIT_ROLL
+	c.pending = {}
+	var d := c.to_dict()
+	var r := MatchController.from_dict(JSON.parse_string(JSON.stringify(d)))
+	check(r.tiles[t.index].level == max_level and r.tiles[t2.index].level == 0, "tile levels survive save / resume")
+	# forced sale refunds the investment and resets the level
+	var c2 := new_match(22)
+	var a := give_land(c2, 1)
+	a.level = 2
+	var refund := int((a.price + EconomySystem.upgrade_invested(a)) * float(GameData.b("sell_ratio")))
+	c2.players[1].gold = 0
+	c2._pay(c2.players[1], 10, -1, "test")
+	check(a.owner_id == -1 and a.level == 0, "a forced sale frees the land and resets its level")
+	check(c2.players[1].gold == refund - 10, "the forced sale refunds the upgrades too (%d G)" % refund)
+	# the AI upgrades only while a gold cushion remains
+	var ai := c2.players[1]
+	ai.difficulty = "normal"
+	var reserve := int((GameData.b("ai_upgrade_reserve") as Dictionary)["normal"])
+	ai.gold = reserve + 100
+	check(AIController._wants_to_upgrade(ai, 100), "AI upgrades when a cushion remains after paying")
+	ai.gold = reserve + 99
+	check(not AIController._wants_to_upgrade(ai, 100), "AI does not upgrade when it would dip into its reserve")
+
+
+func _test_commander() -> void:
+	var c := new_match(31)
+	var p := c.players[0]
+	check(p.commander_star == 1 and p.mission_progress == 0, "the Commander starts at 1 star")
+	var m1 := CommanderSystem.mission_of(p)
+	var m2: Dictionary = (GameData.b("commander_missions") as Array)[1]
+	check(String(m1["metric"]) == "duel_wins" and String(m2["metric"]) == "landmarks" and m1["id"] != m2["id"], "each upgrade has a different mission")
+	# a Landmark does not count while the duel mission is active
+	var t := give_land(c, 0)
+	t.level = int(GameData.b("max_tile_level")) - 1
+	p.gold = 5000
+	c._do_upgrade(p, t, 10)
+	check(p.commander_star == 1 and p.mission_progress == 0, "progress only counts for the ACTIVE mission")
+	# two duel wins (attacker wins) -> 2 stars
+	for i in range(2):
+		c.state = MatchController.State.AWAIT_DUEL
+		c.pending = {"type": "duel_battle", "tile": t.index, "attacker": 0, "defender": 1}
+		c.finish_duel({"winner": 0, "bonus_gold": 0, "gold_delta": {}})
+		c.pending = {}
+		if i == 0:
+			check(p.commander_star == 1 and p.mission_progress == 1, "one duel win: mission 1/2")
+	check(p.commander_star == 2 and p.mission_progress == 0, "2 duel wins: the Commander reaches 2 stars, progress resets")
+	# a lost duel does not count
+	c.state = MatchController.State.AWAIT_DUEL
+	c.pending = {"type": "duel_battle", "tile": t.index, "attacker": 0, "defender": 1}
+	c.finish_duel({"winner": 1, "bonus_gold": 0, "gold_delta": {}})
+	c.pending = {}
+	check(p.commander_star == 2 and p.mission_progress == 0, "a lost duel gives no progress")
+	# the second mission: raise a Landmark -> 3 stars
+	var t2 := give_land(c, 0)
+	t2.level = int(GameData.b("max_tile_level")) - 1
+	c._do_upgrade(p, t2, 10)
+	check(p.commander_star == 3, "raising a Landmark: the Commander reaches 3 stars")
+	check(CommanderSystem.mission_of(p).is_empty() and CommanderSystem.mission_text(p) == "Commander at max stars", "no mission is left at 3 stars")
+	var t3 := give_land(c, 0)
+	t3.level = int(GameData.b("max_tile_level")) - 1
+	c._do_upgrade(p, t3, 10)
+	check(p.commander_star == 3, "the Commander never goes past 3 stars")
+	# the AI earns stars the same way
+	check(c.players[1].commander_star == 1, "other players keep their own progress")
+	# save / resume
+	c.state = MatchController.State.AWAIT_ROLL
+	c.pending = {}
+	var r := MatchController.from_dict(JSON.parse_string(JSON.stringify(c.to_dict())))
+	check(r.players[0].commander_star == 3 and r.players[1].commander_star == 1, "Commander stars survive save / resume")
+	# stars make the King stronger in Last Stand
+	var hp: Array = []
+	var atk: Array = []
+	for star in [1, 2, 3]:
+		var e := BattleEngine.new()
+		var cfg := {"units": [], "champion": p.champion_id, "supports": [], "champion_star": star}
+		e.setup({"seed": 5, "sides": [cfg, {"units": [], "champion": c.players[1].champion_id, "supports": []}]})
+		e.step()
+		var k: BattleUnit = e.kings[0]
+		hp.append(k.max_hp)
+		atk.append(k.base_atk)
+	check(hp[0] < hp[1] and hp[1] < hp[2] and atk[0] < atk[1] and atk[1] < atk[2], "King HP / ATK grow with stars (HP %s, ATK %s)" % [str(hp), str(atk)])
+	# the AI power estimate counts the stars too
+	var a1 := BattleAI.army_power(c.players[0])
+	c.players[0].commander_star = 1
+	check(a1 > BattleAI.army_power(c.players[0]), "army power rises with Commander stars")
 
 
 func _test_dice() -> void:

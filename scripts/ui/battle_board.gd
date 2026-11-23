@@ -14,9 +14,11 @@ var engine: BattleEngine
 var rng := RandomNumberGenerator.new()
 var deck: Deck
 var champion_id: String = ""
+var commander_star: int = 1  # Commander stars (duels use the player's; practice is 1 star)
 var hand: Array = []
 var phase: String = "prep"
 var selected: UnitInstance
+var selected_support: int = -1  # index in prep.hand of the Support card picked for selling (-1 = none)
 var speed: float = 1.0
 
 var grid: BattleGridView
@@ -40,6 +42,9 @@ var battle_left: VBoxContainer  # left column, battle part (log)
 var battle_panel: VBoxContainer
 var battle_status: Label
 var support_box: VBoxContainer
+var energy_label: Label
+var energy_bar: ProgressBar
+var combo_label: Label
 var king_box: VBoxContainer  # King passive (buff) + manual active skill
 var king_btn: Button
 var log_view: RichTextLabel
@@ -69,6 +74,7 @@ func _ready() -> void:
 		var me: PlayerState = duel_context["human"]
 		deck = me.deck
 		champion_id = me.champion_id
+		commander_star = me.commander_star
 		var budget := int(float(me.gold) * float(GameData.b("battle_budget_ratio")))
 		prep = BattlePrep.new(deck, rng, me.gold, budget, me.level, me.roster, me.battle_deck, me.hand)
 		hand = prep.hand
@@ -244,9 +250,8 @@ func _build_ui() -> void:
 	battle_status = UiTheme.make_label("", 17)
 	battle_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long HP totals must not clip at the panel edge
 	battle_panel.add_child(battle_status)
-	var speeds := HBoxContainer.new()
+	var speeds := HBoxContainer.new()  # Pause / 1x / 2x / 4x: added at the bottom of this column (bottom-left corner)
 	speeds.add_theme_constant_override("separation", 6)
-	battle_panel.add_child(speeds)
 	var sg := ButtonGroup.new()
 	for s in [["Pause", 0.0], ["1x", 1.0], ["2x", 2.0], ["4x", 4.0]]:
 		var b := UiTheme.make_toggle(s[0], sg, 46)
@@ -254,14 +259,29 @@ func _build_ui() -> void:
 		b.button_pressed = (s[1] == 1.0)
 		b.pressed.connect(func(): _set_speed(s[1]))
 		speeds.add_child(b)
-	battle_panel.add_child(UiTheme.make_label("King", 16, UiTheme.COL_GOLD))
+	battle_panel.add_child(UiTheme.make_label("King  %s" % CommanderSystem.star_text(commander_star), 16, UiTheme.COL_GOLD))
 	king_box = VBoxContainer.new()
 	king_box.add_theme_constant_override("separation", 4)
 	battle_panel.add_child(king_box)
 	battle_panel.add_child(UiTheme.make_label("Support hand (tap to play)", 16, UiTheme.COL_GOLD))
+	energy_label = UiTheme.make_label("Energy", 15)
+	battle_panel.add_child(energy_label)
+	energy_bar = ProgressBar.new()  # fills while the next energy point charges; a full bar wastes time
+	energy_bar.custom_minimum_size = Vector2(0, 14)
+	energy_bar.min_value = 0.0
+	energy_bar.max_value = 1.0
+	energy_bar.show_percentage = false
+	battle_panel.add_child(energy_bar)
+	combo_label = UiTheme.make_label("", 14, UiTheme.COL_GOLD)
+	combo_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	battle_panel.add_child(combo_label)
 	support_box = VBoxContainer.new()
 	support_box.add_theme_constant_override("separation", 4)
 	battle_panel.add_child(support_box)
+	var battle_push := Control.new()  # pushes the speed buttons to the bottom-left corner
+	battle_push.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	battle_panel.add_child(battle_push)
+	battle_panel.add_child(speeds)
 	battle_left = VBoxContainer.new()
 	battle_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	battle_left.visible = false
@@ -370,21 +390,33 @@ func _refresh_prep() -> void:
 		var card := CardDatabase.get_unit(selected.card_id)
 		var st := selected.stats()
 		sel_label.text = "%s %s | HP %d ATK %d | Rng %d Mov %d | cost %d | %s: %s" % [card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], card["range"], card["move"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]] + _buff_line(selected.card_id)
-	sell_btn.disabled = selected == null
+	if selected_support >= prep.hand.size() or (selected_support >= 0 and not prep.can_sell_support(prep.hand[selected_support])):
+		selected_support = -1
+	if selected_support >= 0:
+		selected = null  # one thing is selected at a time: a unit OR a Support card
+		var sid: String = prep.hand[selected_support]
+		sel_label.text = "%s | %s" % [CardDatabase.get_support(sid)["name"], CardDatabase.get_support(sid)["description"]]
+		sell_btn.text = "Sell (+%d G)" % int(prep.support_price(sid) * float(GameData.b("sell_ratio")))
+	else:
+		sell_btn.text = "Sell"
+	sell_btn.disabled = selected == null and selected_support < 0
 	bench_btn.disabled = selected == null or selected.cell.x < 0
-	hand_label.text = "Support hand (%d/%d) - tap to sell:" % [prep.hand.size(), int(GameData.b("hand_max"))]
+	hand_label.text = "Support hand (%d/%d) - tap a card, then Sell:" % [prep.hand.size(), int(GameData.b("hand_max"))]
 	for c in hand_box.get_children():
 		hand_box.remove_child(c)
 		c.queue_free()
-	for id in prep.hand:
+	for i in range(prep.hand.size()):
+		var id: String = prep.hand[i]
 		var hs := CardDatabase.get_support(id)
 		var sellable := prep.can_sell_support(id)
-		var hb := UiTheme.make_button("%s%s" % [hs["name"], ("  (sell %d G)" % int(prep.support_price(id) * float(GameData.b("sell_ratio")))) if sellable else "  (used now)"], 34)
+		var hb := UiTheme.make_button("%s%s" % [hs["name"], "" if sellable else "  (used now)"], 34)
 		hb.custom_minimum_size.y = 34
 		hb.add_theme_font_size_override("font_size", 13)
 		hb.tooltip_text = String(hs["description"])
 		hb.disabled = not sellable
-		hb.pressed.connect(_on_sell_support.bind(id))
+		hb.toggle_mode = true
+		hb.button_pressed = (i == selected_support)
+		hb.pressed.connect(_on_select_support.bind(i))
 		hand_box.add_child(hb)
 	_refresh_synergy()
 	grid.selected = selected
@@ -462,8 +494,11 @@ func _on_buy(i: int) -> void:
 	_refresh_prep()
 
 
-func _on_sell_support(id: String) -> void:
-	prep.sell_support(id)
+## Tapping a Support card in the hand only selects it (tap again to deselect); the Sell button sells it.
+func _on_select_support(i: int) -> void:
+	selected_support = -1 if selected_support == i else i
+	if selected_support >= 0:
+		selected = null
 	_refresh_prep()
 
 
@@ -486,6 +521,7 @@ func _on_auto() -> void:
 
 func _on_select(u: UnitInstance) -> void:
 	selected = u
+	selected_support = -1
 	_refresh_prep()
 
 
@@ -496,6 +532,12 @@ func _on_to_bench() -> void:
 
 
 func _on_sell() -> void:
+	if selected_support >= 0 and selected_support < prep.hand.size():
+		prep.sell_support(prep.hand[selected_support])
+		selected_support = -1
+		_msg("")
+		_refresh_prep()
+		return
 	if selected != null:
 		prep.sell(selected)
 		selected = null
@@ -509,6 +551,7 @@ func _on_cell(cell: Vector2i) -> void:
 	for u in prep.deployed_units():
 		if u.cell == cell:
 			selected = u  # tapping a deployed unit selects it
+			selected_support = -1
 			_refresh_prep()
 			return
 	if selected != null:
@@ -535,7 +578,7 @@ func _on_start_battle() -> void:
 		enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1)
 	engine = BattleEngine.new()
 	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "manual_king": [true, false], "sides": [
-		prep.to_side_cfg(champion_id, hand), enemy_cfg]})
+		prep.to_side_cfg(champion_id, hand, commander_star), enemy_cfg]})
 	phase = "battle"
 	_set_tip(TutorialGuide.BATTLE["fight"])
 	prep_panel.visible = false
@@ -600,6 +643,7 @@ func _update_battle_ui() -> void:
 	status_label.text = "Tick %d / %d" % [engine.tick, BattleEngine.MAX_TICKS]
 	battle_status.text = "You: %d units, HP %d\nEnemy: %d units, HP %d" % [engine.regulars_alive(0), engine.total_hp(0), engine.regulars_alive(1), engine.total_hp(1)]
 	_refresh_king_btn()
+	_refresh_energy()
 	grid.queue_redraw()
 
 
@@ -635,11 +679,13 @@ func _refresh_king_btn() -> void:
 	if king_btn == null:
 		return
 	var ch := GameData.get_champion(champion_id)
-	var base := "%s - %s" % [ch.get("active_name", "King skill"), ch.get("active_desc", "")]
+	var base := "[%d E] %s - %s" % [engine.king_energy_cost(), ch.get("active_name", "King skill"), ch.get("active_desc", "")]
 	if bool(engine.king_skill_used[0]):
 		king_btn.text = "%s (used)" % ch.get("active_name", "King skill")
 	elif not bool(engine.king_entered[0]):
 		king_btn.text = "%s\n(available once the King enters in Last Stand)" % base
+	elif int(engine.energy[0]) < engine.king_energy_cost():
+		king_btn.text = "%s\n(not enough energy: %d/%d)" % [base, int(engine.energy[0]), engine.king_energy_cost()]
 	else:
 		king_btn.text = "USE: %s" % base
 	king_btn.disabled = not engine.can_use_king_skill(0)
@@ -661,16 +707,38 @@ func _rebuild_supports() -> void:
 		c.queue_free()
 	for id in hand:
 		var s := CardDatabase.get_support(id)
-		var b := UiTheme.make_button("%s - %s" % [s["name"], s["description"]], 64)
+		var b := UiTheme.make_button("[%d E] %s - %s" % [engine.support_energy_cost(id), s["name"], s["description"]], 64)
+		b.set_meta("sid", id)
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.add_theme_font_size_override("font_size", 14)
 		var used := (engine.used_supports[0] as Array).has(id)
 		var ok := engine.is_support_implemented(id)
 		if not ok:
 			b.text = "%s (effect TODO)" % s["name"]
-		b.disabled = used or not ok or engine.finished
+		b.disabled = used or not ok or engine.finished or int(engine.energy[0]) < engine.support_energy_cost(id)
 		b.pressed.connect(_on_support.bind(id))
 		support_box.add_child(b)
+	_refresh_energy()
+
+
+## Energy bar + label, and which Support cards are affordable right now (called every tick).
+func _refresh_energy() -> void:
+	if energy_label == null or engine == null:
+		return
+	var e := int(engine.energy[0])
+	energy_label.text = "Energy %d / %d%s" % [e, engine.energy_max(), "  (full - use it!)" if e >= engine.energy_max() else ""]
+	energy_bar.value = engine.energy_progress(0)
+	var chain := engine.combo_active(0)
+	if chain > 0:
+		var left := maxf(0.0, float(engine.combo_window() - (engine.tick - int(engine.combo_last_tick[0]))) * 0.25)
+		combo_label.text = "Combo x%d (%s): play another %s card within %.1fs for +%d energy back" % [chain, String(engine.combo_category[0]).capitalize(), String(engine.combo_category[0]).capitalize(), left, mini(chain, int(GameData.b("combo_refund_max", 2)))]
+	else:
+		combo_label.text = "Combo: play Support cards of the same category back to back to get energy back"
+	for b in support_box.get_children():
+		if b is Button and b.has_meta("sid"):
+			var sid := String(b.get_meta("sid"))
+			var used := (engine.used_supports[0] as Array).has(sid)
+			b.disabled = used or not engine.is_support_implemented(sid) or engine.finished or e < engine.support_energy_cost(sid)
 
 
 func _on_support(id: String) -> void:

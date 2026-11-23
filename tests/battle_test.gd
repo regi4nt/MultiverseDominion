@@ -32,6 +32,8 @@ func _ready() -> void:
 	BattleDeck.supports_in_shop = false  # unit-only shop for the unit / balance tests below
 	_test_prep()
 	_test_support()
+	_test_energy()
+	_test_combo()
 	_test_last_stand_empty()
 	_test_manual_king()
 	_test_king_passive()
@@ -110,6 +112,7 @@ func _card_total(p: BattlePrep) -> int:
 func _test_support() -> void:
 	var cfg := make_cfg(11, "normal", 4)
 	cfg["ai_supports"] = [false, false]
+	cfg["free_supports"] = true  # the energy rules have their own test (_test_energy)
 	cfg["sides"][0]["supports"] = ["sup_fireball", "sup_mercenary_pact", "sup_battle_cry"]
 	var e := BattleEngine.new()
 	e.setup(cfg)
@@ -125,6 +128,77 @@ func _test_support() -> void:
 	e2.setup(cfg)
 	var n2 := e2.regulars_alive(0)
 	check(e2.use_support(0, "sup_summon_recruits") == "" and e2.regulars_alive(0) == n2 + 2, "Summon Recruits adds 2 pawns")
+
+
+func _test_energy() -> void:
+	var cfg := make_cfg(11, "normal", 4)
+	cfg["ai_supports"] = [false, false]
+	cfg["sides"][0]["supports"] = ["sup_fireball", "sup_summon_recruits"]
+	var e := BattleEngine.new()
+	e.setup(cfg)
+	var start := int(GameData.b("energy_start"))
+	var cost := e.support_energy_cost("sup_fireball")
+	check(int(e.energy[0]) == start and cost > start, "battle starts with %d energy; Fireball costs %d" % [start, cost])
+	check(e.use_support(0, "sup_fireball") != "" and not (e.used_supports[0] as Array).has("sup_fireball"), "a card that costs more than the energy is refused and not spent")
+	var regen := e.energy_regen_ticks()
+	var ticks := 0
+	while int(e.energy[0]) < cost and ticks < 1000:
+		e.step()
+		ticks += 1
+	check(ticks == (cost - start) * regen, "energy fills 1 per %d ticks (%d ticks for %d points)" % [regen, ticks, cost - start])
+	var before := int(e.energy[0])
+	check(e.use_support(0, "sup_fireball") == "" and int(e.energy[0]) == before - cost, "playing a card pays its energy cost")
+	var e2 := BattleEngine.new()
+	e2.setup(cfg)
+	for i in range(regen * (e2.energy_max() + 5)):
+		e2.step()
+		if e2.finished:
+			break
+	check(int(e2.energy[0]) <= e2.energy_max(), "energy never exceeds the maximum")
+	var legendary := ""
+	for sc in CardDatabase.all_supports():
+		if String(sc["rarity"]) == "legendary":
+			legendary = String(sc["id"])
+			break
+	check(legendary != "" and e.support_energy_cost(legendary) > cost and e.support_energy_cost(legendary) <= e.energy_max(), "a Legendary costs more than a Common but still fits in the bar")
+
+
+func _test_combo() -> void:
+	var cfg := make_cfg(11, "normal", 4)
+	cfg["ai_supports"] = [false, false]
+	var a := "sup_fireball"
+	var cat := String(CardDatabase.get_support(a).get("category", ""))
+	var same := ""
+	var other := ""
+	for sc in CardDatabase.all_supports():
+		var id := String(sc["id"])
+		if id == a or not BattleEngine.IMPLEMENTED_SUPPORTS.has(String(sc["effect"])) or BattleEngine.PREP_SUPPORTS.has(String(sc["effect"])):
+			continue
+		if same == "" and String(sc["category"]) == cat:
+			same = id
+		elif other == "" and String(sc["category"]) != cat:
+			other = id
+	cfg["sides"][0]["supports"] = [a, same, other]
+	var e := BattleEngine.new()
+	e.setup(cfg)
+	e.energy[0] = e.energy_max()
+	var cost_b := e.support_energy_cost(same)
+	check(e.use_support(0, a) == "" and e.combo_active(0) == 1, "first card starts a chain of 1")
+	var before := int(e.energy[0])
+	check(e.use_support(0, same) == "" and e.combo_active(0) == 2, "same category right after extends the chain to 2")
+	check(int(e.energy[0]) == before - cost_b + 1, "chain of 2 refunds 1 energy")
+	e.energy[0] = e.energy_max()
+	before = int(e.energy[0])
+	var cost_o := e.support_energy_cost(other)
+	check(e.use_support(0, other) == "" and e.combo_active(0) == 1 and int(e.energy[0]) == before - cost_o, "another category restarts the chain, no refund")
+	var e2 := BattleEngine.new()
+	e2.setup(cfg)
+	e2.energy[0] = e2.energy_max()
+	e2.use_support(0, a)
+	e2.tick += e2.combo_window()
+	check(e2.combo_active(0) == 1, "the chain is still alive at the end of the window")
+	e2.tick += 1
+	check(e2.combo_active(0) == 0, "the chain expires after the combo window")
 
 
 func _test_last_stand_empty() -> void:
@@ -148,17 +222,30 @@ func _test_manual_king() -> void:
 		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 3)}], "champion": "champion_nocthyr", "supports": []}]}
 	var e := BattleEngine.new()
 	e.setup(cfg)
-	check(e.king_entered[0] and not e.king_skill_used[0] and e.can_use_king_skill(0), "manual King enters but waits for the skill")
+	var cost := e.king_energy_cost()
+	check(e.king_entered[0] and not e.king_skill_used[0], "manual King enters but waits for the skill")
+	check(cost > int(e.energy[0]) and not e.can_use_king_skill(0), "the King skill needs energy: %d needed, %d available" % [cost, int(e.energy[0])])
+	check(e.use_king_skill(0) != "" and not e.king_skill_used[0] and int(e.energy[0]) == int(GameData.b("energy_start")), "an unaffordable King skill is refused and nothing is spent")
+	e.energy[0] = e.energy_max()
+	check(e.can_use_king_skill(0), "with enough energy the King skill can be cast")
 	var hp_before := e.total_hp(1)
 	e.step()
 	check(not e.king_skill_used[0], "manual King skill is not cast by itself")
+	var en_before := int(e.energy[0])
 	check(e.use_king_skill(0) == "" and e.king_skill_used[0], "manual King skill can be cast once")
+	check(int(e.energy[0]) <= en_before - cost + 1, "casting the King skill pays its energy cost")
 	check(e.use_king_skill(0) != "", "manual King skill cannot be cast twice")
 	check(e.total_hp(1) < hp_before, "Sun Judgment damages the enemy when cast")
 	check(e.use_king_skill(1) != "", "a King that has not entered cannot cast")
 	var e2 := BattleEngine.new()
 	e2.setup({"seed": 5, "ai_supports": [false, false], "sides": cfg["sides"]})
-	check(e2.king_skill_used[0], "without manual_king the skill is cast on entry (AI / old behaviour)")
+	check(not e2.king_skill_used[0], "an auto King waits until it can pay for its skill")
+	e2.energy[0] = cost
+	e2.step()
+	check(e2.king_skill_used[0], "an auto King casts as soon as it has the energy (AI / old behaviour)")
+	var e3 := BattleEngine.new()
+	e3.setup({"seed": 5, "ai_supports": [false, false], "free_supports": true, "sides": cfg["sides"]})
+	check(e3.king_skill_used[0], "with free_supports the auto King still casts on entry")
 
 
 func _test_king_passive() -> void:
