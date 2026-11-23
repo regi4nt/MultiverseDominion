@@ -14,6 +14,10 @@ func check(cond: bool, msg: String) -> void:
 
 
 func _ready() -> void:
+	# this test checks deck rules, not the Shop: own every unit card whatever the save on disk holds
+	var saved_data: Dictionary = SaveManager.data.duplicate(true)
+	for uid in CardDatabase.all_unit_ids_any_continent():
+		SaveManager.data["collection"][uid] = int(GameData.b("unit_copies"))
 	check(CardDatabase.validate_database().is_empty(), "card database valid: %s" % str(CardDatabase.validate_database()))
 	var d := Deck.create_default()
 	check(d.card_list().size() == 151, "default deck has 151 cards (%d)" % d.card_list().size())
@@ -332,6 +336,7 @@ func _ready() -> void:
 	for id in CardDatabase.all_unit_ids_any_continent():
 		if String(CardDatabase.get_unit(id).get("continent", "")) not in ["", "aetherion"]:
 			SaveManager.data["collection"].erase(id)
+	SaveManager.data.erase("unit_cards_v")  # an old save: from before unit cards were locked
 	SaveManager.ensure_collection()
 	var restored := true
 	for id in CardDatabase.all_unit_ids_any_continent():
@@ -339,6 +344,7 @@ func _ready() -> void:
 	check(restored, "ensure_collection adds the per-continent cards to an old save")
 	SaveManager.data = saved
 
+	SaveManager.data = saved_data
 	print("CARD TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(failures)
 

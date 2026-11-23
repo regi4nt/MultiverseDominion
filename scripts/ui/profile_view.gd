@@ -1,7 +1,8 @@
 class_name ProfileView
 extends RefCounted
-## Player profile card, shown inside a UiDialog (see MainMenu._show_profile). Built from SaveManager data only:
-## name, tutorial status, win/loss record and the six lifetime stats.
+## Player profile. `build_card()` is the always-visible card on the Main Menu (avatar, name, title, level, EXP bar, record);
+## `build()` is the full card in a UiDialog (MainMenu._show_profile, opened by tapping the home card).
+## Built from SaveManager data only: name, title / level / EXP, tutorial status, win/loss record and the six lifetime stats.
 
 const COL_WIN := Color("6fcf8f")
 const COL_LOSS := Color("e0705f")
@@ -37,9 +38,11 @@ static func build() -> Control:
 	var done := bool(p.get("tutorial_done", false))
 	var chip_holder := HBoxContainer.new()
 	who.add_child(chip_holder)
+	chip_holder.add_child(_chip(SaveManager.profile_title(), UiTheme.COL_GOLD))
 	chip_holder.add_child(_chip("Tutorial complete" if done else "Tutorial not played yet", COL_WIN if done else UiTheme.COL_MUTED))
 
 	col.add_child(UiTheme.make_divider())
+	col.add_child(_exp_block(20))
 
 	# --- win / loss bar
 	var rec := VBoxContainer.new()
@@ -70,12 +73,12 @@ static func build() -> Control:
 	return col
 
 
-static func _avatar(letter: String) -> Control:
+static func _avatar(letter: String, size: float = 88.0) -> Control:
 	if letter == "":
 		letter = "P"
 	var av := PanelContainer.new()
-	av.custom_minimum_size = Vector2(88, 88)
-	var sb := UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 3, 44, 8)
+	av.custom_minimum_size = Vector2(size, size)
+	var sb := UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 3, int(size * 0.5), 8)
 	sb.content_margin_left = 0
 	sb.content_margin_right = 0
 	sb.content_margin_top = 0
@@ -83,7 +86,7 @@ static func _avatar(letter: String) -> Control:
 	av.add_theme_stylebox_override("panel", sb)
 	var c := CenterContainer.new()
 	av.add_child(c)
-	c.add_child(UiTheme.make_label(letter, 46, UiTheme.COL_GOLD))
+	c.add_child(UiTheme.make_label(letter, int(size * 0.52), UiTheme.COL_GOLD))
 	return av
 
 
@@ -143,3 +146,68 @@ static func _tile(caption: String, value: String, color: Color) -> Control:
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(cap)
 	return tile
+
+
+## "Lv 5" + EXP bar + "120 / 300 EXP" (or "MAX LEVEL"): shared by the home card and the profile dialog.
+static func _exp_block(font: int) -> Control:
+	var pr := XpSystem.progress(SaveManager.profile_xp())
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	var row := HBoxContainer.new()
+	box.add_child(row)
+	var lv := UiTheme.make_label("Lv %d" % int(pr["level"]), font, UiTheme.COL_GOLD)
+	lv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(lv)
+	var txt := "MAX LEVEL" if bool(pr["max"]) else "%d / %d EXP" % [int(pr["into"]), int(pr["need"])]
+	row.add_child(UiTheme.make_label(txt, maxi(font - 4, 12), UiTheme.COL_MUTED))
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.custom_minimum_size = Vector2(0, 12)
+	bar.min_value = 0.0
+	bar.max_value = 1.0
+	bar.value = 1.0 if bool(pr["max"]) else float(pr["into"]) / float(maxi(int(pr["need"]), 1))
+	bar.add_theme_stylebox_override("background", UiTheme.make_box(Color("2e3350"), Color("2e3350"), 0, 6, 0))
+	bar.add_theme_stylebox_override("fill", UiTheme.make_box(UiTheme.COL_GOLD, UiTheme.COL_GOLD, 0, 6, 0))
+	box.add_child(bar)
+	return box
+
+
+## The Main Menu card: always on screen, no button. Tapping it calls `on_open` (the full profile dialog).
+static func build_card(on_open: Callable) -> Control:
+	var p: Dictionary = SaveManager.data["profile"]
+	var s: Dictionary = SaveManager.data["stats"]
+	var pname := String(p.get("name", "Player")).strip_edges()
+	if pname == "":
+		pname = "Player"
+	var card := PanelContainer.new()
+	card.name = "ProfileCard"
+	card.custom_minimum_size = Vector2(440, 0)
+	card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.tooltip_text = "Tap for your full profile"
+	card.add_theme_stylebox_override("panel", UiTheme.make_box(Color(UiTheme.COL_PANEL, 0.92), UiTheme.COL_GOLD_DIM, 2, 14, 0))
+	card.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			on_open.call())
+	var pad := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 14)
+	card.add_child(pad)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	pad.add_child(row)
+	row.add_child(_avatar(pname.left(1).to_upper(), 72.0))
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 4)
+	row.add_child(col)
+	var name_lbl := UiTheme.make_label(pname, 28, UiTheme.COL_GOLD)
+	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	col.add_child(name_lbl)
+	col.add_child(UiTheme.make_label(SaveManager.profile_title(), 18, UiTheme.COL_TEXT))
+	col.add_child(_exp_block(18))
+	var matches := int(s.get("matches_played", 0))
+	col.add_child(UiTheme.make_label("%d matches  |  %d W  |  %d L" % [matches, int(s.get("wins", 0)), int(s.get("losses", 0))], 14, UiTheme.COL_MUTED))
+	return card

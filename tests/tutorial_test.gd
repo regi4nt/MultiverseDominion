@@ -22,7 +22,7 @@ func new_tutorial() -> MatchController:
 
 func _ready() -> void:
 	var c := new_tutorial()
-	check(c.tutorial and c.players.size() == 2 and c.round_limit == 10 and c.players[1].difficulty == "easy", "tutorial: 1v1 vs an easy AI, 10 rounds")
+	check(c.tutorial and c.players.size() == 2 and c.round_limit == 10 and c.players[1].difficulty == "normal", "tutorial: 1v1 vs a normal AI, 10 rounds")
 	var owned := 0
 	for i in [2, 4, 6, 8]:
 		if c.tiles[i].owner_id == 1:
@@ -106,6 +106,7 @@ func _ready() -> void:
 		var c3 := new_tutorial()
 		GameSession.mode = "ffa_ai"
 		c3.stats["duels_offered"] = 1
+		c3.players[1].roster.units.clear()  # a Normal AI with no army prefers Tax: the forced first duel is over
 		c3.tiles[2].owner_id = 1
 		c3.current = 0
 		c3.players[0].position = 2

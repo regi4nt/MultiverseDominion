@@ -51,16 +51,18 @@ func show_engine(e: BattleEngine) -> void:
 func notify_tick() -> void:
 	if engine == null:
 		return
+	var pro := FxMode.is_pro()  # Lite: no attack lunge and no fall rings (damage numbers and banners stay: they carry information)
 	for ev in engine.events:
 		match ev["type"]:
 			"attack":
 				var att: BattleUnit = engine.grid.get(ev["from"])
-				if att != null:
+				if att != null and pro:
 					_lunge[att.uid] = {"dir": Vector2(ev["to"] - ev["from"]).normalized(), "t": 1.0}
 				if int(ev["dmg"]) > 0:
 					_floaters.append({"cell": Vector2(ev["to"]), "text": str(int(ev["dmg"])), "t": 0.0})
 			"death":
-				_ghosts.append({"cell": Vector2(ev["cell"]), "t": 0.0})
+				if pro:
+					_ghosts.append({"cell": Vector2(ev["cell"]), "t": 0.0})
 			"last_stand":
 				_show_banner("LAST STAND" if int(ev["side"]) == 0 else "ENEMY LAST STAND", Color("ff8a3d"))
 			"last_piece":
@@ -90,8 +92,8 @@ func _process(delta: float) -> void:
 			continue
 		var target := Vector2(u.cell)
 		var cur: Vector2 = _vis.get(u.uid, target)
-		if cur.distance_to(target) > 5.5:
-			cur = target  # teleports (Charge, Night Gallop, Rift Strike) are instant
+		if cur.distance_to(target) > 5.5 or FxMode.is_lite():
+			cur = target  # teleports (Charge, Night Gallop, Rift Strike) are instant; Lite: every move is
 		elif cur != target:
 			cur = cur.move_toward(target, delta * 14.0 * k)
 			busy = true

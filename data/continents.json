@@ -79,7 +79,8 @@
 					"start_gold_extra": 30
 				},
 				"ingame_text": "+30 G at START"
-			}
+			},
+			"unlock_trophies": 0
 		},
 		{
 			"id": "arcanum",
@@ -160,7 +161,8 @@
 					"start_tokens": 2
 				},
 				"ingame_text": "2 Reroll Tokens at start"
-			}
+			},
+			"unlock_trophies": 150
 		},
 		{
 			"id": "machina",
@@ -242,7 +244,8 @@
 					"unit_price_mult": 0.9
 				},
 				"ingame_text": "Battle Shop -10%"
-			}
+			},
+			"unlock_trophies": 400
 		},
 		{
 			"id": "sylvaris",
@@ -324,7 +327,8 @@
 					"harvest_extra": 2
 				},
 				"ingame_text": "+2 G per territory each round"
-			}
+			},
+			"unlock_trophies": 700
 		},
 		{
 			"id": "drakmor",
@@ -406,7 +410,8 @@
 					"duel_win_gold": 30
 				},
 				"ingame_text": "+30 G per duel won"
-			}
+			},
+			"unlock_trophies": 1100
 		},
 		{
 			"id": "thalassia",
@@ -488,7 +493,8 @@
 					"tax_mult": 0.75
 				},
 				"ingame_text": "Tax -25%"
-			}
+			},
+			"unlock_trophies": 1600
 		},
 		{
 			"id": "eclipsia",
@@ -570,7 +576,8 @@
 					"pass_token": 1
 				},
 				"ingame_text": "+1 Reroll Token at START"
-			}
+			},
+			"unlock_trophies": 2200
 		}
 	]
 }

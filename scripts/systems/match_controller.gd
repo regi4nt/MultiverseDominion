@@ -45,6 +45,7 @@ var wager_odds: float = 2.0
 ## Arena "Random map": the continent was drawn, so the human also gets its in-game bonus (data/continents.json random_bonus.ingame).
 var random_map: bool = false
 var wager_settled: bool = false
+var match_difficulty: String = "normal"  # difficulty chosen for the match: sets everyone's Life and the coin reward
 var journey: bool = false  # Journey match: a human win unlocks the next continent (Arena matches unlock nothing)
 var tutorial: bool = false  # guided first match: contextual hints, scripted start, forced first duel
 var round_limit: int = 30
@@ -104,6 +105,8 @@ func setup(cfg: Dictionary) -> void:
 	wager_odds = float(cfg.get("wager_odds", 2.0))
 	random_map = bool(cfg.get("random_map", false))
 	var difficulty: String = cfg.get("difficulty", "normal")
+	match_difficulty = difficulty
+	tutorial = bool(cfg.get("tutorial", false))  # set before the seats are made: the tutorial keeps the standard Life
 	var faction_ids: Array = []
 	for f in continent.get("factions", []):
 		faction_ids.append(f["id"])
@@ -196,7 +199,9 @@ func _make_player(id: int, faction_id: String, is_ai: bool, difficulty: String, 
 	p.passive_value = float(champ.get("passive_value", 0.0))
 	p.color = PLAYER_COLORS[id % PLAYER_COLORS.size()]
 	p.gold = int(GameData.b("start_gold"))
-	p.life = int(GameData.b("start_life"))
+	# Life depends on the match difficulty (easy 5 / normal 3 / hard 1); the guided tutorial keeps the standard 3
+	p.max_life = int(GameData.b("start_life")) if tutorial else GameData.life_for(match_difficulty)
+	p.life = p.max_life
 	p.level = int(GameData.b("start_level"))
 	p.capacity = p.level * int(GameData.b("capacity_per_level"))
 	if p.has_passive("fortune_weave"):
@@ -348,7 +353,7 @@ func get_decision_options() -> Array:
 			var heal_price := heal_price_for(p)
 			var reroll_price := token_price_for(p)
 			out.append({"id": "heal", "label": "Restore Life (%d G)" % heal_price,
-				"enabled": p.life < int(GameData.b("start_life")) and p.gold >= heal_price})
+				"enabled": p.life < p.max_life and p.gold >= heal_price})
 			out.append({"id": "reroll", "label": "Reroll Token (%d G)" % reroll_price, "enabled": p.gold >= reroll_price})
 			out.append({"id": "special", "label": "Special Die (%d G)" % special_die_price(), "enabled": p.gold >= special_die_price() and p.special_dice.size() < int(GameData.b("max_special_dice"))})
 			out.append({"id": "leave", "label": "Leave shop", "enabled": true})
@@ -499,7 +504,7 @@ func decide(choice: Variant) -> void:
 			match String(choice):
 				"heal":
 					var price := heal_price_for(p)
-					if p.life < int(GameData.b("start_life")) and p.gold >= price:
+					if p.life < p.max_life and p.gold >= price:
 						p.gold -= price
 						p.life += 1
 						stats["heals"] += 1
@@ -1069,7 +1074,7 @@ func _resolve_event(p: PlayerState) -> void:
 			_warp(p, lands[rng.randi() % lands.size()].index, "Event")
 			_nested_resolve(p)
 		"heal":
-			var max_life := int(GameData.b("start_life"))
+			var max_life := p.max_life
 			if p.life < max_life:
 				p.life = mini(max_life, p.life + value)
 				_log("%s recovers %d Life (now %d)." % [p.display_name, value, p.life])
@@ -1473,7 +1478,7 @@ func _player_to_dict(p: PlayerState) -> Dictionary:
 	return {
 		"id": p.id, "name": p.display_name, "is_ai": p.is_ai, "difficulty": p.difficulty, "faction": p.faction_id,
 		"champion": p.champion_id, "passive": p.passive, "passive_value": p.passive_value, "color": p.color.to_html(),
-		"position": p.position, "gold": p.gold, "life": p.life, "level": p.level, "capacity": p.capacity,
+		"position": p.position, "gold": p.gold, "life": p.life, "max_life": p.max_life, "level": p.level, "capacity": p.capacity,
 		"tokens": p.reroll_tokens, "skip": p.skip_turns, "alive": p.alive, "team": p.team, "dice": p.special_dice.duplicate(), "move_bonus": p.move_bonus,
 		"cstar": p.commander_star, "mprog": p.mission_progress, "stock": p.stock_value, "sbasis": p.stock_basis,
 		"monster": p.monster_id, "deck": p.deck.to_dict(), "pile": p.battle_deck.pool.duplicate(), "spile": p.battle_deck.support_pool.duplicate(), "hand": p.hand.duplicate(), "units": units}
@@ -1494,7 +1499,7 @@ func to_dict() -> Dictionary:
 		"version": SAVE_FORMAT, "continent_id": continent["id"], "round": round_number, "current": current,
 		"state": int(state), "last_dice": [last_dice.x, last_dice.y], "winner_id": winner_id,
 		"human_present": human_present, "team_mode": team_mode, "winner_team": winner_team, "roll_double": _roll_was_double, "extra_roll": _extra_roll, "bonus_rolls": _bonus_rolls,
-		"tutorial": tutorial, "journey": journey, "wager": wager, "wager_odds": wager_odds, "random_map": random_map, "wager_settled": wager_settled, "round_limit": round_limit, "market": market_change, "pot": casino_pot, "tutorial_seen": tutorial_seen.duplicate(),
+		"tutorial": tutorial, "difficulty": match_difficulty, "journey": journey, "wager": wager, "wager_odds": wager_odds, "random_map": random_map, "wager_settled": wager_settled, "round_limit": round_limit, "market": market_change, "pot": casino_pot, "tutorial_seen": tutorial_seen.duplicate(),
 		"monsters": monsters.map(func(e): return [int(e["tile"]), String(e["id"]), bool(e["taken"])]),
 		"deposits": deposits.map(func(e): return [int(e["tile"]), String(e["id"]), bool(e["taken"]), int(e["owner"]), int(e["left"]), int(e["paid"])]),
 		"stats": stats.duplicate(), "players": plist, "tiles": tl, "log": recent_log.duplicate(),
@@ -1536,6 +1541,7 @@ static func from_dict(d: Dictionary) -> MatchController:
 		p.position = int(pd["position"])
 		p.gold = int(pd["gold"])
 		p.life = int(pd["life"])
+		p.max_life = int(pd.get("max_life", maxi(p.life, int(GameData.b("start_life")))))  # older saves: standard 3
 		p.level = int(pd["level"])
 		p.capacity = int(pd["capacity"])
 		p.reroll_tokens = int(pd["tokens"])
@@ -1568,6 +1574,7 @@ static func from_dict(d: Dictionary) -> MatchController:
 			p.roster.units.append(u)
 		c.players.append(p)
 	c.tutorial = bool(d.get("tutorial", false))
+	c.match_difficulty = String(d.get("difficulty", "normal"))
 	c.journey = bool(d.get("journey", false))
 	c.wager = int(d.get("wager", 0))
 	c.wager_odds = float(d.get("wager_odds", 2.0))
@@ -1767,7 +1774,7 @@ func use_special_die(index: int) -> String:
 			else:
 				_pay(p, -int(face), -1, "die")
 		"heal":
-			var max_life := int(GameData.b("start_life"))
+			var max_life := p.max_life
 			if p.life < max_life:
 				p.life = mini(max_life, p.life + int(face))
 				_log("%s recovers %d Life (now %d)." % [p.display_name, int(face), p.life])

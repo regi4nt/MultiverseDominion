@@ -23,8 +23,23 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
    Juga: `tutorial_test`, `audio_test`, `rules_test` (Auction, Special Dice, unlock), `team_test` (mode 2vs2), `save_test`, `perf_test`, `ui_resume_smoke`; dan
    `ui_tutorial_smoke` + `layout_test` (butuh render nyata, lihat BUILD_ANDROID.md bagian 4).
 
+## Peti hadiah / Chests (Main Menu -> Chests)
+- **Menang Arena = dapat 1 peti** (Journey, Tutorial, Battle Chess, dan kekalahan tidak). Grade ditentukan acak menurut difficulty (`ChestSystem.DROP_WEIGHTS`): Easy 70/25/5, Normal 55/33/12, Hard 35/45/20 (% Bronze/Silver/Gold). Layar hasil menampilkan peti yang didapat.
+- **4 slot**. Peti masuk ke slot kosong pertama dalam keadaan menunggu; tekan *Start unlocking* untuk menjalankan **timer** (jam nyata, tetap berjalan saat game ditutup). Hanya **satu peti** yang boleh membuka kunci pada satu waktu. Semua slot penuh = peti langsung jadi coin (Bronze 50 / Silver 150 / Gold 400).
+- **Timer**: Bronze 15 menit, Silver 1 jam, Gold 4 jam. **Open now** melewati sisa timer dengan Crystal (1 Crystal per 30 menit tersisa, dibulatkan ke atas, ada konfirmasi).
+- **Isi** (rentang, peluang): Bronze = Coins 60-120, Fragments 5-15 (70%), Chips 50-150 (40%), Tiket 1 (10%), XP 20-40. Silver = Coins 150-300, Fragments 20-45, Chips 150-400 (70%), Tiket 1-2 (40%), Crystal 1 (20%), XP 60-110. Gold = Coins 400-800, Fragments 60-140, Chips 500-1200 (90%), Tiket 2-4 (80%), Crystal 1-3 (60%), XP 150-260, plus 25% membuka Support card berikutnya. Semua angka ada di `ChestSystem.GRADE_DATA`.
+- Tersimpan di save (`chests`: slots + opened); save lama otomatis mendapat 4 slot kosong. Menu utama menampilkan "Chests (N ready!)" bila ada peti siap.
+- Kode: `scripts/systems/chest_system.gd`, `scripts/ui/chests.gd`, `scenes/chests/chests.tscn`. Tes: `godot --headless --path . res://tests/chest_test.tscn` -> `CHEST TEST RESULT: PASS`.
+
+## Events (Main Menu -> Events, tepat di atas Settings)
+- Dua tab: **Mission** dan **Achievement**. Entri yang selesai tampil di atas dengan tombol **Claim**; angka di tab = jumlah hadiah yang belum diambil, menu utama menampilkan "Events (N to claim!)".
+- **Mission**: 4 misi harian, diundi dari 8 misi (`EventHub.MISSION_POOL`) dengan seed tanggal (daftar sama seharian, berganti tiap tengah malam waktu lokal; ada hitung mundur reset). Progres dan klaim ikut di-reset.
+- **Achievement**: 16 target permanen (menang, main, Arena, Battle Chess, peti, gacha, level, trofi, jumlah coin) di `EventHub.ACHIEVEMENTS`.
+- Hadiah: coin, fragment, tiket, Crystal, chip, XP. Progres dihitung lewat `EventHub.track(metric, n)` dari `SaveManager.record_match` / `record_practice`, `ChestSystem.open`, dan `ShopSystem.pull_batch`. Disimpan di save (`events`).
+- Kode: `scripts/systems/event_hub.gd`, `scripts/ui/events.gd`, `scenes/events/events.tscn`. Tes: `godot --headless --path . res://tests/event_test.tscn` -> `EVENT TEST RESULT: PASS`.
+
 ## Shop (Main Menu -> Shop, di atas Profile)
-- Mata uang: **Aether Coins** (disimpan di save, mulai 600). Menang match +150, kalah +50 (`ShopSystem`). **Battle Chess** juga memberi coin: menang +75, kalah/seri +15 (`ShopSystem.PRACTICE_WIN_REWARD` / `PRACTICE_LOSS_REWARD`, `SaveManager.record_practice`); tidak mengubah statistik, progres Journey, atau membuka kartu.
+- Mata uang: **Aether Coins** (disimpan di save, mulai 600). Hadiah match tergantung difficulty (lihat bagian "Nyawa & hadiah per difficulty"). **Battle Chess** juga memberi coin: menang +75, kalah/seri +15 (`ShopSystem.PRACTICE_WIN_REWARD` / `PRACTICE_LOSS_REWARD`, `SaveManager.record_practice`); tidak mengubah statistik, progres Journey, atau membuka kartu.
 - Tab **Gacha**: Pull x1 = 100, Pull x10 = 900 (10 kartu, minimal 1 Rare). Rate: Common 60 / Rare 28 / Epic 10 / Legendary 2 (%).
   Pity: Epic atau lebih dijamin paling lambat pull ke-30. Kartu duplikat diubah jadi **Card Fragment** (Common 10, Rare 25, Epic 60, Legendary 150), disimpan di save (`wallet.fragments`) dan ditampilkan di header Shop.
 - Tab **Buy Cards**: beli langsung Support yang masih terkunci (filter per kategori). Harga: Common 200, Rare 500, Epic 1200, Legendary 3000.
@@ -35,12 +50,27 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - Semua area scroll dibuat lewat `UiTheme.make_scroll()` yang sekarang mengembalikan `TouchScroll` (`scripts/ui/touch_scroll.gd`): kontrol Button / Panel / RichTextLabel di dalamnya otomatis `MOUSE_FILTER_PASS` (juga yang ditambahkan belakangan, mis. grid kartu yang dibangun ulang), jadi geseran yang dimulai di atas tombol atau kartu tetap men-scroll daftar (Deck, New Match, Shop, Settings, dialog, dll).
 - Geseran yang dimulai di atas tombol membatalkan tekan tombol itu setelah melewati dead zone, jadi melepas jari tidak ikut menekan tombol. Slider, scrollbar, LineEdit/TextEdit tetap `STOP`.
 
+## Shop, unit terkunci & jalur trofi
+- **Shop** punya 6 tab: **Support Gacha**, **Unit Gacha**, **Buy Support**, **Buy Unit**, **Exchange**, **Gamble** (`scripts/ui/shop.gd`, logika di `ShopSystem`). Mata uang di dompet: Aether Coins, Fragments, **Gacha Tickets**, **Crystals**, **Chips**.
+- **Gacha** bisa dibayar Coins atau Tiket (1 pull = 1 tiket, 10-pull = 9 tiket). Unit Gacha hanya mengeluarkan kartu unit Rare (85%) / Epic (15%) dari benua yang sudah terbuka, pity Epic di pull ke-20, duplikat jadi fragment.
+- **Buy Support / Buy Unit**: beli kartu terkunci dengan Coins, **Crystals** (kristal = beli kartu), atau tukar Fragments. Harga unit: Rare 400 coin / 2 kristal / 120 fragment, Epic 1000 / 4 / 300.
+- **Exchange** (`ShopSystem.EXCHANGES`): 100 coins = 1 tiket; 3 tiket = 1 kristal; 100 coins = 100 chip; 100 chip = 80 coins; 10 fragment = 20 coins; 50 coins = 10 fragment. Bolak-balik selalu rugi, tidak bisa untung. Chip dipakai di tab **Gamble**.
+- **Gamble (judi)**: mini game uang cepat, taruhan dan hadiah hanya dalam **Chip** (bet 100/500/1000/5000; ubah kemenangan jadi coins lewat Exchange). Coin Flip (menang 48%, bayar x2), Dice 2 dadu (Low/High x2.3, Seven x5.5), Slots 3 reel (tiga 7 x30, tiga sama x8, dua sama x1.5). Semua punya house edge kecil (~95% return, diuji simulasi). Logika: `ShopSystem.gamble`.
+- **Kartu unit terkunci** (mekanik Clash Royale): pemain baru hanya punya 15 tipe unit starter (8 Pawn + 7 bidak Solvaris = deck default). Sisanya hanya bisa dipakai di deck setelah didapat dari Shop. Deck tidak pernah memakai unit yang belum dimiliki (`Deck.owned_filter`). Save lama (semua unit dimiliki) tetap utuh (`unit_cards_v`).
+- **Journey = jalur trofi**: menang +trofi, kalah -trofi (Easy +20/-30, Normal +30/-20, Hard +40/-10; `trophy_win`/`trophy_loss` di balance.json). Trofi tidak turun di bawah ambang benua tertinggi yang terbuka. Benua terbuka otomatis di `unlock_trophies` (Aetherion 0, Arcanum 150, Machina 400, Sylvaris 700, Drakmor 1100, Thalassia 1600, Eclipsia 2200), dan kartu unitnya masuk Shop (tidak langsung bisa dipakai).
+
+## Nyawa & hadiah per difficulty
+- **Nyawa (Life)** awal semua penguasa dalam match mengikuti difficulty: **Easy 5, Normal 3, Hard 1** (`data/balance.json` -> `life_by_difficulty`, `GameData.life_for`). Angka ini juga batas maksimal heal (Territory Shop, Royal Pardon, dadu Healing, dst.): `PlayerState.max_life`. Pada Hard, kekalahan duel atau bangkrut pertama langsung menyingkirkan penguasa. Tutorial memakai AI Normal dan 3 Life. Tersimpan di save/resume (`max_life`, `difficulty`); save lama dianggap 3.
+- **Hadiah Aether Coins setelah match** (Journey / Arena, `ShopSystem.WIN_REWARD_BY_DIFF` / `LOSS_REWARD_BY_DIFF`): Easy menang +100 / kalah +25, Normal +150 / +50, Hard +300 / +75. Bonus random-map Arena dihitung dari hadiah menang difficulty yang dipilih.
+- **Battle Chess** (`PRACTICE_WIN_BY_DIFF` / `PRACTICE_LOSS_BY_DIFF`): Easy +50 / +10, Normal +75 / +15, Hard +150 / +25. Battle Chess tidak memakai Life.
+- Layar New Match menampilkan Life dan hadiah difficulty yang sedang dipilih; layar hasil menampilkan difficulty di baris coin. Taruhan (wager) tetap memakai pengali odds sendiri di atas hadiah ini.
+
 ## Taruhan / Wager (Arena dan Battle Chess)
 - Sebelum bertanding pemain bisa mempertaruhkan **Aether Coins**: None / 50 / 100 / 250 / 500 / 1000 (chip yang melebihi saldo nonaktif). Journey dan Tutorial tidak punya taruhan.
 - **Arena**: panel *Wager* ada di kolom Match (di bawah Difficulty). **Battle Chess**: menekan kartunya membuka dialog kesulitan + taruhan, lalu tombol FIGHT.
 - Stake dibayar **saat match dimulai** (`SaveManager.place_wager`). Menang: dibayar **stake x odds** (stake sudah termasuk), kalah: stake hangus. Battle Chess seri: stake dikembalikan.
   Keluar di tengah Battle Chess = stake hangus. Arena: stake ikut tersimpan di match yang bisa dilanjutkan (`MatchController.wager`), diselesaikan satu kali (`wager_settled`).
-- Odds (`ShopSystem.wager_odds`): 1 vs 1 / 2 vs 2 / Battle Chess x2, 4 Player x3; dikali kesulitan AI easy x0.75, normal x1, hard x1.5. Taruhan ini **di luar** hadiah coin normal (menang +150/+75, kalah +50/+15).
+- Odds (`ShopSystem.wager_odds`): 1 vs 1 / 2 vs 2 / Battle Chess x2, 4 Player x3; dikali kesulitan AI easy x0.75, normal x1, hard x1.5. Taruhan ini **di luar** hadiah coin normal (lihat hadiah per difficulty di atas).
 
 ## Monster tersembunyi di Territory
 - **4 monster per benua** (7 benua = 28 monster, semuanya berbeda: nama, stat, dan buff; data di `data/monsters.json`). Satu monster untuk tiap region (Utara/Timur/Selatan/Barat), masing-masing bersembunyi di **petak Territory acak** region itu.
@@ -279,7 +309,7 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
 - **Build di GitHub dan Gradle/AAB**: `.github/workflows/` (tes otomatis + APK + AAB, Godot 4.7); lihat BUILD_ANDROID.md. Skrip tes: `tools/run_tests.sh`. Proyek kini memakai Godot 4.7 (target API 36 untuk Google Play).
 
 ## Tutorial, Auction, Special Dice, seni, audio, kartu baru
-- **Tutorial** (New Match -> Offline -> Tutorial): match 1v1 melawan AI Easy di Aetherion, 10 ronde, seed tetap. AI sudah memiliki wilayah di depan pemain dan
+- **Tutorial** (New Match -> Offline -> Tutorial): match 1v1 melawan AI Normal di Aetherion, 10 ronde, seed tetap. AI sudah memiliki wilayah di depan pemain dan
   tawaran duel pertama selalu muncul. `TutorialGuide` menjelaskan tiap aturan saat pertama kali muncul (panel petunjuk di papan; tips
   di atas separuh papan musuh saat persiapan duel). Hasilnya tidak dihitung ke statistik; `profile.tutorial_done` disimpan.
 - **Auction sungguhan**: lot acak dilelang ke semua pemain hidup, mulai dari yang mendarat; buka 40% harga, naik 10% per tawaran;
@@ -294,6 +324,24 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
 - **Audio** (`Sfx`): 11 efek suara disintesis dari kode (klik, dadu, koin, pukulan, gugur, sihir, portal, menang/kalah, dll), bisa dimatikan di Settings.
   Belum ada musik.
 - **Animasi battle**: gerak halus antar petak, lunge saat menyerang, angka damage melayang, cincin saat unit gugur; mengikuti kecepatan 1x/2x/4x.
+- **Battle Chess: 1 Round / 10 Rounds / Survival** (dialog FIGHT di New Match -> Battle Chess, baris *Length*; `GameSession.battle_series`):
+  - *1 Round*: satu battle seperti sebelumnya.
+  - *10 Rounds*: 10 battle berturut-turut dengan pasukan yang sama. Menang jika jumlah round menang > kalah, seri jika sama.
+  - *Survival*: lanjut terus sampai kalah pertama. Seri tidak mengakhiri run.
+  - Antar round: pasukan, gold, level dan kartu Support tetap; dapat income gold (150 + 25 per round yang sudah dimainkan), shop dibagi ulang, medan diacak lagi.
+    Musuh makin kuat (budget +12% per round, maks x3.5; +1 level shop tiap 3 round). Kecepatan battle yang dipilih tetap.
+  - Koin Aether dibayar tiap round (hadiah practice + bonus 25 x nomor round untuk round menang dari round 2). Wager dibayar sekali di akhir run:
+    10 Rounds = menang/seri/kalah menurut skor; Survival = menang jika menang minimal 5 round. *End Run* di 10 Rounds menghanguskan wager; keluar lewat Menu di tengah run juga menghanguskannya.
+  - Aturan ada di `ShopSystem` (`series_*`), tes: `tests/series_test.gd`.
+- **Profil di beranda** (`ProfileView.build_card`, `XpSystem`): kartu profil (avatar, nama, title, Lv, bar EXP, rekor) langsung tampil di Main Menu, tanpa tombol Profile; tap kartu untuk detail lengkap.
+  EXP total disimpan di `profile.xp`, level dihitung darinya (butuh `100 + 40 x (level-1)` EXP per level, maks Lv 60).
+  Title: Recruit (Lv 1), Squire (5), Knight (10), Captain (15), Warden (20), Warlord (30), Archon (40), Overlord (50), Dominion Lord (60).
+  EXP: match Territory menang 100 / kalah 30 (+2 per round, maks 30 round), Battle Chess menang 40 / kalah 10 per battle; dikali easy 0.75, normal 1, hard 1.5.
+  Save lama dapat EXP awal dari rekornya (menang x100, kalah x30), sekali saja. Tes: `tests/xp_test.gd`.
+- **Mode Effects Lite / Pro** (Settings -> Effects, `FxMode`, tersimpan di `settings.effects`, default Pro):
+  Pro = semua animasi (dadu berguling, pion melompat, kamera meluncur, lunge, cincin gugur, kartu Shop muncul bertahap, fade dialog).
+  Lite = hasil langsung tampil tanpa tween: dadu langsung hasil, pion langsung mendarat, kamera lompat, unit battle berpindah instan tanpa lunge/cincin, kartu Shop dan dialog tanpa fade.
+  Angka damage dan banner (CHECK, CHECKMATE, dll) tetap tampil di Lite karena membawa informasi.
 
 ## TODO (tidak berpura-pura selesai)
 - Pool kartu unit baru (varian pengganti) dan Champion/Rule Card sebagai sumber Special Dice.

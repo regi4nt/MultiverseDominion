@@ -19,7 +19,8 @@ var _hub_node: Control = null  # the Card Hub overlay (Collection / Deck / Info)
 var _hub_prev_continent: String = ""
 var _guide: TutorialGuide = null
 var _new_card: String = ""
-var _journey_lines: Array[String] = []  # Journey progress shown on the result screen
+var _chest: Dictionary = {}  # reward chest of an Arena win (ChestSystem.award result), {} = none
+var _journey_lines: Array[String] = []  # Journey trophies / opened continents shown on the result screen
 var _hint_panel: PanelContainer
 var _hint_label: Label
 var _backdrop: TextureRect
@@ -342,7 +343,7 @@ func _refresh_players() -> void:
 		if ctrl.team_mode:
 			nm += "  [%s]" % ctrl.team_label(p)
 		if p.alive:
-			nm += "  Cmdr " + CommanderSystem.star_text(p.commander_star)
+			nm += "  " + CommanderSystem.star_text(p.commander_star)  # Commander level only ("Lv 1".."Lv 3"), no "Cmdr" text
 		var name_l := UiTheme.make_label(nm, 17, UiTheme.COL_TEXT if p.alive else UiTheme.COL_MUTED)
 		name_l.clip_text = true
 		col.add_child(name_l)
@@ -486,17 +487,17 @@ func _on_game_over(_winner: int) -> void:
 	if ctrl.human_present and not _stats_saved and not ctrl.tutorial:  # the tutorial does not count as a ranked result
 		_stats_saved = true
 		var cid := String(ctrl.continent["id"])
-		var mastered_before := SaveManager.is_journey_cleared(cid)
 		if ctrl.wager > 0 and not ctrl.wager_settled:  # Arena wager: paid at the start, settled once
 			ctrl.wager_settled = true
 			_wager_paid = SaveManager.settle_wager(ctrl.wager, "win" if human_won else "loss", ctrl.wager_odds)
 		_new_card = SaveManager.record_match(human_won, ctrl.round_number, ctrl.players[0].gold, cid, ctrl.journey, String(ctrl.players[0].faction_id),
-			ShopSystem.random_bonus(cid) if ctrl.random_map and not ctrl.journey else {})
+			ShopSystem.random_bonus(cid) if ctrl.random_map and not ctrl.journey else {}, ctrl.match_difficulty)
+		if human_won and not ctrl.journey:  # Arena victory: a reward chest (Bronze / Silver / Gold) for the Chests screen
+			_chest = ChestSystem.award(ctrl.match_difficulty)
 		if ctrl.journey:
-			var cname := String(ctrl.continent.get("name", cid))
-			_journey_lines.append("%s: %d / %d factions won" % [cname, SaveManager.journey_won_factions(cid).size(), SaveManager.journey_faction_total(cid)])
-			if human_won and not mastered_before and SaveManager.is_journey_cleared(cid):
-				_journey_lines.append("%s mastered! Choose a new continent to unlock in Journey." % cname)
+			_journey_lines.append("Trophies %s%d  (total %d)" % ["+" if SaveManager.last_trophy_delta >= 0 else "", SaveManager.last_trophy_delta, SaveManager.trophies()])
+			for oid in SaveManager.last_opened_continents:
+				_journey_lines.append("%s opened! Its unit cards are now in the Shop." % String(GameData.get_continent(oid).get("name", oid)))
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -524,8 +525,15 @@ func _on_game_over(_winner: int) -> void:
 		v.add_child(UiTheme.make_label(line, 20, UiTheme.COL_GOLD))
 	if _new_card != "":
 		v.add_child(UiTheme.make_label("New card unlocked: %s" % CardDatabase.get_support(_new_card)["name"], 20, UiTheme.COL_GOLD))
+	if not _chest.is_empty():
+		var cg := String(_chest["grade"])
+		if _chest["status"] == "added":
+			v.add_child(UiTheme.make_label("Chest earned: %s  (slot %d)" % [ChestSystem.grade_name(cg), int(_chest["slot"]) + 1], 22, ChestSystem.grade_color(cg)))
+		else:
+			v.add_child(UiTheme.make_label("%s - chest slots full, +%d coins instead" % [ChestSystem.grade_name(cg), int(_chest["coins"])], 20, ChestSystem.grade_color(cg)))
 	if _stats_saved:
-		v.add_child(UiTheme.make_label("+%d Aether Coins%s" % [SaveManager.last_reward, ("  (random map: %s)" % SaveManager.last_bonus_text) if SaveManager.last_bonus_text != "" else ""], 20, UiTheme.COL_GOLD))
+		v.add_child(UiTheme.make_label(SaveManager.xp_line(), 20, UiTheme.COL_GOLD))
+		v.add_child(UiTheme.make_label("+%d Aether Coins (%s)%s" % [SaveManager.last_reward, ctrl.match_difficulty.capitalize(), ("  (random map: %s)" % SaveManager.last_bonus_text) if SaveManager.last_bonus_text != "" else ""], 20, UiTheme.COL_GOLD))
 		if ctrl.wager > 0:
 			if _wager_paid > 0:
 				v.add_child(UiTheme.make_label("Wager won: +%d coins (stake %d, x%s)" % [_wager_paid, ctrl.wager, str(snappedf(ctrl.wager_odds, 0.01))], 20, UiTheme.COL_GOLD))

@@ -13,6 +13,7 @@ var data: Dictionary = {}
 
 func _ready() -> void:
 	load_game()
+	ensure_xp()
 	ensure_collection()
 	apply_settings()
 
@@ -21,7 +22,7 @@ func default_data() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"profile": {"name": "Player", "level": 1, "xp": 0, "tutorial_done": false},
-		"settings": {"master_volume": 0.8, "default_difficulty": "normal", "sfx": true, "check_updates": true, "skipped_update": "", "fullscreen": false},
+		"settings": {"master_volume": 0.8, "default_difficulty": "normal", "sfx": true, "check_updates": true, "skipped_update": "", "fullscreen": false, "effects": "pro"},
 		"campaign": {"progress": 0},  # TODO (Phase 6): Story Campaign
 		"unlocked_continents": ["aetherion"],
 		"journey_wins": {},  # continent id -> ids of the factions that won a Journey match on it
@@ -29,8 +30,11 @@ func default_data() -> Dictionary:
 		"collection": {},  # TODO (Phase 3): Card Collection
 		"decks": {},  # TODO (Phase 3): Deck Configuration
 		"stats": {"matches_played": 0, "wins": 0, "losses": 0, "total_rounds": 0, "best_gold": 0},
-		"wallet": {"coins": 600, "fragments": 0},  # Aether Coins + Card Fragments (Gacha duplicates): persistent Shop currencies (see ShopSystem)
-		"shop": {"pity": 0, "pulls": 0},
+		"wallet": {"coins": 600, "fragments": 0, "tickets": 0, "crystals": 0, "chips": 0},  # Aether Coins, Card Fragments (Gacha duplicates), Gacha Tickets, Crystals (buy cards), Chips: persistent Shop currencies (see ShopSystem)
+		"shop": {"pity": 0, "pulls": 0, "unit_pity": 0, "unit_pulls": 0},
+		"chests": {"slots": [null, null, null, null], "opened": 0},  # Arena reward chests (see ChestSystem): 4 slots, each null or {grade, start, ready}
+		"events": {},  # Missions + Achievements (see EventHub)
+		"trophies": 0,  # Journey trophy road: a win raises it, a defeat lowers it; continents open at their unlock_trophies
 	}
 
 
@@ -120,59 +124,14 @@ func unlock_continent(id: String) -> void:
 			data["unlocked_factions"].append(f["id"])
 
 
-## Journey progress. Only the first continent is open at the start. Winning a Journey match on a continent with each of ITS
-## 4 factions masters it, and every mastered continent earns one pick: the player chooses which locked continent to open.
-func journey_won_factions(continent_id: String) -> Array:
-	var out: Array = []
-	var won: Array = (data.get("journey_wins", {}) as Dictionary).get(continent_id, [])
-	for f in GameData.get_continent(continent_id).get("factions", []):
-		if won.has(f["id"]):
-			out.append(f["id"])
-	return out
-
-
-func journey_faction_total(continent_id: String) -> int:
-	var n := 0
-	for f in GameData.get_continent(continent_id).get("factions", []):
-		if String(f.get("champion", "")) != "":
-			n += 1
-	return n
-
-
-## Mastered: won on this continent with every one of its factions.
-func is_journey_cleared(id: String) -> bool:
-	var total := journey_faction_total(id)
-	return total > 0 and journey_won_factions(id).size() >= total
-
-
-## Continent picks the player has earned and not spent yet (mastered continents minus continents opened after the first).
-func journey_picks_available() -> int:
-	var mastered := 0
-	for c in GameData.continents:
-		if is_continent_unlocked(String(c["id"])) and is_journey_cleared(String(c["id"])):
-			mastered += 1
-	return maxi(0, mastered - maxi(0, (data["unlocked_continents"] as Array).size() - 1))
-
-
-## Spends one pick to open a locked continent (and its factions). False when no pick is left or the continent cannot be opened.
-func choose_continent(id: String) -> bool:
-	var c := GameData.get_continent(id)
-	if c.is_empty() or not c.get("playable", false) or is_continent_unlocked(id) or journey_picks_available() < 1:
-		return false
-	unlock_continent(id)
-	save_game()
-	return true
-
-
-## The Journey goal: the first open continent that is not mastered yet (the last open one when all are mastered).
+## The Journey continent to play by default: the newest open one (highest unlock_trophies).
 func journey_frontier() -> String:
 	var last := ""
 	for c in GameData.continents:
 		var id := String(c["id"])
 		if c.get("playable", false) and is_continent_unlocked(id):
-			last = id
-			if not is_journey_cleared(id):
-				return id
+			if last == "" or continent_trophies(id) >= continent_trophies(last):
+				last = id
 	return last if last != "" else String(GameData.continents[0]["id"])
 
 
@@ -210,12 +169,105 @@ func spend_fragments(n: int) -> bool:
 	return true
 
 
-## Adds one copy of a card to the collection if it is not owned yet. Returns true when it was new.
+## Gacha Tickets / Crystals / Chips (wallet keys "tickets", "crystals", "chips").
+func currency(key: String) -> int:
+	return int(data["wallet"].get(key, 0))
+
+
+func add_currency(key: String, n: int) -> void:
+	data["wallet"][key] = maxi(0, currency(key) + n)
+
+
+## Pays `n` of a wallet currency; false (and nothing paid) when the player has less.
+func spend_currency(key: String, n: int) -> bool:
+	if n < 0 or currency(key) < n:
+		return false
+	data["wallet"][key] = currency(key) - n
+	return true
+
+
+func tickets() -> int:
+	return currency("tickets")
+
+
+func crystals() -> int:
+	return currency("crystals")
+
+
+func chips() -> int:
+	return currency("chips")
+
+
+## Adds a card to the collection if it is not owned yet (a unit card = all its `unit_copies`, a Support card = 1).
+## Returns true when it was new.
 func unlock_card(card_id: String) -> bool:
 	if owned_count(card_id) > 0:
 		return false
-	data["collection"][card_id] = 1
+	data["collection"][card_id] = 1 if CardDatabase.is_support(card_id) else int(GameData.b("unit_copies"))
 	return true
+
+
+## The unit cards a new player owns: the 8 Pawns and the 7 pieces of Solvaris (the default King), i.e. exactly the 15 types of
+## the default deck. Every other unit card comes from the Shop (Unit Gacha / Buy Unit).
+func starter_unit_ids() -> Array[String]:
+	var out: Array[String] = []
+	for raw in GameData.cards.get("units", []):
+		if String(raw["chess"]) == "pawn" or String(raw["faction"]) == "solvaris":
+			out.append(String(raw["id"]))
+	return out
+
+
+# ------------------------------------------------------------------ Journey trophy road
+
+func trophies() -> int:
+	return int(data.get("trophies", 0))
+
+
+## Trophies needed to open a continent (data/continents.json "unlock_trophies").
+func continent_trophies(id: String) -> int:
+	return int(GameData.get_continent(id).get("unlock_trophies", 0))
+
+
+## Highest unlock_trophies among the open continents: trophies never drop below it (like a Clash Royale arena floor).
+func trophy_floor() -> int:
+	var best := 0
+	for c in GameData.continents:
+		if is_continent_unlocked(String(c["id"])):
+			best = maxi(best, continent_trophies(String(c["id"])))
+	return best
+
+
+## Trophy change of a Journey result: the harder the AI, the more a win gives and the less a defeat takes.
+static func trophy_delta(won: bool, difficulty: String) -> int:
+	var table: Dictionary = GameData.b("trophy_win", {}) if won else GameData.b("trophy_loss", {})
+	return int(table.get(difficulty, 30 if won else -20))
+
+
+## Continents (ids) that the current trophies have opened but are still locked: opens them. Returns the newly opened ids.
+func unlock_by_trophies() -> Array[String]:
+	var opened: Array[String] = []
+	for c in GameData.continents:
+		var id := String(c["id"])
+		if c.get("playable", false) and not is_continent_unlocked(id) and trophies() >= continent_trophies(id):
+			unlock_continent(id)
+			opened.append(id)
+	return opened
+
+
+## The next locked playable continent in trophy order ("" when everything is open).
+func next_continent_goal() -> String:
+	var best := ""
+	for c in GameData.continents:
+		var id := String(c["id"])
+		if c.get("playable", false) and not is_continent_unlocked(id):
+			if best == "" or continent_trophies(id) < continent_trophies(best):
+				best = id
+	return best
+
+
+## Trophy change and newly opened continents of the last Journey result (shown on the result screen).
+var last_trophy_delta: int = 0
+var last_opened_continents: Array[String] = []
 
 
 ## Coins earned by the last record_match (shown on the result screen).
@@ -233,7 +285,7 @@ func unlock_next_card() -> String:
 
 
 ## Returns the id of the card unlocked by this result ("" if none).
-func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "", reward_bonus: Dictionary = {}) -> String:
+func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "", reward_bonus: Dictionary = {}, difficulty: String = "normal") -> String:
 	var s: Dictionary = data["stats"]
 	s["matches_played"] += 1
 	s["total_rounds"] += rounds
@@ -242,19 +294,27 @@ func record_match(won: bool, rounds: int, final_gold: int, continent_id: String 
 	else:
 		s["losses"] += 1
 	s["best_gold"] = maxi(int(s["best_gold"]), final_gold)
-	if won and journey and continent_id != "" and faction_id != "":  # Journey only: it counts the faction that won (see journey_picks_available)
-		var wins: Dictionary = data["journey_wins"]
-		var won_with: Array = wins.get(continent_id, [])
-		if not won_with.has(faction_id):
-			won_with.append(faction_id)
-		wins[continent_id] = won_with
-	last_reward = ShopSystem.WIN_REWARD if won else ShopSystem.LOSS_REWARD
+	last_trophy_delta = 0
+	last_opened_continents = []
+	EventHub.track("matches")
+	if won:
+		EventHub.track("wins")
+		if not journey:
+			EventHub.track("arena_wins")
+	if journey:  # Journey only: the trophy road. A win raises the score, a defeat lowers it (never below the floor of the open continents)
+		var before := trophies()
+		last_trophy_delta = trophy_delta(won, difficulty)
+		data["trophies"] = maxi(before + last_trophy_delta, trophy_floor())
+		last_trophy_delta = trophies() - before
+		last_opened_continents = unlock_by_trophies()
+	last_reward = ShopSystem.win_reward(difficulty) if won else ShopSystem.loss_reward(difficulty)
 	last_bonus_text = ""
 	if won and not reward_bonus.is_empty():  # Arena random map: the drawn continent's own bonus
-		last_reward += int(round(ShopSystem.WIN_REWARD * float(reward_bonus.get("coins_pct", 0)) / 100.0)) + int(reward_bonus.get("coins_flat", 0))
+		last_reward += int(round(ShopSystem.win_reward(difficulty) * float(reward_bonus.get("coins_pct", 0)) / 100.0)) + int(reward_bonus.get("coins_flat", 0))
 		add_fragments(int(reward_bonus.get("fragments", 0)))
 		last_bonus_text = String(reward_bonus.get("text", ""))
 	add_coins(last_reward)
+	_award_xp(XpSystem.match_xp(won, rounds, difficulty))
 	var card := unlock_next_card() if won else ""
 	save_game()
 	return card
@@ -289,11 +349,64 @@ func settle_wager(stake: int, outcome: String, odds: float) -> int:
 
 ## Battle Chess (offline auto battle): pays Aether Coins only - no stats, no Journey progress, no card unlock.
 ## Returns the coins paid.
-func record_practice(won: bool) -> int:
-	var reward := ShopSystem.PRACTICE_WIN_REWARD if won else ShopSystem.PRACTICE_LOSS_REWARD
+func record_practice(won: bool, difficulty: String = "normal") -> int:
+	var reward := ShopSystem.practice_reward(won, difficulty)
+	EventHub.track("chess_played")
+	if won:
+		EventHub.track("chess_wins")
 	add_coins(reward)
+	_award_xp(XpSystem.practice_xp(won, difficulty))
 	save_game()
 	return reward
+
+
+## Profile XP (see XpSystem). `last_xp` / `last_level_up` describe the last award, for the result screens.
+var last_xp: int = 0
+var last_level_up: int = 0  # the new level when the last award levelled the player up, else 0
+
+
+func profile_xp() -> int:
+	return int(data["profile"].get("xp", 0))
+
+
+func profile_level() -> int:
+	return XpSystem.level_of(profile_xp())
+
+
+func profile_title() -> String:
+	return XpSystem.title(profile_level())
+
+
+## Public XP award (reward chests).
+func add_xp(amount: int) -> void:
+	_award_xp(amount)
+
+
+func _award_xp(amount: int) -> void:
+	var before := profile_level()
+	data["profile"]["xp"] = profile_xp() + maxi(amount, 0)
+	data["profile"]["level"] = profile_level()
+	last_xp = maxi(amount, 0)
+	last_level_up = profile_level() if profile_level() > before else 0
+
+
+## "+120 XP" or "+120 XP   LEVEL UP! Lv 4 - Recruit" for the result screens.
+func xp_line() -> String:
+	var t := "+%d XP" % last_xp
+	if last_level_up > 0:
+		t += "   LEVEL UP!  Lv %d - %s" % [last_level_up, XpSystem.title(last_level_up)]
+	return t
+
+
+## Older saves had no XP: start them from their record (win 100, loss 30), once.
+func ensure_xp() -> void:
+	var p: Dictionary = data["profile"]
+	if not p.has("xp_v"):
+		var s: Dictionary = data["stats"]
+		p["xp"] = maxi(int(p.get("xp", 0)), int(s.get("wins", 0)) * 100 + int(s.get("losses", 0)) * 30)
+		p["xp_v"] = 1
+		save_game()
+	p["level"] = XpSystem.level_of(int(p.get("xp", 0)))
 
 
 ## Fills the starter collection (all unit cards of every continent x 9, 15 default Support cards) and main deck.
@@ -301,17 +414,25 @@ func ensure_collection() -> void:
 	var changed := false
 	var col: Dictionary = data["collection"]
 	if col.is_empty():
-		for id in CardDatabase.all_unit_ids_any_continent():
+		for id in starter_unit_ids():  # unit cards are locked: only the starter units are owned, the rest comes from the Shop
 			col[id] = int(GameData.b("unit_copies"))
 		for s in CardDatabase.all_supports():
 			if s.get("owned_default", false):
 				col[s["id"]] = 1
+		data["unit_cards_v"] = 2  # 2 = unit cards are locked (starter units only) and come from the Shop; a save without it owns every unit
 		changed = true
-	else:  # older saves: add the unit cards of continents that did not exist yet (per-continent Rook/Knight/Bishop/Queen)
+	elif int(data.get("unit_cards_v", 1)) < 2:
+		# older save (every unit owned): keep what the player has, add the unit cards of continents that did not exist yet
 		for id in CardDatabase.all_unit_ids_any_continent():
 			if not col.has(id):
 				col[id] = int(GameData.b("unit_copies"))
-				changed = true
+		# Journey used to be factions-won based: start the trophy road at the floor of the continents already open
+		var floor_t := 0
+		for cid in (data["unlocked_continents"] as Array):
+			floor_t = maxi(floor_t, continent_trophies(String(cid)))
+		data["trophies"] = maxi(trophies(), floor_t)
+		data["unit_cards_v"] = 2
+		changed = true
 	if not (data["decks"] as Dictionary).has("main"):
 		data["decks"]["main"] = Deck.create_default().to_dict()
 		changed = true
@@ -358,7 +479,9 @@ func get_deck(continent_id: String = "") -> Deck:
 	var ubc: Dictionary = main.get("units_by_continent", {})
 	var deck := Deck.from_dict({"champion": main.get("champion", "champion_solvaris"), "supports": main.get("supports", []),
 		"continent": cid, "units": ubc.get(cid, []), "lineup": (main.get("lineups_by_continent", {}) as Dictionary).get(cid, [])})
+	deck.owned_filter = data["collection"]
 	deck.sanitize_units()
+	deck.sanitize_owned()
 	deck.lineup = deck.valid_lineup()
 	deck.champion_id = player_champion_id()  # never a King of a locked faction
 	return deck

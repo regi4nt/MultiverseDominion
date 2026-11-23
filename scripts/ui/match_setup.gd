@@ -38,7 +38,9 @@ var _champion_text: RichTextLabel
 var _portrait: PortraitView
 var _continent_text: Label
 var _journey_hint: Label
+var _trophy_note: Label
 var _wager_panel: WagerPanel
+var _difficulty_note: Label
 var _start_btn: Button
 var _home_note: Label
 
@@ -76,6 +78,7 @@ func _reset_root() -> void:
 	_portrait = null
 	_continent_text = null
 	_journey_hint = null
+	_trophy_note = null
 	_start_btn = null
 	_home_note = null
 	_root = VBoxContainer.new()
@@ -164,18 +167,18 @@ func _fill_cards() -> void:
 func _offline_cards() -> Array:
 	return [
 		{"id": "journey", "icon": "knight", "title": "JOURNEY", "sub": "Story  ·  1 vs 1",
-			"desc": "Win a 1 vs 1 on a continent with all 4 of its factions to master it, then choose a new continent to unlock.",
-			"chips": ["1 vs 1", "Unlocks continents"], "status": _journey_status()},
+			"desc": "Climb the trophy road in 1 vs 1 matches: a win earns trophies, a defeat loses some. Enough trophies open the next continent and its unit cards in the Shop.",
+			"chips": ["1 vs 1", "Trophy road"], "status": _journey_status()},
 		{"id": "arena", "icon": "king", "title": "ARENA", "sub": "Free match",
 			"desc": "Play a free match against AI on any unlocked continent. Nothing to unlock, just fight for the crown.",
 			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "%d of %d continents open" % [_open_continent_count(), GameData.continents.size()]},
 		{"id": "battle_chess", "icon": "rook", "title": "BATTLE CHESS", "sub": "8 x 8 auto battle",
 			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle.",
 			"chips": ["8 x 8", "Auto battle", "Earns coins"],
-			"status": "Win +%d  -  Loss +%d Aether Coins" % [ShopSystem.PRACTICE_WIN_REWARD, ShopSystem.PRACTICE_LOSS_REWARD]},
+			"status": "Win +%d to +%d  -  Loss +%d to +%d Aether Coins (by difficulty)" % [ShopSystem.PRACTICE_WIN_BY_DIFF["easy"], ShopSystem.PRACTICE_WIN_BY_DIFF["hard"], ShopSystem.PRACTICE_LOSS_BY_DIFF["easy"], ShopSystem.PRACTICE_LOSS_BY_DIFF["hard"]]},
 		{"id": "tutorial", "icon": "pawn", "title": "TUTORIAL", "sub": "10 rounds  ·  1 vs 1",
-			"desc": "A guided match against an easy AI that explains dice, land, tax and duels as you meet them.",
-			"chips": ["Guided", "Easy AI"],
+			"desc": "A guided match against a normal AI that explains dice, land, tax and duels as you meet them.",
+			"chips": ["Guided", "Normal AI"],
 			"status": "Completed  -  replay anytime" if SaveManager.data["profile"].get("tutorial_done", false) else "Recommended for new players"},
 	]
 
@@ -203,10 +206,10 @@ func _open_continent_count() -> int:
 
 
 func _journey_status() -> String:
-	if SaveManager.journey_picks_available() > 0:
-		return "Continent unlock ready  -  choose one!"
-	var cid := SaveManager.journey_frontier()
-	return "%s: %d / %d factions won" % [GameData.get_continent(cid)["name"], SaveManager.journey_won_factions(cid).size(), SaveManager.journey_faction_total(cid)]
+	var next := SaveManager.next_continent_goal()
+	if next == "":
+		return "%d trophies  -  every continent open" % SaveManager.trophies()
+	return "%d trophies  -  %s at %d" % [SaveManager.trophies(), String(GameData.get_continent(next)["name"]).capitalize(), SaveManager.continent_trophies(next)]
 
 
 func _on_card(id: String) -> void:
@@ -501,13 +504,18 @@ func _build_match_column(parent: Control) -> void:
 		b.button_pressed = (GameSession.difficulty == d)
 		b.pressed.connect(func():
 			GameSession.difficulty = d
+			_refresh_difficulty_note()
+			_refresh_trophy_note()
+			_refresh_journey_hint()
 			if _wager_panel != null:
 				_wager_panel.refresh())  # the odds depend on the difficulty
 		UiTheme.scroll_passthrough(b)
 		drow.add_child(b)
-	var life_note := UiTheme.make_label("Everyone starts with %d Life. A lost duel or bankruptcy costs 1." % int(GameData.b("start_life")), 15, UiTheme.COL_MUTED)
+	var life_note := UiTheme.make_label("", 15, UiTheme.COL_MUTED)
 	life_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	c.add_child(life_note)
+	_difficulty_note = life_note
+	_refresh_difficulty_note()
 	_wager_panel = null
 	if _kind == "arena":
 		_wager_panel = WagerPanel.new("arena", false)
@@ -515,16 +523,33 @@ func _build_match_column(parent: Control) -> void:
 		c.add_child(_wager_panel)
 
 
+## Life and coin reward of the chosen difficulty (easy 5 Life / normal 3 / hard 1).
+func _refresh_difficulty_note() -> void:
+	if _difficulty_note == null:
+		return
+	var d := String(GameSession.difficulty)
+	_difficulty_note.text = "%s: everyone starts with %d Life (a lost duel or bankruptcy costs 1).\nReward: win +%d, loss +%d Aether Coins." % [
+		d.capitalize(), GameData.life_for(d), ShopSystem.win_reward(d), ShopSystem.loss_reward(d)]
+
+
+func _refresh_trophy_note() -> void:
+	if _trophy_note == null or _kind != "journey":
+		return
+	var d := String(GameSession.difficulty)
+	_trophy_note.text = "Trophies: %d.  Win +%d / defeat %d (%s).  Continents open at their trophy count." % [
+		SaveManager.trophies(), SaveManager.trophy_delta(true, d), SaveManager.trophy_delta(false, d), d.capitalize()]
+
+
 func _build_continent_column(parent: Control) -> void:
 	var c := _column(parent, "Journey Map" if _kind == "journey" else "Continent", 1.0)
-	var picks := SaveManager.journey_picks_available() if _kind == "journey" else 0
 	var cnote: Label
 	if _kind == "arena":
-		cnote = UiTheme.make_label("Locked continents open by mastering continents in Journey.", 15, UiTheme.COL_MUTED)
-	elif picks > 0:
-		cnote = UiTheme.make_label("You can unlock %d continent%s! Tap a locked one to open it." % [picks, "" if picks == 1 else "s"], 15, UiTheme.COL_GOLD)
+		cnote = UiTheme.make_label("Locked continents open with trophies from the Journey.", 15, UiTheme.COL_MUTED)
 	else:
-		cnote = UiTheme.make_label("Win with all 4 factions of a continent to unlock another one of your choice.", 15, UiTheme.COL_MUTED)
+		cnote = UiTheme.make_label("Trophies: %d.  Win +%d / defeat %d (%s).  Continents open at their trophy count." % [
+			SaveManager.trophies(), SaveManager.trophy_delta(true, String(GameSession.difficulty)), SaveManager.trophy_delta(false, String(GameSession.difficulty)),
+			String(GameSession.difficulty).capitalize()], 15, UiTheme.COL_GOLD)
+	_trophy_note = cnote
 	cnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	c.add_child(cnote)
 	var random_on := _kind == "arena" and GameSession.continent_random and _open_continents().size() >= 2
@@ -557,14 +582,6 @@ func _build_continent_column(parent: Control) -> void:
 		var cont: Dictionary = GameData.continents[i]
 		var id := String(cont["id"])
 		var open: bool = cont.get("playable", false) and SaveManager.is_continent_unlocked(id)
-		if not open and picks > 0 and cont.get("playable", false):  # a pick is ready: this locked continent can be chosen
-			var ub := UiTheme.make_button("%d.  %s\nTap to unlock" % [i + 1, cont["name"]], 58)
-			ub.add_theme_color_override("font_color", UiTheme.COL_GOLD)
-			ub.add_theme_stylebox_override("normal", UiTheme.make_box(Color("2a2410"), UiTheme.COL_GOLD_DIM, 2, 12, 6))
-			ub.pressed.connect(_ask_unlock.bind(id))
-			UiTheme.scroll_passthrough(ub)
-			c.add_child(ub)
-			continue
 		var state := _continent_state(id, open)
 		if random_on and open:  # random mode: each open continent shows the bonus it would pay
 			state = ShopSystem.random_bonus_lines(id)
@@ -590,28 +607,10 @@ func _open_continents() -> Array:
 
 func _continent_state(id: String, open: bool) -> String:
 	if not open:
-		return "Locked"
+		return "Locked  -  %d trophies" % SaveManager.continent_trophies(id)
 	if _kind != "journey":
 		return "Open"
-	if SaveManager.is_journey_cleared(id):
-		return "Mastered  (%d / %d)" % [SaveManager.journey_faction_total(id), SaveManager.journey_faction_total(id)]
-	return "Factions won  %d / %d" % [SaveManager.journey_won_factions(id).size(), SaveManager.journey_faction_total(id)]
-
-
-func _ask_unlock(id: String) -> void:
-	var dlg := UiDialog.new()
-	dlg.name = "UnlockDialog"
-	dlg.title = "Unlock %s?" % GameData.get_continent(id)["name"]
-	dlg.dialog_text = "This uses your continent unlock. Its 4 factions become available in your Deck. Master another continent to earn the next unlock."
-	dlg.ok_button_text = "Unlock"
-	dlg.cancel_button_text = "Cancel"
-	dlg.confirmed.connect(func():
-		SaveManager.choose_continent(id)
-		dlg.queue_free()
-		_show_setup("journey"))
-	dlg.canceled.connect(dlg.queue_free)
-	add_child(dlg)
-	dlg.popup_centered(Vector2i(520, 0))
+	return "Open  -  from %d trophies" % SaveManager.continent_trophies(id)
 
 
 ## Read-only: the faction comes from the Deck. The button jumps to the Deck's faction list.
@@ -696,18 +695,11 @@ func _refresh_journey_hint() -> void:
 	var cname := String(GameData.get_continent(cid).get("name", cid))
 	var fid := SaveManager.player_faction_id()
 	var fname := String(GameData.find_faction(fid).get("name", fid.capitalize()))
-	var won := SaveManager.journey_won_factions(cid).size()
-	var total := SaveManager.journey_faction_total(cid)
-	if SaveManager.is_journey_cleared(cid) and GameData.get_faction(cid, fid).is_empty():
-		_journey_hint.text = "%s is mastered, but Journey still needs one of its factions. Pick one in your Deck." % cname
-	elif SaveManager.is_journey_cleared(cid):
-		_journey_hint.text = "%s is mastered. Wins still earn Aether Coins." % cname
-	elif GameData.get_faction(cid, fid).is_empty():
-		_journey_hint.text = "%s is not a faction of %s: Journey only allows its own factions. Pick one in your Deck (%d / %d won)." % [fname, cname, won, total]
-	elif SaveManager.journey_won_factions(cid).has(fid):
-		_journey_hint.text = "%s already won on %s (%d / %d). Switch faction in your Deck to progress." % [fname, cname, won, total]
+	var d := String(GameSession.difficulty)
+	if GameData.get_faction(cid, fid).is_empty():
+		_journey_hint.text = "%s is not a faction of %s: Journey only allows its own factions. Pick one in your Deck." % [fname, cname]
 	else:
-		_journey_hint.text = "Win with %s to progress on %s (%d / %d factions won)." % [fname, cname, won, total]
+		_journey_hint.text = "Win with %s on %s: +%d trophies. A defeat: %d." % [fname, cname, SaveManager.trophy_delta(true, d), SaveManager.trophy_delta(false, d)]
 
 
 func _refresh_continent_info() -> void:

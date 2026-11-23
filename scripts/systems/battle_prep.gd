@@ -39,6 +39,17 @@ func _init(d: Deck, r: RandomNumberGenerator, start_gold: int, budget: int, star
 	refresh_offers(false)
 
 
+## Series (Battle Chess 10 rounds / survival): between two rounds the army, gold, level and hand stay; the player earns
+## income, the shop is dealt again and the free rerolls come back.
+func start_next_round(income: int) -> void:
+	finish()
+	gold += income
+	budget_left += income
+	free_reroll = false
+	free_rerolls_left = 0
+	refresh_offers(false)
+
+
 ## Ends preparation: unbought offers go back to the pile.
 func finish() -> void:
 	var back: Array[String] = []

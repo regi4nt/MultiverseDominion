@@ -1,6 +1,9 @@
 {
 	"start_gold": 1500,
 	"start_life": 3,
+	"life_by_difficulty": {"easy": 5, "normal": 3, "hard": 1},
+	"trophy_win": {"easy": 20, "normal": 30, "hard": 40},
+	"trophy_loss": {"easy": -30, "normal": -20, "hard": -10},
 	"start_level": 3,
 	"capacity_per_level": 3,
 	"max_level": 10,

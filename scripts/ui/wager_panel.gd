@@ -13,6 +13,7 @@ var with_difficulty: bool = false  # Battle Chess has no setup screen: the panel
 var _chips: HFlowContainer
 var _info: Label
 var _balance: Label
+var _series_info: Label
 
 
 func _init(k: String = "arena", difficulty_row: bool = false) -> void:
@@ -36,6 +37,23 @@ func _ready() -> void:
 				GameSession.difficulty = d
 				refresh())
 			drow.add_child(b)
+	if with_difficulty:  # Battle Chess: how long the run is (1 round / 10 rounds / until the first defeat)
+		add_child(UiTheme.make_label("Length", 20, UiTheme.COL_TEXT))
+		var lrow := HBoxContainer.new()
+		lrow.add_theme_constant_override("separation", 8)
+		add_child(lrow)
+		var lgroup := ButtonGroup.new()
+		for sid in ShopSystem.SERIES_IDS:
+			var lb := UiTheme.make_toggle(ShopSystem.series_title(sid), lgroup, 48)
+			lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			lb.button_pressed = (GameSession.battle_series == sid)
+			lb.pressed.connect(func():
+				GameSession.battle_series = sid
+				refresh())
+			lrow.add_child(lb)
+		_series_info = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
+		_series_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		add_child(_series_info)
 	var head := HBoxContainer.new()
 	add_child(head)
 	var title := UiTheme.make_label("Wager", 20, UiTheme.COL_TEXT)
@@ -84,13 +102,24 @@ func refresh() -> void:
 		UiTheme.scroll_passthrough(b)
 		_chips.add_child(b)
 	_balance.text = "You have %d coins" % coins
+	if _series_info != null:
+		_series_info.text = ShopSystem.series_desc(GameSession.battle_series)
 	var stake := GameSession.wager
 	if stake <= 0:
 		_info.text = "No wager. Pick a stake to bet Aether Coins: win it back with a bonus, lose it if you lose."
 	else:
 		var o := odds()
+		var tail := ""
+		if kind == "battle_chess":
+			match GameSession.battle_series:
+				"ten":
+					tail = "  Win = more rounds won than lost. Draw (equal): stake returned. Quitting early forfeits it."
+				"survival":
+					tail = "  Win = clear %d rounds before your first defeat." % ShopSystem.SERIES_SURVIVAL_TARGET
+				_:
+					tail = "  Draw: stake returned."
 		_info.text = "Stake %d paid at the start.  Win: +%d coins back (x%s).  Lose: the stake is gone.%s" % [
-			stake, ShopSystem.wager_payout(stake, o), _fmt(o), "  Draw: stake returned." if kind == "battle_chess" else ""]
+			stake, ShopSystem.wager_payout(stake, o), _fmt(o), tail]
 
 
 static func _fmt(o: float) -> String:

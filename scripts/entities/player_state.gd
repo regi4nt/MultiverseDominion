@@ -15,6 +15,7 @@ var color: Color = Color.WHITE
 var position: int = 0
 var gold: int = 0
 var life: int = 3
+var max_life: int = 3  # starting Life of the match difficulty (easy 5 / normal 3 / hard 1): the cap for every heal
 var level: int = 3  # Chess Capacity data is prepared; used from Phase 4.
 var capacity: int = 9
 var reroll_tokens: int = 0

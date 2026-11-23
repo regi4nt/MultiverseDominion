@@ -190,7 +190,7 @@ static func _casino_choice(c: MatchController, p: PlayerState) -> String:
 static func _shop_choice(c: MatchController, p: PlayerState) -> String:
 	var heal_price := c.heal_price_for(p)
 	var reroll_price := c.token_price_for(p)
-	if p.life < int(GameData.b("start_life")) and p.gold >= heal_price + 150:
+	if p.life < p.max_life and p.gold >= heal_price + 150:
 		return "heal"
 	if p.difficulty != "easy" and p.special_dice.is_empty() and p.gold >= c.special_die_price() + 500:
 		return "special"
@@ -281,7 +281,7 @@ static func _use_special_die(c: MatchController, p: PlayerState) -> bool:
 				if c._owned_land_count(p) == 0:
 					continue  # nothing to reap
 			"heal":
-				if p.life >= int(GameData.b("start_life")):
+				if p.life >= p.max_life:
 					continue  # already at full Life
 		return c.use_special_die(i) == ""
 	return false

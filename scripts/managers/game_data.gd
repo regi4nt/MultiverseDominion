@@ -83,6 +83,12 @@ func b(key: String, default_value: Variant = 0) -> Variant:
 	return balance.get(key, default_value)
 
 
+## Starting (= maximum) Life for a match difficulty: easy 5 / normal 3 / hard 1 (balance.json "life_by_difficulty").
+func life_for(difficulty: String) -> int:
+	var t: Dictionary = balance.get("life_by_difficulty", {})
+	return int(t.get(difficulty, balance.get("start_life", 3)))
+
+
 func get_continent(id: String) -> Dictionary:
 	for c in continents:
 		if c["id"] == id:

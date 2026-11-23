@@ -38,37 +38,54 @@ func _win(cid: String, fid: String, journey: bool = true) -> void:
 
 func _test_unlock_rules() -> void:
 	_fresh_save()
-	check(SaveManager.journey_frontier() == "aetherion", "a new save starts the Journey on Aetherion")
-	check(SaveManager.journey_picks_available() == 0 and not SaveManager.choose_continent("arcanum"), "no continent can be opened at the start")
+	check(SaveManager.journey_frontier() == "aetherion" and SaveManager.trophies() == 0, "a new save starts the Journey on Aetherion with 0 trophies")
+	check(SaveManager.next_continent_goal() == "arcanum" and SaveManager.continent_trophies("arcanum") == 150, "the next goal is Arcanum at 150 trophies")
 	_win("aetherion", "solvaris", false)  # Arena win
-	check(SaveManager.journey_won_factions("aetherion").is_empty(), "an Arena win counts for nothing")
-	SaveManager.record_match(false, 10, 100, "aetherion", true, "solvaris")  # Journey defeat
-	check(SaveManager.journey_won_factions("aetherion").is_empty(), "a Journey defeat counts for nothing")
-	_win("aetherion", "solvaris")
-	_win("aetherion", "solvaris")
-	check(SaveManager.journey_won_factions("aetherion") == ["solvaris"], "a Journey win counts once per faction")
-	_win("aetherion", "astralis")  # a faction of another continent
-	check(SaveManager.journey_won_factions("aetherion") == ["solvaris"], "a faction of another continent does not count towards mastery")
-	_win("aetherion", "nocthyr")
-	_win("aetherion", "valdoria")
-	check(not SaveManager.is_journey_cleared("aetherion") and SaveManager.journey_picks_available() == 0, "3 of 4 factions: not mastered, no unlock yet")
-	_win("aetherion", "elarion")
-	check(SaveManager.is_journey_cleared("aetherion"), "all 4 factions won: the continent is mastered")
-	check(SaveManager.journey_picks_available() == 1, "a mastered continent earns one unlock")
-	check(not SaveManager.is_continent_unlocked("arcanum"), "mastering does not open a continent by itself")
-	check(not SaveManager.choose_continent("aetherion"), "an open continent cannot be 'chosen'")
-	check(SaveManager.choose_continent("machina"), "the player can choose ANY locked continent")
-	check(SaveManager.is_continent_unlocked("machina") and SaveManager.can_use_faction("ferrum"), "the chosen continent and its factions are open")
-	check(not SaveManager.is_continent_unlocked("arcanum"), "the others stay locked")
-	check(SaveManager.journey_picks_available() == 0 and not SaveManager.choose_continent("arcanum"), "one mastery = one unlock")
-	check(SaveManager.journey_frontier() == "machina", "the Journey goal moves to the open continent that is not mastered")
-	for f in ["ferrum", "voltrix", "chronex", "nexaris"]:
-		_win("machina", f)
-	check(SaveManager.journey_picks_available() == 1, "mastering the new continent earns the next unlock")
-	check(SaveManager.choose_continent("eclipsia") and SaveManager.journey_picks_available() == 0, "and it can be spent on another continent")
+	check(SaveManager.trophies() == 0, "an Arena win earns no trophies")
+	SaveManager.record_match(false, 10, 100, "aetherion", true, "solvaris")  # Journey defeat at the floor
+	check(SaveManager.trophies() == 0 and SaveManager.last_trophy_delta == 0, "trophies never drop below the floor (0 at the start)")
+	SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "normal")
+	check(SaveManager.trophies() == 30 and SaveManager.last_trophy_delta == 30, "a Journey win on Normal gives +30 trophies")
+	SaveManager.record_match(false, 10, 100, "aetherion", true, "solvaris", {}, "normal")
+	check(SaveManager.trophies() == 10, "a Journey defeat on Normal takes 20 trophies")
+	SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "hard")
+	SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "easy")
+	check(SaveManager.trophies() == 10 + 40 + 20, "Hard wins give +40, Easy wins +20")
+	SaveManager.record_match(false, 10, 100, "aetherion", true, "solvaris", {}, "easy")
+	SaveManager.record_match(false, 10, 100, "aetherion", true, "solvaris", {}, "hard")
+	check(SaveManager.trophies() == 70 - 30 - 10, "Easy defeats take 30, Hard defeats only 10")
+	# climb to the Arcanum threshold: the continent opens by itself, only its cards are opened for the Shop
+	_fresh_save()
+	var wins := 0
+	while not SaveManager.is_continent_unlocked("arcanum") and wins < 20:
+		SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "normal")
+		wins += 1
+	check(wins == 5 and SaveManager.trophies() == 150, "5 Normal wins reach 150 trophies and open Arcanum")
+	check(SaveManager.last_opened_continents == ["arcanum"], "the result reports the newly opened continent")
+	check(SaveManager.can_use_faction("astralis"), "the opened continent's factions can be used")
+	check(not SaveManager.is_continent_unlocked("machina"), "the next continent stays locked")
+	check(SaveManager.journey_frontier() == "arcanum", "the Journey continent moves to the newest open one")
+	check(SaveManager.trophy_floor() == 150, "the trophy floor is the threshold of the highest open continent")
+	SaveManager.record_match(false, 10, 100, "arcanum", true, "astralis", {}, "easy")
+	check(SaveManager.trophies() == 150 and SaveManager.is_continent_unlocked("arcanum"), "a defeat cannot take you below the floor or close a continent")
 	for c in GameData.continents:
 		SaveManager.unlock_continent(String(c["id"]))
-	check(SaveManager.journey_picks_available() == 0, "with everything open there is nothing left to pick")
+	check(SaveManager.next_continent_goal() == "", "with everything open there is no next goal")
+	# an older save: every unit owned, factions-based Journey -> keeps the units, trophies start at the floor of the open continents
+	var old := SaveManager.default_data()
+	old["collection"] = {}
+	for id in CardDatabase.all_unit_ids_any_continent():
+		old["collection"][id] = 9
+	old["unlocked_continents"] = ["aetherion", "machina"]
+	old.erase("unit_cards_v")
+	SaveManager.data = old
+	SaveManager.ensure_collection()
+	check(SaveManager.data["unit_cards_v"] == 2, "an old save is migrated once")
+	check(SaveManager.trophies() == 400, "an old save starts the trophy road at its highest open continent")
+	var all_owned := true
+	for id in CardDatabase.all_unit_ids_any_continent():
+		all_owned = all_owned and SaveManager.owned_count(id) > 0
+	check(all_owned, "an old save keeps every unit card it owned")
 
 
 func _test_config() -> void:
@@ -201,23 +218,18 @@ func _test_ui() -> void:
 	check(n._view == "setup" and n._kind == "journey", "tapping Journey opens its setup")
 	check(GameSession.category == "journey" and GameSession.mode == "custom_ai" and GameSession.ai_count == 1, "Journey is always 1 vs 1")
 	check(GameSession.continent_id == "aetherion", "Journey preselects the continent to master")
-	check(_find_button(n, "2.  ARCANUM") != null and _find_button(n, "2.  ARCANUM").disabled, "Journey: locked continents stay locked until one is earned")
-	check(_find_button(n, "1.  AETHERION").text.find("0 / 4") >= 0, "the continent row shows the factions won")
+	check(_find_button(n, "2.  ARCANUM") != null and _find_button(n, "2.  ARCANUM").disabled, "Journey: locked continents stay locked until the trophies are reached")
+	check(_find_button(n, "2.  ARCANUM").text.find("150 trophies") >= 0, "a locked continent row shows the trophies it needs")
+	check(_find_button(n, "1.  AETHERION").text.find("Open") >= 0, "an open continent row says Open")
 	check(_find_button(n, "1 vs 1") == null, "Journey has no player-count choice")
 	check(n._journey_hint.text.find("Solvaris") >= 0 and n._journey_hint.text.find("AETHERION") >= 0, "Journey hint names the faction that must win")
-	# earn an unlock: win with all 4 Aetherion factions
-	for f in ["solvaris", "nocthyr", "valdoria", "elarion"]:
-		_win("aetherion", f)
+	# climb the trophy road: the continent opens by itself
+	for i in range(5):
+		SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "normal")
 	n._show_setup("journey")
 	var arc := _find_button(n, "2.  ARCANUM")
-	check(arc != null and not arc.disabled and arc.text.find("Tap to unlock") >= 0, "an earned unlock makes the locked continents choosable")
-	check(_find_button(n, "5.  DRAKMOR").text.find("Tap to unlock") >= 0, "any locked continent can be chosen, not only the next one")
-	arc.pressed.emit()
-	var dlg: UiDialog = n.get_node("UnlockDialog")
-	check(dlg != null and not SaveManager.is_continent_unlocked("arcanum"), "choosing asks for confirmation first")
-	dlg.confirmed.emit()
-	check(SaveManager.is_continent_unlocked("arcanum"), "confirming opens the chosen continent")
-	check(_find_button(n, "3.  MACHINA").disabled and _find_button(n, "3.  MACHINA").text.find("Locked") >= 0, "the unlock is spent: the others are locked again")
+	check(arc != null and not arc.disabled and arc.text.find("Open") >= 0, "reaching the trophies opens the continent")
+	check(_find_button(n, "3.  MACHINA").disabled and _find_button(n, "3.  MACHINA").text.find("400 trophies") >= 0, "the next continent stays locked")
 	check(GameSession.continent_id == "arcanum", "the Journey now points at the new continent")
 	check(n._journey_hint.text.find("not a faction of") >= 0, "a faction of another continent is explained as not counting")
 	n.on_back_requested()

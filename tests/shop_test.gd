@@ -140,6 +140,161 @@ func _ready() -> void:
 	SaveManager.record_match(false, 10, 100, "")
 	check(SaveManager.coins() == ShopSystem.WIN_REWARD + ShopSystem.LOSS_REWARD, "a defeat pays %d coins" % ShopSystem.LOSS_REWARD)
 
+	# --- rewards by difficulty (easy < normal < hard)
+	for d in ["easy", "normal", "hard"]:
+		SaveManager.data["wallet"]["coins"] = 0
+		SaveManager.record_match(true, 10, 100, "", false, "", {}, d)
+		check(SaveManager.last_reward == ShopSystem.WIN_REWARD_BY_DIFF[d], "%s victory pays %d coins" % [d, ShopSystem.WIN_REWARD_BY_DIFF[d]])
+		SaveManager.record_match(false, 10, 100, "", false, "", {}, d)
+		check(SaveManager.last_reward == ShopSystem.LOSS_REWARD_BY_DIFF[d], "%s defeat pays %d coins" % [d, ShopSystem.LOSS_REWARD_BY_DIFF[d]])
+	check(ShopSystem.win_reward("easy") < ShopSystem.win_reward("normal") and ShopSystem.win_reward("normal") < ShopSystem.win_reward("hard"), "win reward grows with difficulty")
+	check(ShopSystem.win_reward("normal") == ShopSystem.WIN_REWARD and ShopSystem.loss_reward("normal") == ShopSystem.LOSS_REWARD, "normal keeps the standard reward")
+	check(ShopSystem.practice_reward(true, "hard") > ShopSystem.practice_reward(true, "easy"), "Battle Chess pays more on hard")
+
+	# --- unit cards are locked at the start: the starter set is the 8 Pawns + the 7 Solvaris pieces
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.ensure_collection()
+	var starter := SaveManager.starter_unit_ids()
+	check(starter.size() == 15, "the starter set is exactly 15 unit types (%d)" % starter.size())
+	var owned_units := 0
+	for id in CardDatabase.all_unit_ids_any_continent():
+		owned_units += 1 if SaveManager.owned_count(id) > 0 else 0
+	check(owned_units == 15 and SaveManager.owned_count(starter[0]) == int(GameData.b("unit_copies")), "a new save owns only the starter units (x%d)" % int(GameData.b("unit_copies")))
+	CardDatabase.set_continent("aetherion")
+	var dk := SaveManager.get_deck("aetherion")
+	check(dk.effective_unit_ids().size() == 15 and dk.validate(SaveManager.data["collection"]).is_empty(), "the default deck is valid with the starter units")
+	var foreign := SaveManager.get_deck("arcanum")
+	for id in foreign.effective_unit_ids():
+		check(SaveManager.owned_count(id) > 0, "a deck never uses a locked unit card (%s)" % id)
+		break
+	# only continents opened on the trophy road are sold
+	var for_sale := ShopSystem.shop_units("", true)
+	var only_open := true
+	for u in for_sale:
+		only_open = only_open and SaveManager.is_continent_unlocked(String(CardDatabase.get_unit(String(u["id"])).get("continent", "aetherion")) if CardDatabase.get_unit(String(u["id"])).has("continent") else "aetherion")
+	check(not for_sale.is_empty() and for_sale.all(func(u): return String(u["chess"]) != "pawn" and String(u["rarity"]) != "common"), "the Shop sells locked non-starter unit cards (%d)" % for_sale.size())
+	var arc_unit := ""
+	for u in CardDatabase.units_of_continent("arcanum"):
+		if String(u["chess"]) != "pawn":
+			arc_unit = String(u["id"])
+			break
+	check(arc_unit != "" and not ShopSystem.unit_for_sale(arc_unit) and ShopSystem.buy(arc_unit) != "", "a unit card of a locked continent is not sold")
+	SaveManager.unlock_continent("arcanum")
+	check(ShopSystem.unit_for_sale(arc_unit), "opening the continent adds its unit cards to the Shop")
+	var uc := ShopSystem.card_by_id(arc_unit)
+	check(ShopSystem.is_unit_card(uc) and ShopSystem.buy_price(uc) == int(ShopSystem.UNIT_BUY_PRICE[String(uc["rarity"])]), "a unit card has its own price")
+	SaveManager.data["wallet"]["coins"] = 0
+	check(ShopSystem.buy(arc_unit) == "Not enough Aether Coins." and SaveManager.owned_count(arc_unit) == 0, "buying a unit without coins fails")
+	SaveManager.data["wallet"]["coins"] = ShopSystem.buy_price(uc)
+	check(ShopSystem.buy(arc_unit) == "" and SaveManager.owned_count(arc_unit) == int(GameData.b("unit_copies")) and SaveManager.coins() == 0, "buying a unit with coins unlocks all its copies")
+	check(ShopSystem.buy(arc_unit) == "You already own this card.", "an owned unit cannot be bought again")
+	SaveManager.data["wallet"]["crystals"] = ShopSystem.crystal_price(uc) - 1
+	var other := ""
+	for u in CardDatabase.units_of_continent("arcanum"):
+		if String(u["chess"]) != "pawn" and SaveManager.owned_count(String(u["id"])) == 0 and String(u["rarity"]) == String(uc["rarity"]):
+			other = String(u["id"])
+			break
+	check(ShopSystem.buy(other, "crystals") == "Not enough Crystals.", "a unit needs enough crystals")
+	SaveManager.add_currency("crystals", 1)
+	check(ShopSystem.buy(other, "crystals") == "" and SaveManager.owned_count(other) > 0 and SaveManager.crystals() == 0, "crystals buy a unit")
+	var fu := ""
+	for u in ShopSystem.shop_units("", true):
+		fu = String(u["id"])
+		break
+	SaveManager.data["wallet"]["fragments"] = ShopSystem.fragment_price(ShopSystem.card_by_id(fu)) - 1
+	check(ShopSystem.exchange(fu) == "Not enough Card Fragments.", "fragments must cover the unit price")
+	SaveManager.add_fragments(1)
+	check(ShopSystem.exchange(fu) == "" and SaveManager.owned_count(fu) > 0, "fragments exchange for a unit")
+	# a bought unit becomes usable in a custom deck of its continent
+	var d2 := SaveManager.get_deck("arcanum")
+	var still_locked := String(ShopSystem.shop_units("", true)[0]["id"])
+	check(d2.is_owned(arc_unit) and not d2.is_owned(still_locked), "the deck sees which unit cards are owned")
+
+	# --- Unit Gacha
+	var urng := RandomNumberGenerator.new()
+	urng.seed = 7
+	SaveManager.data["wallet"]["coins"] = 5000
+	var before_units := ShopSystem.shop_units("", true).size()
+	var up := ShopSystem.pull_batch(10, urng, "unit")
+	check(up.size() == 10 and SaveManager.coins() == 5000 - ShopSystem.PULL10_PRICE, "a unit 10-pull costs %d coins" % ShopSystem.PULL10_PRICE)
+	var all_units_ok := true
+	var pulled_open := true
+	for r in up:
+		all_units_ok = all_units_ok and ShopSystem.is_unit_card(ShopSystem.card_by_id(String(r["id"]))) and String(r["rarity"]) in ["rare", "epic"]
+		pulled_open = pulled_open and SaveManager.owned_count(String(r["id"])) > 0
+	check(all_units_ok and pulled_open, "unit pulls give Rare / Epic unit cards and own them")
+	check(ShopSystem.shop_units("", true).size() < before_units or before_units == 0, "new unit cards leave the locked list")
+	var upity := RandomNumberGenerator.new()
+	upity.seed = 3
+	check(ShopSystem.roll_unit_rarity(upity, ShopSystem.UNIT_PITY_LIMIT - 1) == "epic", "the unit pity pull is Epic")
+	var ucount := {"rare": 0, "epic": 0}
+	for i in range(3000):
+		ucount[ShopSystem.roll_unit_rarity(upity, 0)] += 1
+	check(ucount["rare"] > ucount["epic"] * 3 and ucount["epic"] > 0, "unit rarity frequencies follow the rates (%s)" % str(ucount))
+	var dup_frag := SaveManager.fragments()
+	var dups := 0
+	for i in range(40):
+		for r in ShopSystem.pull_batch(1, urng, "unit"):
+			dups += 0 if bool(r["new"]) else 1
+	check(dups == 0 or SaveManager.fragments() > dup_frag, "duplicate unit pulls become fragments")
+	# tickets pay a pull
+	SaveManager.data["wallet"]["tickets"] = 0
+	check(ShopSystem.pull_batch(1, urng, "support", "tickets").is_empty(), "a ticket pull without tickets fails")
+	SaveManager.data["wallet"]["tickets"] = ShopSystem.TICKET_PULL10
+	var coins_now := SaveManager.coins()
+	check(ShopSystem.pull_batch(10, urng, "unit", "tickets").size() == 10 and SaveManager.tickets() == 0 and SaveManager.coins() == coins_now, "a 10-pull costs 9 tickets and no coins")
+
+	# --- Exchange (penukaran)
+	SaveManager.data["wallet"] = {"coins": 1000, "fragments": 0, "tickets": 0, "crystals": 0, "chips": 0}
+	check(ShopSystem.convert_currency("coins_ticket", 3) == "" and SaveManager.tickets() == 3 and SaveManager.coins() == 700, "coins -> tickets: 100 coins = 1 ticket")
+	check(ShopSystem.convert_currency("ticket_crystal", 1) == "" and SaveManager.crystals() == 1 and SaveManager.tickets() == 0, "tickets -> crystals: 3 tickets = 1 crystal")
+	check(ShopSystem.convert_currency("ticket_crystal", 1) == "Not enough Gacha Tickets.", "not enough tickets for a crystal")
+	check(ShopSystem.convert_currency("coins_chip", 2) == "" and SaveManager.chips() == 200 and SaveManager.coins() == 500, "coins -> chips: 100 coins = 100 chips")
+	check(ShopSystem.convert_currency("chip_coins", 2) == "" and SaveManager.chips() == 0 and SaveManager.coins() == 660, "chips -> coins: 100 chips = 80 coins (a round trip loses 20%)")
+	check(ShopSystem.convert_currency("chip_coins", 1) == "Not enough Chips.", "no chips left")
+	SaveManager.data["wallet"]["fragments"] = 25
+	check(ShopSystem.convert_currency("fragment_coins", 2) == "" and SaveManager.fragments() == 5 and SaveManager.coins() == 700, "fragments -> coins: 10 fragments = 20 coins")
+	check(ShopSystem.convert_currency("coins_fragment", 2) == "" and SaveManager.fragments() == 25 and SaveManager.coins() == 600, "coins -> fragments: 50 coins = 10 fragments")
+	check(not ShopSystem.can_convert("coins_ticket", 7) and ShopSystem.can_convert("coins_ticket", 6), "can_convert follows the balance")
+	var no_loop := true
+	for e in ShopSystem.EXCHANGES:
+		for back in ShopSystem.EXCHANGES:
+			if String(back["from"]) == String(e["to"]) and String(back["to"]) == String(e["from"]):
+				no_loop = no_loop and (float(e["to_n"]) / float(e["from_n"])) * (float(back["to_n"]) / float(back["from_n"])) < 1.0
+	check(no_loop, "exchanging back and forth never makes money")
+	var six := ["coins_ticket", "ticket_crystal", "coins_chip", "chip_coins", "fragment_coins", "coins_fragment"]
+	var ids: Array = ShopSystem.EXCHANGES.map(func(e): return String(e["id"]))
+	check(ids == six, "the six exchanges: coins/ticket, ticket/crystal, coins/chip, chip/coins, fragment/coins, coins/fragment")
+
+	# --- Gamble: chips only
+	var grng := RandomNumberGenerator.new()
+	grng.seed = 11
+	SaveManager.data["wallet"] = {"coins": 500, "fragments": 0, "tickets": 0, "crystals": 0, "chips": 0}
+	check(not bool(ShopSystem.gamble("coin", "heads", 100, grng)["ok"]) and SaveManager.coins() == 500, "gambling needs chips: coins are never used")
+	SaveManager.data["wallet"]["chips"] = 50
+	check(String(ShopSystem.gamble("coin", "heads", 100, grng)["error"]) == "Not enough Chips.", "a bet above your chips is refused")
+	check(String(ShopSystem.gamble("coin", "", 100, grng)["error"]) != "" and String(ShopSystem.gamble("dice", "mid", 100, grng)["error"]) != "" and String(ShopSystem.gamble("coin", "heads", 123, grng)["error"]) != "", "bad picks / bets are refused without paying")
+	check(SaveManager.chips() == 50, "a refused round costs nothing")
+	# the simulated return matches the rules, and every game leaves the house a small edge
+	for g in ["coin", "dice", "slots"]:
+		var choice := {"coin": "heads", "dice": "high", "slots": ""}[g] as String
+		var staked := 0
+		var back := 0
+		SaveManager.data["wallet"]["chips"] = 100000000
+		var rounds := 20000
+		for i in range(rounds):
+			var r := ShopSystem.gamble(g, choice, 100, grng)
+			staked += int(r["bet"])
+			back += int(r["payout"])
+			if i == 0:
+				check(int(r["net"]) == int(r["payout"]) - 100, "%s: net = payout - bet" % g)
+		var rtp := float(back) / float(staked)
+		check(rtp > 0.85 and rtp < 1.02, "%s returns about %d%% over %d rounds (%.3f)" % [g, int(round(rtp * 100.0)), rounds, rtp])
+	check(ShopSystem.SLOT_EXPECTED_RETURN < 1.0 and ShopSystem.COIN_WIN_CHANCE * 2.0 < 1.0 and 15.0 / 36.0 * float(ShopSystem.DICE_PAYOUT["high"]) < 1.0 and 6.0 / 36.0 * float(ShopSystem.DICE_PAYOUT["seven"]) < 1.0, "every game has a house edge")
+	SaveManager.data["wallet"]["chips"] = 1000
+	var w := ShopSystem.gamble("coin", "heads", 1000, grng)
+	check(SaveManager.chips() == int(w["payout"]) and (int(w["payout"]) == 2000 or int(w["payout"]) == 0), "a coin flip pays double or nothing")
+
 	SaveManager.data = saved
 	SaveManager.save_game()
 	print("SHOP TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)

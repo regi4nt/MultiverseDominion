@@ -38,6 +38,7 @@ func land_on_auction(c: MatchController, pid: int) -> void:
 
 func _ready() -> void:
 	_test_auction()
+	_test_life_by_difficulty()
 	_test_dice()
 	_test_unlocks()
 	_test_upgrades()
@@ -591,6 +592,23 @@ func _test_unlocks() -> void:
 	check(SaveManager.record_match(false, 10, 100, "") == "" and SaveManager.data["stats"]["wins"] == before, "a defeat unlocks nothing")
 	SaveManager.data = saved
 	SaveManager.save_game()
+
+
+## Life by difficulty: easy 5 / normal 3 / hard 1 (heals are capped at it); the tutorial keeps 3; it survives save/resume.
+func _test_life_by_difficulty() -> void:
+	var want := {"easy": 5, "normal": 3, "hard": 1}
+	for d in want:
+		var c := MatchController.new()
+		c.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": d, "ai_count": 3, "seed": 7, "all_ai": true})
+		var ok := true
+		for p in c.players:
+			ok = ok and p.life == int(want[d]) and p.max_life == int(want[d])
+		check(ok, "%s: every ruler starts with %d Life" % [d, int(want[d])])
+		var back := MatchController.from_dict(c.to_dict())
+		check(back.players[0].max_life == int(want[d]) and back.match_difficulty == d, "%s: Life cap and difficulty survive a save" % d)
+	var t := MatchController.new()
+	t.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 4242, "tutorial": true, "round_limit": 10})
+	check(t.players[0].life == 3, "the tutorial keeps 3 Life")
 
 
 func _test_games() -> void:

@@ -61,6 +61,15 @@ var _leave_dialog: UiDialog
 var _start_dialog: UiDialog
 var _wager: int = 0  # Battle Chess stake (already paid); a win pays stake x odds, a draw returns it
 var _wager_odds: float = 2.0
+var _series: String = "single"  # Battle Chess length (GameSession.battle_series): "single" | "ten" | "survival"
+var _round: int = 1
+var _wins: int = 0
+var _losses: int = 0
+var _draws: int = 0
+var _series_coins: int = 0  # Aether Coins earned over the whole run (shown in the final summary)
+var _forfeited: bool = false  # "End Run" in a 10-round run: the wager counts as lost
+var _series_over: bool = false  # the run is finished (or was a single battle): the result screen offers New Battle / Main Menu
+var _result_dim: ColorRect  # the result screen of the round that was just played
 
 
 func _ready() -> void:
@@ -70,6 +79,7 @@ func _ready() -> void:
 		_wager = GameSession.wager
 		_wager_odds = GameSession.wager_odds
 		GameSession.wager = 0
+		_series = GameSession.battle_series if ShopSystem.SERIES_IDS.has(GameSession.battle_series) else "single"
 	if duel_context.is_empty():
 		CardDatabase.set_continent(GameSession.continent_id)
 		WorldMods.apply(GameData.get_continent(CardDatabase.active_continent))
@@ -328,12 +338,28 @@ func _build_ui() -> void:
 	add_child(_start_dialog)
 
 
-## Menu button / Android Back in Battle Chess: ask first, unless the battle is already over.
+## "Round 3 / 10  W2 L0 D1\n" (10 rounds), "Round 4  W3 L0 D1\n" (survival), "" for a single battle or a duel.
+func _round_line() -> String:
+	if not duel_context.is_empty() or _series == "single":
+		return ""
+	var of_txt := " / %d" % ShopSystem.SERIES_TEN_ROUNDS if _series == "ten" else ""
+	return "Round %d%s  W%d L%d D%d\n" % [_round, of_txt, _wins, _losses, _draws]
+
+
+## Menu button / Android Back in Battle Chess: ask first, unless the run is already over.
 func _request_leave() -> void:
-	if _result_shown:
+	if _result_shown and _series_over:
 		get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
-	else:
-		_leave_dialog.popup_centered(Vector2i(460, 170))
+		return
+	var txt := "Leave Battle Chess? This battle will be lost and pays no coins."
+	if _series != "single":
+		txt = "Leave the run? The coins you already earned stay."
+		if _wager > 0:
+			txt += " Your wager of %d coins is forfeited." % _wager
+	elif _wager > 0:
+		txt = "Leave Battle Chess? This battle will be lost, pays no coins and your wager of %d coins is forfeited." % _wager
+	_leave_dialog.dialog_text = txt
+	_leave_dialog.popup_centered(Vector2i(460, 170))
 
 
 func on_back_requested() -> void:
@@ -352,7 +378,7 @@ func _on_start_pressed() -> void:
 # ------------------------------------------------------------------ preparation
 
 func _refresh_prep() -> void:
-	status_label.text = "Gold %d | Budget %d\nLevel %d | Capacity %d/%d" % [prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
+	status_label.text = "%sGold %d | Budget %d\nLevel %d | Capacity %d/%d" % [_round_line(), prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
 	for c in shop_box.get_children():
 		shop_box.remove_child(c)
 		c.queue_free()
@@ -611,7 +637,8 @@ func _on_start_battle() -> void:
 	var enemy_cfg: Dictionary
 	if duel_context.is_empty():
 		var diff := String(GameSession.difficulty)
-		var enemy_prep := BattleAI.build_enemy(diff, prep.level + (1 if diff == "hard" else 0), rng, deck, terrain)
+		var enemy_level := prep.level + (1 if diff == "hard" else 0) + ShopSystem.series_level_bonus(_round)
+		var enemy_prep := BattleAI.build_enemy(diff, enemy_level, rng, deck, terrain, ShopSystem.series_budget_mult(_round))
 		_enemy_champion = BattleAI.pick_champion(rng, champion_id)
 		_enemy_hand = BattleAI.pick_hand(deck, rng, 2)
 		enemy_cfg = enemy_prep.to_side_cfg(_enemy_champion, _enemy_hand)
@@ -637,7 +664,7 @@ func _on_start_battle() -> void:
 	_log_index = 0
 	_rebuild_supports()
 	_rebuild_king()
-	_set_speed(1.0)
+	_set_speed(speed if _round > 1 else 1.0)  # later rounds keep the speed the player picked
 
 
 func _battle_sounds() -> void:
@@ -696,7 +723,7 @@ func _update_battle_ui() -> void:
 	while _log_index < engine.log_lines.size():
 		log_view.add_text(engine.log_lines[_log_index] + "\n")
 		_log_index += 1
-	status_label.text = "Tick %d / %d" % [engine.tick, BattleEngine.MAX_TICKS]
+	status_label.text = "%sTick %d / %d" % [_round_line(), engine.tick, BattleEngine.MAX_TICKS]
 	battle_status.text = "You: %d units, HP %d\nEnemy: %d units, HP %d" % [engine.regulars_alive(0), engine.total_hp(0), engine.regulars_alive(1), engine.total_hp(1)]
 	_refresh_king_btn()
 	_refresh_energy()
@@ -851,30 +878,115 @@ func _show_result() -> void:
 		v.add_child(tl)
 	v.add_child(UiTheme.make_label("Ticks: %d | Your survivors: %d | Enemy survivors: %d" % [engine.tick, engine.regulars_alive(0), engine.regulars_alive(1)], 18))
 	if duel_context.is_empty():
-		var coins := SaveManager.record_practice(won)  # Battle Chess pays Aether Coins (once: _result_shown guards this screen)
-		if _wager > 0:
-			var outcome := "win" if won else ("draw" if engine.winner < 0 else "loss")
-			var paid := SaveManager.settle_wager(_wager, outcome, _wager_odds)
-			match outcome:
-				"win":
-					v.add_child(UiTheme.make_label("Wager won: +%d coins (stake %d, x%s)" % [paid, _wager, str(snappedf(_wager_odds, 0.01))], 20, UiTheme.COL_GOLD))
-				"draw":
-					v.add_child(UiTheme.make_label("Draw: wager of %d coins returned" % paid, 20, UiTheme.COL_GOLD))
-				_:
-					v.add_child(UiTheme.make_label("Wager lost: -%d coins" % _wager, 20, UiTheme.COL_DANGER))
-			_wager = 0  # settled once
-		v.add_child(UiTheme.make_label("Aether Coins: +%d  (total %d)" % [coins, SaveManager.coins()], 20, UiTheme.COL_GOLD))
-	if duel_context.is_empty():
-		var again := UiTheme.make_button("New Battle", 56)
-		again.pressed.connect(func(): get_tree().reload_current_scene())
-		v.add_child(again)
-		var menu := UiTheme.make_button("Main Menu", 56)
-		menu.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
-		v.add_child(menu)
+		_result_dim = dim
+		_result_rewards(v, won)
 	else:
 		var cont := UiTheme.make_button("Continue", 60)
 		cont.pressed.connect(_finish_duel)
 		v.add_child(cont)
+
+
+## Battle Chess result: coins of this round, then either "Next Round" (the run goes on) or the final summary + wager.
+func _result_rewards(v: VBoxContainer, won: bool) -> void:
+	var draw := engine.winner < 0
+	if won:
+		_wins += 1
+	elif draw:
+		_draws += 1
+	else:
+		_losses += 1
+	var coins := SaveManager.record_practice(won, String(GameSession.difficulty))  # once per round: _result_shown guards this screen
+	var bonus := ShopSystem.series_coin_bonus(_series, _round) if won else 0
+	if bonus > 0:
+		SaveManager.add_coins(bonus)
+		SaveManager.save_game()
+	coins += bonus
+	_series_coins += coins
+	v.add_child(UiTheme.make_label(SaveManager.xp_line(), 18, UiTheme.COL_GOLD))
+	var goes_on := ShopSystem.series_continues(_series, _round, _losses)
+	_series_over = not goes_on
+	if _series != "single":
+		v.add_child(UiTheme.make_label("Round %d%s  |  Won %d  Lost %d  Drawn %d" % [_round, " / %d" % ShopSystem.SERIES_TEN_ROUNDS if _series == "ten" else "", _wins, _losses, _draws], 20, UiTheme.COL_TEXT))
+	if bonus > 0:
+		v.add_child(UiTheme.make_label("Aether Coins: +%d  (round bonus +%d, total %d)" % [coins, bonus, SaveManager.coins()], 20, UiTheme.COL_GOLD))
+	else:
+		v.add_child(UiTheme.make_label("Aether Coins: +%d  (total %d)" % [coins, SaveManager.coins()], 20, UiTheme.COL_GOLD))
+	if goes_on:
+		var income := ShopSystem.series_income(_round)
+		v.add_child(UiTheme.make_label("Next: round %d. You get +%d gold and keep your army; the enemy grows stronger." % [_round + 1, income], 16, UiTheme.COL_MUTED))
+		var nxt := UiTheme.make_button("Next Round", 60)
+		nxt.pressed.connect(_next_round)
+		v.add_child(nxt)
+		var quit := UiTheme.make_button("End Run", 52)
+		quit.pressed.connect(func(): _end_run_early(v, nxt, quit))
+		v.add_child(quit)
+		return
+	_finish_series(v, won)
+
+
+## The run is over (single battle done, 10 rounds played, or the survival run ended): summary, wager, buttons.
+func _finish_series(v: VBoxContainer, won: bool) -> void:
+	var outcome := "loss" if _forfeited else ShopSystem.series_outcome(_series, _wins, _losses, 0 if won else (-1 if engine.winner < 0 else 1))
+	if _series != "single":
+		var head := "RUN COMPLETE" if _series == "ten" else "RUN ENDED"
+		v.add_child(UiTheme.make_label("%s: %s  |  %d won, %d lost, %d drawn  |  %d coins earned" % [head, ShopSystem.series_title(_series), _wins, _losses, _draws, _series_coins], 20, UiTheme.COL_GOLD))
+	if _wager > 0:
+		var paid := SaveManager.settle_wager(_wager, outcome, _wager_odds)
+		match outcome:
+			"win":
+				v.add_child(UiTheme.make_label("Wager won: +%d coins (stake %d, x%s)" % [paid, _wager, str(snappedf(_wager_odds, 0.01))], 20, UiTheme.COL_GOLD))
+			"draw":
+				v.add_child(UiTheme.make_label("Draw: wager of %d coins returned" % paid, 20, UiTheme.COL_GOLD))
+			_:
+				v.add_child(UiTheme.make_label("Wager lost: -%d coins" % _wager, 20, UiTheme.COL_DANGER))
+		_wager = 0  # settled once
+	var again := UiTheme.make_button("New Battle", 56)
+	again.pressed.connect(func(): get_tree().reload_current_scene())
+	v.add_child(again)
+	var menu := UiTheme.make_button("Main Menu", 56)
+	menu.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
+	v.add_child(menu)
+
+
+## "End Run" between two rounds: the run stops now. 10 Rounds: a stake is forfeited (no cashing out after a good start);
+## Survival: the wager is judged by the rounds cleared so far.
+func _end_run_early(v: VBoxContainer, nxt: Button, quit: Button) -> void:
+	nxt.queue_free()
+	quit.queue_free()
+	_series_over = true
+	if _series == "ten" and _wager > 0:
+		v.add_child(UiTheme.make_label("Run ended early: the wager is forfeited.", 18, UiTheme.COL_DANGER))
+		_forfeited = true
+	_finish_series(v, true)
+
+
+## Next round of a run: same army, gold + income, new shop, new ground; back to preparation.
+func _next_round() -> void:
+	var played := _round
+	_round += 1
+	prep.start_next_round(ShopSystem.series_income(played))
+	prep.capacity_bonus = 0  # Mercenary Pact lasts one battle
+	terrain = Terrain.generate(rng)
+	prep.set_terrain(terrain)
+	if _result_dim != null:
+		_result_dim.queue_free()
+		_result_dim = null
+	_result_shown = false
+	engine = null
+	phase = "prep"
+	selected = null
+	selected_support = -1
+	log_view.clear()
+	_log_index = 0
+	battle_panel.visible = false
+	battle_left.visible = false
+	prep_panel.visible = true
+	prep_left.visible = true
+	bench_grid.visible = true
+	prep_actions.visible = true
+	grid.show_prep(prep)
+	_msg("")
+	_refresh_prep()
 
 
 ## Duel mode: report the result to the Territory Board (winner is a PLAYER id, -1 = draw).

@@ -51,6 +51,22 @@ func _ready() -> void:
 
 	rows.add_child(_thin_line())
 
+	# Effects: Pro = all animations, Lite = instant results (lighter for weak devices).
+	var fx_row := HBoxContainer.new()
+	fx_row.add_theme_constant_override("separation", 8)
+	var fx_group := ButtonGroup.new()
+	for m in [[FxMode.LITE, "Lite"], [FxMode.PRO, "Pro"]]:
+		var fb := UiTheme.make_toggle(m[1], fx_group, 44.0)
+		fb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		fb.button_pressed = (FxMode.mode() == m[0])
+		var mode_id: String = m[0]
+		fb.pressed.connect(func(): SaveManager.set_setting("effects", mode_id))
+		fx_row.add_child(fb)
+	rows.add_child(_row("Effects", fx_row, true))
+	rows.add_child(UiTheme.make_label("Pro: all animations.  Lite: instant, lighter on weak devices.", 16, UiTheme.COL_MUTED))
+
+	rows.add_child(_thin_line())
+
 	# Difficulty
 	var diff_row := HBoxContainer.new()
 	diff_row.add_theme_constant_override("separation", 8)

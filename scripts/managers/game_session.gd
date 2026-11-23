@@ -17,6 +17,7 @@ var open_deck_tab: bool = false  # the Card Hub opens on the Deck tab (New Match
 var collection_return: String = ""  # scene the Card Hub "Back" button returns to ("" = Main Menu)
 var wager: int = 0  # Aether Coins staked on the next Arena match / Battle Chess battle (already paid when it is set to start)
 var wager_odds: float = 2.0  # win multiplier of that stake (ShopSystem.wager_odds)
+var battle_series: String = "single"  # Battle Chess length: "single" (1 round) | "ten" (10 rounds) | "survival" (until the first defeat)
 var resume_match: bool = false  # Main Menu "Continue Match" -> Territory Board loads user://match.json
 
 
@@ -26,8 +27,8 @@ func start_tutorial() -> void:
 
 
 func to_match_config() -> Dictionary:
-	if mode == "tutorial":  # fixed, easy, 1v1 on Aetherion, 10 rounds
-		return {"mode": mode, "continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "easy", "ai_count": 1,
+	if mode == "tutorial":  # fixed, normal AI, 1v1 on Aetherion, 10 rounds
+		return {"mode": mode, "continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1,
 			"player_name": SaveManager.data["profile"]["name"], "seed": 4242, "tutorial": true, "round_limit": 10}
 	return {
 		"mode": mode,

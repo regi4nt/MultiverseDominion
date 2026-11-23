@@ -167,6 +167,9 @@ func pan_to_tile(i: int) -> void:
 	_kill_camera_tweens()
 	if not is_inside_tree() or _focus.distance_to(target) < 0.002:
 		return
+	if FxMode.is_lite():  # Lite: the camera jumps instead of gliding
+		_set_focus(target)
+		return
 	_pan_tw = create_tween()
 	_pan_tw.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_pan_tw.tween_method(_set_focus, _focus, target, 0.35 / speed_mult)
@@ -196,7 +199,7 @@ func bind(c: MatchController) -> void:
 func _on_dice_rolled(_a: int, _b: int) -> void:
 	if _roll_tw != null and _roll_tw.is_valid():
 		_roll_tw.kill()
-	if not is_inside_tree():
+	if not is_inside_tree() or FxMode.is_lite():  # Lite: the dice show the result at once, no tumble
 		_roll_t = 1.0
 		_update_zoom_lock()
 		queue_redraw()
@@ -226,7 +229,7 @@ func is_busy() -> bool:
 
 func _on_player_moved(pid: int, from_i: int, to_i: int, warped: bool) -> void:
 	var steps := posmod(to_i - from_i, BoardBuilder.TILES_TOTAL)
-	if warped or steps == 0 or steps > 14:
+	if warped or steps == 0 or steps > 14 or FxMode.is_lite():  # Lite: the pawn lands directly, no hopping
 		_visual_pos[pid] = float(to_i)
 		focus_tile(to_i)
 		return
@@ -360,7 +363,7 @@ func _glide() -> void:
 	var v := _vel.limit_length(3.0)
 	_vel = Vector2.ZERO
 	_kill_camera_tweens()
-	if not is_inside_tree():
+	if not is_inside_tree() or FxMode.is_lite():  # Lite: the board stops where the finger lifts
 		return
 	var target := _focus + v * 0.22
 	_inertia_tw = create_tween()

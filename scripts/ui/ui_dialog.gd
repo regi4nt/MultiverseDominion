@@ -54,6 +54,9 @@ func popup_centered(size_hint: Vector2i = Vector2i.ZERO) -> void:
 		return
 	_build(float(size_hint.x))
 	show()
+	if FxMode.is_lite():  # Lite: no fade-in
+		_root.modulate.a = 1.0
+		return
 	_root.modulate.a = 0.0
 	create_tween().tween_property(_root, "modulate:a", 1.0, 0.12)
 

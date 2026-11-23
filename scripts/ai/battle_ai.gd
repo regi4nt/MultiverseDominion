@@ -143,9 +143,10 @@ static func _shop_loop(prep: BattlePrep, difficulty: String, rng: RandomNumberGe
 
 
 ## Standalone AI army (Battle Chess, tests).
-static func build_enemy(difficulty: String, level: int, rng: RandomNumberGenerator, deck: Deck, terrain: Dictionary = {}) -> BattlePrep:
+static func build_enemy(difficulty: String, level: int, rng: RandomNumberGenerator, deck: Deck, terrain: Dictionary = {}, budget_mult: float = 1.0) -> BattlePrep:
 	var budget_table: Dictionary = GameData.b("enemy_budget")
-	var budget := int(budget_table.get(difficulty, 450))
+	var budget := int(float(budget_table.get(difficulty, 450)) * budget_mult)
+	level = mini(level, int(GameData.b("max_level")))
 	var prep := BattlePrep.new(deck, rng, budget, budget, level)
 	prep.terrain = terrain
 	_shop_loop(prep, difficulty, rng)

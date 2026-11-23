@@ -15,6 +15,9 @@ var unit_ids: Array[String] = []  # the 15 chosen unit types; empty = default of
 ## Custom lineup (Lineup tab): where each unit type stands on the deployment area; Auto Deploy follows it.
 ## Entries: {"id": unit card id, "x": column 0..7, "y": row 4..7}. Empty = the default AI formation.
 var lineup: Array = []
+## The player's collection (card id -> copies), set by SaveManager.get_deck: unit cards that are not owned (they come from the
+## Shop) are never used. Empty = no restriction (AI decks, tests).
+var owned_filter: Dictionary = {}
 
 
 static func create_default() -> Deck:
@@ -44,8 +47,22 @@ func effective_unit_ids() -> Array[String]:
 		return unit_ids.duplicate()
 	var out: Array[String] = []
 	for u in CardDatabase.faction_units(faction_id()):
-		out.append(String(u["id"]))
+		if is_owned(String(u["id"])):
+			out.append(String(u["id"]))
 	return out
+
+
+func is_owned(id: String) -> bool:
+	return owned_filter.is_empty() or int(owned_filter.get(id, 0)) > 0
+
+
+## A custom unit list that holds a card the player does not own (any more) goes back to the default (owned) types.
+func sanitize_owned() -> void:
+	for id in unit_ids:
+		if not is_owned(id):
+			unit_ids = [] as Array[String]
+			lineup = []
+			return
 
 
 func card_list() -> Array[String]:

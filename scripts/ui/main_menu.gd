@@ -29,6 +29,10 @@ func _ready() -> void:
 	var tag := UiTheme.make_label("Conquer the Land. Command the Army. Shape the Fate.", 24, UiTheme.COL_MUTED)
 	tag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(tag)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 14)
+	left.add_child(gap)
+	left.add_child(ProfileView.build_card(_show_profile))  # profile (name, title, level, EXP) is on the home screen; tap it for details
 
 	var right := VBoxContainer.new()
 	right.custom_minimum_size = Vector2(380, 0)
@@ -54,9 +58,16 @@ func _ready() -> void:
 	var shop := UiTheme.make_button("Shop")
 	shop.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/shop/shop.tscn"))
 	right.add_child(shop)
-	var profile := UiTheme.make_button("Profile")
-	profile.pressed.connect(_show_profile)
-	right.add_child(profile)
+	var chests := UiTheme.make_button("Chests")
+	if ChestSystem.ready_count() > 0:
+		chests.text = "Chests  (%d ready!)" % ChestSystem.ready_count()
+	chests.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/chests/chests.tscn"))
+	right.add_child(chests)
+	var events := UiTheme.make_button("Events")
+	if EventHub.claimable_count() > 0:
+		events.text = "Events  (%d to claim!)" % EventHub.claimable_count()
+	events.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/events/events.tscn"))
+	right.add_child(events)
 	var settings := UiTheme.make_button("Settings")
 	settings.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/settings/settings.tscn"))
 	right.add_child(settings)
