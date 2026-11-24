@@ -185,7 +185,7 @@ func _test_debt_choice() -> void:
 	c.state = MatchController.State.ROLLED
 	p.gold = 50
 	p.life = 2
-	var debt := 400
+	var debt := 100  # more than the 50 G in hand, but within reach once both lands are sold
 	c._pay_or_ask(p, debt, -1, "test")
 	check(String(c.pending.get("type", "")) == "debt" and c.state == MatchController.State.AWAIT_DECISION, "a human who cannot pay is asked first (no automatic sale)")
 	check(lands[0].owner_id == 0 and lands[1].owner_id == 0 and p.gold == 50, "nothing is sold until the player chooses")
@@ -201,6 +201,7 @@ func _test_debt_choice() -> void:
 	c.decide("sell_%d" % lands[1].index)
 	var life := p.life
 	var hp := c.heal_price_for(p)
+	p.gold = maxi(p.gold, hp + debt)  # land prices vary: make sure the Life purchase below is always exercised
 	if p.life < p.max_life and p.gold >= hp + debt:
 		c.decide("heal")
 		check(p.life == life + 1 and p.gold >= debt, "a Life can be bought with the money raised")

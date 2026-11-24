@@ -146,9 +146,11 @@ func _ready() -> void:
 	# --- match rewards
 	SaveManager.data["wallet"]["coins"] = 0
 	SaveManager.record_match(true, 10, 100, "")
-	check(SaveManager.coins() == ShopSystem.WIN_REWARD and SaveManager.last_reward == ShopSystem.WIN_REWARD, "a victory pays %d coins" % ShopSystem.WIN_REWARD)
+	var level_bonus := SaveManager.last_level_coins  # a level-up in the same match pays extra coins on top of the reward
+	check(SaveManager.coins() - level_bonus == ShopSystem.WIN_REWARD and SaveManager.last_reward == ShopSystem.WIN_REWARD, "a victory pays %d coins" % ShopSystem.WIN_REWARD)
 	SaveManager.record_match(false, 10, 100, "")
-	check(SaveManager.coins() == ShopSystem.WIN_REWARD + ShopSystem.LOSS_REWARD, "a defeat pays %d coins" % ShopSystem.LOSS_REWARD)
+	level_bonus += SaveManager.last_level_coins
+	check(SaveManager.coins() - level_bonus == ShopSystem.WIN_REWARD + ShopSystem.LOSS_REWARD and SaveManager.last_reward == ShopSystem.LOSS_REWARD, "a defeat pays %d coins" % ShopSystem.LOSS_REWARD)
 
 	# --- rewards by difficulty (easy < normal < hard)
 	for d in ["easy", "normal", "hard"]:

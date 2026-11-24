@@ -217,7 +217,7 @@ func _offline_cards() -> Array:
 			"chips": ["40 tiles", "1 vs 1", "2 vs 2", "4 Player"], "status": "Same rules as Arena"},
 		{"id": "battle_chess", "icon": "rook", "title": "BATTLE CHESS", "sub": "8 x 8 auto battle",
 			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle.",
-			"chips": ["8 x 8", "Auto battle", "Earns coins"],
+			"chips": ["8 x 8", "Auto battle"],  # the status line below already says it earns Aether Coins; a third chip wrapped the row and pushed the hub past 720 px
 			"status": "Win +%d to +%d  -  Loss +%d to +%d Aether Coins (by difficulty)" % [ShopSystem.PRACTICE_WIN_BY_DIFF["easy"], ShopSystem.PRACTICE_WIN_BY_DIFF["hard"], ShopSystem.PRACTICE_LOSS_BY_DIFF["easy"], ShopSystem.PRACTICE_LOSS_BY_DIFF["hard"]]},
 		{"id": "tutorial", "icon": "pawn", "title": "TUTORIAL", "sub": "10 rounds  ·  1 vs 1",
 			"desc": "A guided match against a normal AI that explains dice, land, tax and duels as you meet them.",

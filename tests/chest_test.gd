@@ -15,6 +15,11 @@ func check(cond: bool, msg: String) -> void:
 
 func _ready() -> void:
 	var saved: Dictionary = SaveManager.data.duplicate(true)
+	var xp_mid := 0  # the profile comes from the save on disk (left over from other tests): park it in the middle of a level so chest/match XP never triggers a level-up (extra coins, extra chest)
+	for l in range(1, 20):
+		xp_mid += XpSystem.need_for(l)
+	xp_mid += XpSystem.need_for(20) / 2
+	SaveManager.data["profile"]["xp"] = xp_mid
 	ChestSystem.time_offset = 0
 	SaveManager.data["chests"] = {"slots": [null, null, null, null], "opened": 0}
 	SaveManager.data["wallet"] = {"coins": 0, "fragments": 0, "tickets": 0, "crystals": 0, "chips": 0}
@@ -74,7 +79,7 @@ func _ready() -> void:
 	var full := ChestSystem.award_grade("gold")
 	check(full["status"] == "full" and SaveManager.coins() == int(full["coins"]) and int(full["coins"]) > 0, "slots and Storage full: the chest becomes coins")
 	SaveManager.data["wallet"]["coins"] = 0
-	var freed := ChestSystem.slots()[3]
+	var freed = ChestSystem.slots()[3]  # Variant: a slot is a chest Dictionary or null
 	ChestSystem.slots()[3] = null
 	check(ChestSystem.move_to_slot(0) == "" and ChestSystem.grade_at(3) == "gold" and ChestSystem.state(3) == "locked" and ChestSystem.storage_count() == ChestSystem.STORAGE_CAPACITY - 1, "a stored chest moves into a free slot, waiting")
 	check(ChestSystem.move_to_slot(99) != "", "bad Storage index is refused")
@@ -98,6 +103,8 @@ func _ready() -> void:
 	ChestSystem.time_offset = 0
 	SaveManager.data["chests"] = {"slots": [null, null, null, null], "opened": 0, "storage": []}
 	SaveManager.data["wallet"]["coins"] = 0
+	for g in ["silver", "bronze", "gold", "bronze"]:  # the timer tests below expect slot 0 silver, slot 1 bronze, slot 2 gold
+		ChestSystem.award_grade(g)
 
 	# --- timer
 	check(ChestSystem.open(0)["ok"] == false, "a waiting chest cannot be opened")
@@ -122,6 +129,7 @@ func _ready() -> void:
 	check(ChestSystem.state(0) == "ready" and ChestSystem.state(1) == "ready" and ChestSystem.state(2) == "locked", "chests survive save and load")
 
 	# --- opening
+	SaveManager.data["profile"]["xp"] = xp_mid
 	var coins0 := SaveManager.coins()
 	var frag0 := SaveManager.fragments()
 	var xp0 := SaveManager.profile_xp()
@@ -175,6 +183,7 @@ func _ready() -> void:
 	var saved_slots: Array = ChestSystem.slots().duplicate(true)
 	for scenario in [["arena_win", "arena", 0, 1], ["arena_loss", "arena", 1, 0], ["journey_win", "journey", 0, 0]]:
 		SaveManager.data["chests"] = {"slots": [null, null, null, null], "opened": 0}
+		SaveManager.data["profile"]["xp"] = xp_mid
 		GameSession.category = scenario[1]
 		GameSession.mode = "custom_ai"
 		GameSession.ai_count = 1
@@ -206,9 +215,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var found := false
 	for b in menu.find_children("*", "Button", true, false):
-		if (b as Button).text.begins_with("Chests") and (b as Button).text.contains("ready"):
+		if (b as Button).text.begins_with("Events") and (b as Button).text.contains("to claim"):  # chests live in the Events screen: its badge counts ready chests
 			found = true
-	check(found, "main menu has a Chests button that shows ready chests")
+	check(found, "main menu Events button badge counts ready chests")
 	menu.queue_free()
 
 	ChestSystem.time_offset = 0
