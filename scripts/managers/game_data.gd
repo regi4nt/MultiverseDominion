@@ -89,6 +89,20 @@ func life_for(difficulty: String) -> int:
 	return int(t.get(difficulty, balance.get("start_life", 3)))
 
 
+## Starting Dominion Gold of every player for a match difficulty: easy 2000 / normal 1500 / hard 1000 (balance.json "start_gold_by_difficulty").
+func gold_for(difficulty: String) -> int:
+	var t: Dictionary = balance.get("start_gold_by_difficulty", {})
+	return int(t.get(difficulty, balance.get("start_gold", 1500)))
+
+
+## Round limit of a Territory match (the richest player wins when it is reached) per mode and difficulty:
+## balance.json "round_limit_by_mode" -> journey / arena -> easy / normal / hard. Falls back to "max_rounds".
+func round_limit_for(category: String, difficulty: String) -> int:
+	var modes: Dictionary = balance.get("round_limit_by_mode", {})
+	var t: Dictionary = modes.get(category, {})
+	return int(t.get(difficulty, balance.get("max_rounds", 30)))
+
+
 func get_continent(id: String) -> Dictionary:
 	for c in continents:
 		if c["id"] == id:

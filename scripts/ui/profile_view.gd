@@ -78,6 +78,9 @@ static func _avatar(letter: String, size: float = 88.0) -> Control:
 		letter = "P"
 	var av := PanelContainer.new()
 	av.custom_minimum_size = Vector2(size, size)
+	# A row stretches its children to the row height, which turned the avatar into an oval: keep it an exact circle.
+	av.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	av.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var sb := UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 3, int(size * 0.5), 8)
 	sb.content_margin_left = 0
 	sb.content_margin_right = 0
@@ -182,7 +185,7 @@ static func build_card(on_open: Callable) -> Control:
 		pname = "Player"
 	var card := PanelContainer.new()
 	card.name = "ProfileCard"
-	card.custom_minimum_size = Vector2(440, 0)
+	card.custom_minimum_size = Vector2(380, 0)
 	card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.tooltip_text = "Tap for your full profile"
@@ -197,7 +200,9 @@ static func build_card(on_open: Callable) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	pad.add_child(row)
-	row.add_child(_avatar(pname.left(1).to_upper(), 72.0))
+	var av := _avatar(pname.left(1).to_upper(), 72.0)
+	av.size_flags_vertical = Control.SIZE_SHRINK_BEGIN  # top-aligned with the name
+	row.add_child(av)
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.alignment = BoxContainer.ALIGNMENT_CENTER

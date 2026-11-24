@@ -1,12 +1,13 @@
 extends Control
-## Events screen with two tabs: Mission (4 daily missions, reset at midnight) and Achievement (permanent goals).
-## Finished entries show a Claim button that pays the reward (see EventHub).
+## Events screen with three tabs: Mission (4 daily missions, reset at midnight), Achievement (permanent goals)
+## and Chests (the 4 reward-chest slots, see ChestsPanel). Finished entries show a Claim button that pays the reward (see EventHub).
 
-const TABS := [["mission", "Mission"], ["achievement", "Achievement"]]
+const TABS := [["mission", "Mission"], ["achievement", "Achievement"], ["chest", "Chests"]]
 
 var _tab := "mission"
 var _tab_buttons: Dictionary = {}
-var _lists: Dictionary = {}  # tab id -> VBoxContainer
+var _lists: Dictionary = {}  # tab id -> VBoxContainer (mission / achievement)
+var _chest_panel: ChestsPanel
 var _wallet_labels: Dictionary = {}
 var _reset_label: Label
 var _tick := 0.0
@@ -46,7 +47,7 @@ func _ready() -> void:
 	var group := ButtonGroup.new()
 	for spec in TABS:
 		var b := UiTheme.make_toggle(spec[1], group, 52)
-		b.custom_minimum_size.x = 220
+		b.custom_minimum_size.x = 200
 		b.button_pressed = (spec[0] == _tab)
 		b.pressed.connect(_show_tab.bind(spec[0]))
 		tabs.add_child(b)
@@ -58,6 +59,8 @@ func _ready() -> void:
 	tabs.add_child(_reset_label)
 
 	for spec in TABS:
+		if spec[0] == "chest":
+			continue
 		var scroll := UiTheme.make_scroll()
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -68,6 +71,9 @@ func _ready() -> void:
 		scroll.add_child(list)
 		_lists[spec[0]] = list
 		scroll.set_meta("tab", spec[0])
+	_chest_panel = ChestsPanel.new()
+	_chest_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(_chest_panel)
 	_show_tab("mission")
 
 
@@ -84,6 +90,7 @@ func _show_tab(which: String) -> void:
 	_tab = which
 	for id in _lists:
 		(_lists[id].get_parent() as Control).visible = (id == which)
+	_chest_panel.visible = which == "chest"
 	for id in _tab_buttons:
 		(_tab_buttons[id] as Button).set_pressed_no_signal(id == which)
 	_rebuild()
@@ -94,13 +101,17 @@ func _update_header() -> void:
 		(_wallet_labels[k] as Label).text = "%d %s" % [SaveManager.currency(String(k)), k]
 	_reset_label.visible = _tab == "mission"
 	_reset_label.text = "Resets in %s" % ChestSystem.clock_text(EventHub.seconds_to_reset())
-	for id in _tab_buttons:
-		var n := EventHub.claimable_count_in(id == "mission")
-		(_tab_buttons[id] as Button).text = "%s%s" % [String(TABS[0][1] if id == "mission" else TABS[1][1]), "  (%d)" % n if n > 0 else ""]
+	for spec in TABS:
+		var id := String(spec[0])
+		var n := ChestSystem.ready_count() if id == "chest" else EventHub.claimable_count_in(id == "mission")
+		(_tab_buttons[id] as Button).text = "%s%s" % [String(spec[1]), "  (%d)" % n if n > 0 else ""]
 
 
 func _rebuild() -> void:
 	_update_header()
+	if _tab == "chest":
+		_chest_panel.refresh()
+		return
 	var daily := _tab == "mission"
 	var list: VBoxContainer = _lists[_tab]
 	for c in list.get_children():

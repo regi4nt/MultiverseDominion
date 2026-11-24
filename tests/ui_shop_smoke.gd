@@ -7,6 +7,7 @@ func _ready() -> void:
 	SaveManager.data["collection"].clear()
 	SaveManager.ensure_collection()
 	SaveManager.data["wallet"]["coins"] = 5000
+	SaveManager.data["wallet"]["tickets"] = 500
 
 	var menu: Control = load("res://scenes/main_menu/main_menu.tscn").instantiate()
 	add_child(menu)
@@ -24,16 +25,14 @@ func _ready() -> void:
 	var shop: Control = load("res://scenes/shop/shop.tscn").instantiate()
 	add_child(shop)
 	await get_tree().process_frame
-	var gs: Control = shop._views["gacha_support"]
-	var gu: Control = shop._views["gacha_unit"]
-	var bs: Control = shop._views["buy_support"]
-	var bu: Control = shop._views["buy_unit"]
+	var gs: Control = shop._views["gacha"]
+	var bs: Control = shop._views["buy_card"]  # one Buy Card tab: Support + unit cards
 	var ex: Control = shop._views["exchange"]
 	var tabs: Array = shop._tab_buttons.keys()
-	if tabs != ["gacha_support", "gacha_unit", "buy_support", "buy_unit", "exchange", "gamble"] or (shop._tab_buttons["buy_support"] as Button).text != "Buy Support" \
-			or (shop._tab_buttons["buy_unit"] as Button).text != "Buy Unit" or (shop._tab_buttons["exchange"] as Button).text != "Exchange" or (shop._tab_buttons["gamble"] as Button).text != "Gamble":
+	if tabs != ["gacha", "buy_card", "gamble", "exchange"] or (shop._tab_buttons["gacha"] as Button).text != "Card Gacha" or (shop._tab_buttons["buy_card"] as Button).text != "Buy Card" \
+			or (shop._tab_buttons["exchange"] as Button).text != "Exchange" or (shop._tab_buttons["gamble"] as Button).text != "Gamble":
 		fails += 1
-		push_error("tab order: Support Gacha, Unit Gacha, Buy Support, Buy Unit, Exchange (%s)" % str(tabs))
+		push_error("tab order: Card Gacha, Buy Card, Gamble, Exchange (%s)" % str(tabs))
 	if not gs.visible or bs.visible or gs.pull10.disabled:
 		fails += 1
 	gs._on_pull(10)
@@ -41,23 +40,34 @@ func _ready() -> void:
 	if gs.result_flow.get_child_count() != 10:
 		fails += 1
 		push_error("10 pulls should show 10 cards")
-	# --- Buy Support
-	shop._show_tab("buy_support")
+	# --- Buy Card: "All" lists unit + Support cards together
+	shop._show_tab("buy_card")
 	await get_tree().process_frame
+	var n_all: int = bs.grid.get_child_count()
+	if bs.kind != "all" or n_all == 0 or n_all != ShopSystem.locked_supports().size() + ShopSystem.shop_units("", true).size():
+		fails += 1
+		push_error("the Buy Card tab (All) should list every locked Support and unit card (%d)" % n_all)
+	# --- Buy Card: Support filter
+	bs.kind = "support"
+	bs.rebuild()
 	var n: int = bs.grid.get_child_count()
 	if n == 0 or n != ShopSystem.locked_supports().size():
 		fails += 1
-		push_error("the Buy Support tab should list every locked card (%d)" % n)
+		push_error("the Buy Card tab (Support) should list every locked Support card (%d)" % n)
 	var id := String(ShopSystem.locked_supports()[0]["id"])
 	bs._on_card(id)
-	if bs.buy_btn.disabled:
+	SaveManager.data["wallet"]["crystals"] = 50
+	shop._refresh()
+	bs.refresh_buttons()
+	if bs.crystal_btn.disabled:
 		fails += 1
+	var crystals := SaveManager.crystals()
 	var coins := SaveManager.coins()
-	bs._on_pay("coins")
+	bs._on_buy()
 	await get_tree().process_frame
-	if SaveManager.owned_count(id) != 1 or SaveManager.coins() >= coins:
+	if SaveManager.owned_count(id) != 1 or SaveManager.crystals() >= crystals or SaveManager.coins() != coins:
 		fails += 1
-		push_error("buying should unlock the card and cost coins")
+		push_error("buying should unlock the card and cost crystals, never coins")
 	# --- exchange with fragments
 	var id2 := String(ShopSystem.locked_supports()[0]["id"])
 	bs._on_card(id2)
@@ -86,40 +96,68 @@ func _ready() -> void:
 		push_error("Buy with Crystals must be disabled without crystals")
 	SaveManager.add_currency("crystals", 50)
 	shop._refresh()
-	bs._on_pay("crystals")
+	bs._on_buy()
 	if SaveManager.owned_count(id3) != 1 or SaveManager.crystals() >= 50:
 		fails += 1
 		push_error("crystals should buy a card")
+	bs.kind = "support"
 	bs.filter = "Magic"
 	bs.rebuild()
 	if bs.grid.get_child_count() != ShopSystem.locked_supports("Magic").size():
 		fails += 1
-	# --- Unit Gacha
-	shop._show_tab("gacha_unit")
-	await get_tree().process_frame
-	if not gu.visible or gs.visible or gu.pull10.disabled:
+	# --- Card Gacha pools: Unit + Support, Unit, Support
+	shop._show_tab("gacha")
+	SaveManager.data["wallet"]["tickets"] = 100
+	shop._refresh()
+	if not gs.visible or gs.pull10.disabled or gs.mode != "mix" or not (gs._mode_buttons["mix"] as Button).button_pressed:
 		fails += 1
-		push_error("the Unit Gacha tab opens with usable pull buttons")
-	var locked_before := ShopSystem.shop_units("", true).size()
-	gu._on_pull(10)
+		push_error("the Card Gacha tab opens on Unit + Support with usable pull buttons")
+	if gs._mode_buttons.keys() != ["mix", "unit", "support"] or (gs._mode_buttons["unit"] as Button).text != "Unit" or (gs._mode_buttons["support"] as Button).text != "Support":
+		fails += 1
+		push_error("the Card Gacha has three pool buttons: Unit + Support, Unit, Support")
+	gs.set_mode("unit")
 	await get_tree().process_frame
-	if gu.result_flow.get_child_count() != 10:
+	if gs.mode != "unit" or gs.pity_bar.max_value != ShopSystem.UNIT_PITY_LIMIT or gs._chips.get_child_count() != ShopSystem.UNIT_RATES.size():
+		fails += 1
+		push_error("the Unit pool shows its own rates and pity")
+	var locked_before := ShopSystem.shop_units("", true).size()
+	gs._on_pull(10)
+	await get_tree().process_frame
+	if gs.result_flow.get_child_count() != 10:
 		fails += 1
 		push_error("10 unit pulls should show 10 cards")
 	if ShopSystem.shop_units("", true).size() >= locked_before:
 		fails += 1
 		push_error("unit pulls should unlock unit cards")
-	# --- Buy Unit
-	shop._show_tab("buy_unit")
-	await get_tree().process_frame
-	if bu.grid.get_child_count() != ShopSystem.shop_units("", true).size() or bu.grid.get_child_count() == 0:
+	gs.set_mode("support")
+	if gs.pity_bar.max_value != ShopSystem.PITY_LIMIT or gs._chips.get_child_count() != ShopSystem.RATES.size():
 		fails += 1
-		push_error("the Buy Unit tab should list every locked unit card of the open continents (%d)" % bu.grid.get_child_count())
+		push_error("the Support pool shows the Support rates and pity")
+	gs._on_pull(10)
+	await get_tree().process_frame
+	if gs.result_flow.get_child_count() != 10:
+		fails += 1
+		push_error("10 Support pulls should show 10 cards")
+	gs.set_mode("mix")
+	gs._on_pull(10)
+	await get_tree().process_frame
+	if gs.result_flow.get_child_count() != 10:
+		fails += 1
+		push_error("10 mixed pulls should show 10 cards")
+	# --- Buy Card: Unit filter
+	shop._show_tab("buy_card")
+	await get_tree().process_frame
+	bs.kind = "unit"
+	bs.filter = "all"
+	bs.rebuild()
+	if bs.grid.get_child_count() != ShopSystem.shop_units("", true).size() or bs.grid.get_child_count() == 0:
+		fails += 1
+		push_error("the Buy Card tab (Unit) should list every locked unit card of the open continents (%d)" % bs.grid.get_child_count())
 	var uid := String(ShopSystem.shop_units("", true)[0]["id"])
-	bu._on_card(uid)
-	SaveManager.data["wallet"]["coins"] = 5000
+	bs._on_card(uid)
+	SaveManager.data["wallet"]["crystals"] = 50
 	shop._refresh()
-	bu._on_pay("coins")
+	bs._on_buy()
 	await get_tree().process_frame
 	if SaveManager.owned_count(uid) != int(GameData.b("unit_copies")):
 		fails += 1
@@ -136,9 +174,28 @@ func _ready() -> void:
 		push_error("Exchange tab: 500 coins should become 5 tickets")
 	SaveManager.data["wallet"]["coins"] = 0
 	shop._refresh()
-	if not (ex.rows["coins_ticket"]["buttons"][0] as Button).disabled:
+	if not (ex.rows["coins_ticket"]["convert"] as Button).disabled or (ex.rows["coins_ticket"]["slider"] as HSlider).editable:
 		fails += 1
-		push_error("Exchange buttons must be disabled without enough currency")
+		push_error("Exchange row must be disabled without enough currency")
+	# slider with - / + beside it picks the packs
+	SaveManager.data["wallet"]["coins"] = 1000
+	SaveManager.data["wallet"]["tickets"] = 0
+	shop._refresh()
+	var xs: HSlider = ex.rows["coins_ticket"]["slider"]
+	if xs.max_value != 10 or not xs.editable:
+		fails += 1
+		push_error("Exchange slider: 1000 coins = at most 10 packs of 100")
+	xs.value = 4
+	(ex.rows["coins_ticket"]["plus"] as Button).pressed.emit()
+	(ex.rows["coins_ticket"]["minus"] as Button).pressed.emit()
+	(ex.rows["coins_ticket"]["plus"] as Button).pressed.emit()
+	if int(xs.value) != 5:
+		fails += 1
+		push_error("Exchange + / - should move the slider by one pack")
+	(ex.rows["coins_ticket"]["convert"] as Button).pressed.emit()
+	if SaveManager.tickets() != 5 or SaveManager.coins() != 500:
+		fails += 1
+		push_error("Exchange button should convert the packs chosen on the slider")
 	# --- Gamble tab: chips only
 	var gb: Control = shop._views["gamble"]
 	shop._show_tab("gamble")
@@ -154,16 +211,17 @@ func _ready() -> void:
 	for g in ["coin", "dice", "slots"]:
 		gb._pick_game(g)
 		gb.bet = 100
-		gb._on_play()
+		await gb._on_play()
 		if gb.net_label.text == "" or SaveManager.coins() != 777:
 			fails += 1
 			push_error("Gamble %s should show a result and never touch coins" % g)
-	SaveManager.data["wallet"]["coins"] = 0
-	shop._show_tab("gacha_support")
+	SaveManager.data["wallet"]["coins"] = 5000  # coins alone must not enable a pull
+	SaveManager.data["wallet"]["tickets"] = 0
+	shop._show_tab("gacha")
 	shop._refresh()
 	if not gs.pull1.disabled or not gs.pull10.disabled:
 		fails += 1
-		push_error("pull buttons must be disabled without coins")
+		push_error("pull buttons must be disabled without tickets (coins cannot pay)")
 	SaveManager.data = saved
 	SaveManager.save_game()
 	print("UI SHOP SMOKE: ", "PASS" if fails == 0 else "FAIL (%d)" % fails)

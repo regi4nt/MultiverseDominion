@@ -29,7 +29,7 @@ static func step(c: MatchController) -> void:
 static func _should_reroll(c: MatchController, p: PlayerState) -> bool:
 	if p.reroll_tokens <= 0 or p.difficulty == "easy":
 		return false
-	var target: BoardTile = c.tiles[posmod(p.position + c.last_dice.x + c.last_dice.y, BoardBuilder.TILES_TOTAL)]
+	var target: BoardTile = c.tiles[posmod(p.position + c.last_dice.x + c.last_dice.y, BoardBuilder.tiles_total)]
 	if target.type == BoardTile.Type.CORNER and target.corner_kind == "rift":
 		return true
 	if target.type == BoardTile.Type.TERRITORY and target.owner_id >= 0 and target.owner_id != p.id and not c.is_ally(target.owner_id, p.id):
@@ -43,7 +43,14 @@ static func _decide(c: MatchController, p: PlayerState) -> void:
 	match String(pend.get("type", "")):
 		"buy":
 			var t: BoardTile = c.tiles[int(pend["tile"])]
-			c.decide("buy" if _wants_to_buy(c, p, t, int(pend["price"])) else "skip")
+			if _wants_to_buy(c, p, t, int(pend["price"])):
+				c.decide("buy")
+			elif _wants_to_lease(c, p, int(pend.get("lease", 0))):
+				c.decide("lease")
+			else:
+				c.decide("skip")
+		"redeem":
+			c.decide("redeem" if p.gold - int(pend["price"]) >= (300 if p.difficulty == "hard" else 450) else "skip")
 		"upgrade":
 			c.decide("upgrade" if _wants_to_upgrade(p, int(pend["price"])) else "skip")
 		"auction":
@@ -72,13 +79,21 @@ static func _decide(c: MatchController, p: PlayerState) -> void:
 ## Fight a hidden monster when the army (without the gold share of army_power) is strong enough for the difficulty.
 static func _monster_choice(c: MatchController, p: PlayerState, monster_id: String) -> String:
 	var mine := BattleAI.army_power(p) - float(p.gold) * 0.4
-	var need := MonsterSystem.power(monster_id)
+	var need := MonsterSystem.power(monster_id, p.commander_star)
 	match p.difficulty:
 		"easy":
 			return "fight" if c.rng.randf() < 0.8 else "flee"
 		"hard":
 			return "fight" if mine >= need * 0.8 else "flee"
 	return "fight" if mine >= need * 0.65 else "flee"
+
+
+## Leasing is the cheap way to hold land when buying it would leave the purse too thin: only Normal / Hard AIs lease (half of the
+## time), and only while a small cushion stays in the purse.
+static func _wants_to_lease(c: MatchController, p: PlayerState, lease: int) -> bool:
+	if lease <= 0 or p.difficulty == "easy" or p.gold < lease:
+		return false
+	return p.gold - lease >= (100 if p.difficulty == "hard" else 150) and c.rng.randf() < 0.5
 
 
 static func _wants_to_buy(c: MatchController, p: PlayerState, t: BoardTile, price: int) -> bool:
@@ -132,7 +147,7 @@ static func _landing_score(c: MatchController, p: PlayerState, from: int) -> flo
 	var weights: Array[int] = [1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1]  # sums 2..12
 	var total := 0.0
 	for i in range(weights.size()):
-		var t: BoardTile = c.tiles[posmod(from + 2 + i, BoardBuilder.TILES_TOTAL)]
+		var t: BoardTile = c.tiles[posmod(from + 2 + i, BoardBuilder.tiles_total)]
 		total += float(weights[i]) * _tile_value(c, p, t)
 	return total / 36.0
 

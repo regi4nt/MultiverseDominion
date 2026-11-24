@@ -1,6 +1,6 @@
 class_name WagerPanel
 extends VBoxContainer
-## Wager picker for Arena and Battle Chess: choose a stake of Aether Coins before the match.
+## Wager picker for Arena and Battle Chess: choose a stake of Aether Coins (slider, multiples of 10) before the match.
 ## The stake is paid when the match starts; a win pays stake x odds (the stake included), a loss loses it,
 ## Battle Chess returns it on a draw. Odds depend on the mode and the difficulty (ShopSystem.wager_odds).
 ## Writes GameSession.wager; the host reads `odds()` when it starts the match.
@@ -10,7 +10,10 @@ signal changed
 var kind: String = "arena"  # "arena" | "battle_chess"
 var with_difficulty: bool = false  # Battle Chess has no setup screen: the panel shows the difficulty too
 
-var _chips: HFlowContainer
+var _slider: HSlider
+var _minus: Button
+var _plus: Button
+var _value: Label
 var _info: Label
 var _balance: Label
 var _series_info: Label
@@ -61,10 +64,32 @@ func _ready() -> void:
 	head.add_child(title)
 	_balance = UiTheme.make_label("", 16, UiTheme.COL_GOLD)
 	head.add_child(_balance)
-	_chips = HFlowContainer.new()
-	_chips.add_theme_constant_override("h_separation", 6)
-	_chips.add_theme_constant_override("v_separation", 6)
-	add_child(_chips)
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 10)
+	add_child(line)
+	_minus = UiTheme.make_button("-", 48)
+	_minus.custom_minimum_size.x = 56
+	_minus.pressed.connect(func(): _on_pick(GameSession.wager - ShopSystem.WAGER_STEP))
+	line.add_child(_minus)
+	_slider = HSlider.new()
+	_slider.min_value = 0
+	_slider.max_value = ShopSystem.WAGER_MAX
+	_slider.step = ShopSystem.WAGER_STEP
+	_slider.rounded = true
+	_slider.custom_minimum_size = Vector2(160, 40)
+	_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_slider.scrollable = false  # the mouse wheel must scroll the page, not change the stake
+	_slider.value_changed.connect(func(v: float): _on_pick(int(v)))
+	line.add_child(_slider)
+	_plus = UiTheme.make_button("+", 48)
+	_plus.custom_minimum_size.x = 56
+	_plus.pressed.connect(func(): _on_pick(GameSession.wager + ShopSystem.WAGER_STEP))
+	line.add_child(_plus)
+	_value = UiTheme.make_label("None", 18, UiTheme.COL_GOLD)
+	_value.custom_minimum_size.x = 72
+	_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	line.add_child(_value)
 	_info = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_info)
@@ -75,32 +100,29 @@ func odds() -> float:
 	return ShopSystem.wager_odds(kind, GameSession.mode, GameSession.ai_count, GameSession.difficulty)
 
 
+## Highest stake the player can pay now: the balance rounded down to a multiple of WAGER_STEP, capped at WAGER_MAX.
+func max_stake() -> int:
+	return mini(SaveManager.coins() / ShopSystem.WAGER_STEP * ShopSystem.WAGER_STEP, ShopSystem.WAGER_MAX)
+
+
 func _on_pick(amount: int) -> void:
-	GameSession.wager = amount
+	GameSession.wager = clampi(amount, 0, max_stake()) / ShopSystem.WAGER_STEP * ShopSystem.WAGER_STEP
 	refresh()
 	changed.emit()
 
 
-## Rebuilds the chips (the balance and the odds can change) and the summary line.
+## Syncs the slider (the balance and the odds can change) and the summary line.
 func refresh() -> void:
-	if _chips == null:
+	if _slider == null:
 		return
 	var coins := SaveManager.coins()
-	if GameSession.wager > coins:
-		GameSession.wager = 0
-	for c in _chips.get_children():
-		_chips.remove_child(c)
-		c.queue_free()
-	var group := ButtonGroup.new()
-	var steps: Array = [0] + ShopSystem.WAGER_STEPS
-	for amount in steps:
-		var b := UiTheme.make_toggle("None" if amount == 0 else str(amount), group, 48)
-		b.custom_minimum_size.x = 84
-		b.button_pressed = (GameSession.wager == amount)
-		b.disabled = amount > coins
-		b.pressed.connect(_on_pick.bind(int(amount)))
-		UiTheme.scroll_passthrough(b)
-		_chips.add_child(b)
+	var top := max_stake()
+	GameSession.wager = clampi(GameSession.wager, 0, top) / ShopSystem.WAGER_STEP * ShopSystem.WAGER_STEP  # balance dropped / old value off the grid
+	_slider.editable = top > 0
+	_slider.set_value_no_signal(GameSession.wager)  # no signal: refresh must not re-enter _on_pick while dragging
+	_minus.disabled = GameSession.wager <= 0
+	_plus.disabled = GameSession.wager >= top
+	_value.text = "None" if GameSession.wager == 0 else str(GameSession.wager)
 	_balance.text = "You have %d coins" % coins
 	if _series_info != null:
 		_series_info.text = ShopSystem.series_desc(GameSession.battle_series)

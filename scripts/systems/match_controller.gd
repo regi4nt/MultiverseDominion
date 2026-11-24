@@ -44,6 +44,7 @@ var wager: int = 0  # Arena wager: the stake was paid at the start; a human win 
 var wager_odds: float = 2.0
 ## Arena "Random map": the continent was drawn, so the human also gets its in-game bonus (data/continents.json random_bonus.ingame).
 var random_map: bool = false
+var chaos: bool = false  # Chaos Mode: the 40-tile board (see BoardBuilder.configure)
 var wager_settled: bool = false
 var match_difficulty: String = "normal"  # difficulty chosen for the match: sets everyone's Life and the coin reward
 var journey: bool = false  # Journey match: a human win unlocks the next continent (Arena matches unlock nothing)
@@ -60,6 +61,9 @@ var stats: Dictionary = {"tax": 0, "duels_offered": 0, "refused": 0, "duels": 0,
 var market_change: float = 0.0
 ## Hidden territory monsters (see MonsterSystem): [{"tile", "id", "taken"}]. Never shown on the map.
 var monsters: Array = []
+## true = a human who chooses "Fight" meets the monster in the Battle scene (prepare, deploy, Support cards) like a Duel; the
+## Territory Board sets it. false (headless tests, sims) = the fight is resolved instantly by MonsterSystem.fight.
+var monster_battles_interactive: bool = false
 ## Hidden territory treasures and mines (see DepositSystem): [{"tile", "id", "taken", "owner", "left", "paid"}]. Never shown on the map.
 var deposits: Array = []
 ## Casino pot: grows with every bet placed, paid out (and reset) on a jackpot.
@@ -83,6 +87,8 @@ func setup(cfg: Dictionary) -> void:
 	CardDatabase.set_continent(String(continent["id"]))
 	WorldMods.apply(continent)
 	GameData.apply_flavor(String(continent["id"]))  # themed event cards + Special Dice of this continent
+	chaos = bool(cfg.get("chaos", false)) and not bool(cfg.get("tutorial", false))
+	BoardBuilder.configure(chaos)
 	tiles = BoardBuilder.build(continent)
 	PortalSystem.randomize_portals(tiles, rng)
 	monsters = []
@@ -114,6 +120,8 @@ func setup(cfg: Dictionary) -> void:
 	if GameData.find_faction(human_faction).get("champion", "") == "":
 		human_faction = faction_ids[0]
 	var pool: Array = faction_ids.duplicate()
+	if bool(cfg.get("any_continent_enemies", false)) and not tutorial:
+		pool = _all_faction_ids()  # Arena: the opponents are drawn from the factions of EVERY playable continent
 	pool.erase(human_faction)
 	_shuffle(pool)
 	var order: Array = [human_faction]
@@ -125,6 +133,8 @@ func setup(cfg: Dictionary) -> void:
 	for i in range(ai_count + 1):
 		var is_ai := (i > 0) or not human_present
 		var fac := GameData.get_faction(continent["id"], order[i])
+		if fac.is_empty():
+			fac = GameData.find_faction(String(order[i]))  # a faction of another continent (Arena opponents)
 		var tag := "AI"
 		if team_mode and i == 2:
 			tag = "Ally"  # seat 2 is the human's teammate
@@ -155,6 +165,17 @@ func setup(cfg: Dictionary) -> void:
 	_apply_random_map(true)
 	if WorldMods.modifier_name != "":
 		_log("World modifier - %s: %s" % [WorldMods.modifier_name, continent["modifier"].get("description", "")])
+
+
+## Every faction id of every playable continent (the Arena opponent pool).
+func _all_faction_ids() -> Array:
+	var out: Array = []
+	for c in GameData.continents:
+		if not c.get("playable", false):
+			continue
+		for f in c.get("factions", []):
+			out.append(f["id"])
+	return out
 
 
 ## In-game bonus of the random map, for the human seat only (never the AI).
@@ -198,7 +219,7 @@ func _make_player(id: int, faction_id: String, is_ai: bool, difficulty: String, 
 	p.passive = champ.get("passive", "")
 	p.passive_value = float(champ.get("passive_value", 0.0))
 	p.color = PLAYER_COLORS[id % PLAYER_COLORS.size()]
-	p.gold = int(GameData.b("start_gold"))
+	p.gold = int(GameData.b("start_gold")) if tutorial else GameData.gold_for(match_difficulty)  # by difficulty; the guided tutorial keeps the standard gold
 	# Life depends on the match difficulty (easy 5 / normal 3 / hard 1); the guided tutorial keeps the standard 3
 	p.max_life = int(GameData.b("start_life")) if tutorial else GameData.life_for(match_difficulty)
 	p.life = p.max_life
@@ -331,7 +352,15 @@ func get_decision_options() -> Array:
 			var t: BoardTile = tiles[int(pending["tile"])]
 			var price := int(pending["price"])
 			out.append({"id": "buy", "label": "Buy %s (%d G)" % [t.name, price], "enabled": p.gold >= price})
+			var lease := int(pending.get("lease", 0))
+			if lease > 0:
+				out.append({"id": "lease", "label": "Lease %d rounds (%d G)" % [int(GameData.b("lease_rounds")), lease], "enabled": p.gold >= lease})
 			out.append({"id": "skip", "label": "Skip", "enabled": true})
+		"redeem":
+			var rt: BoardTile = tiles[int(pending["tile"])]
+			var rcost := int(pending["price"])
+			out.append({"id": "redeem", "label": "Buy out %s (%d G)" % [rt.name, rcost], "enabled": p.gold >= rcost})
+			out.append({"id": "skip", "label": "Not now", "enabled": true})
 		"upgrade":
 			var ut: BoardTile = tiles[int(pending["tile"])]
 			var ucost := int(pending["price"])
@@ -376,6 +405,8 @@ func get_decision_options() -> Array:
 			var penalty := int(GameData.b("refuse_duel_penalty"))
 			out.append({"id": "accept", "label": "Accept Duel", "enabled": true})
 			out.append({"id": "refuse", "label": "Refuse (pay %d G)" % (int(pending["rent"]) + penalty), "enabled": true})
+		"debt":
+			out.append_array(_debt_options(players[int(pending["actor"])]))
 		"conquest":
 			out.append({"id": "conquest", "label": "Conquest: take %s" % tiles[int(pending["tile"])].name, "enabled": true})
 			out.append({"id": "reward", "label": "Victory Reward (+%d G)" % int(pending["reward"]), "enabled": true})
@@ -391,6 +422,8 @@ func describe_tile(idx: int) -> String:
 			s += "\nRegion: %s | Price: %d G" % [region_name, t.price]
 			if t.level > 0:
 				s += " | %s" % t.level_label()
+			if t.lease_left > 0 and t.owner_id >= 0:
+				s += " | LEASED (%d rounds left)" % t.lease_left
 			if t.owner_id >= 0:
 				s += " | Rent: %d G\nOwner: %s" % [EconomySystem.rent_of(t, tiles), players[t.owner_id].display_name]
 			else:
@@ -481,6 +514,20 @@ func decide(choice: Variant) -> void:
 				if p.gold < price:
 					return
 				_do_buy(p, tiles[int(pending["tile"])], price)
+			elif typeof(choice) == TYPE_STRING and choice == "lease":
+				var lease_price := int(pending.get("lease", 0))
+				if lease_price <= 0 or p.gold < lease_price:
+					return
+				_do_lease(p, tiles[int(pending["tile"])], lease_price)
+			pending = {}
+			_finish_landing()
+		"redeem":
+			if typeof(choice) == TYPE_STRING and choice == "redeem":
+				var rt: BoardTile = tiles[int(pending["tile"])]
+				var rcost := int(pending["price"])
+				if p.gold < rcost:
+					return
+				_do_redeem(p, rt, rcost)
 			pending = {}
 			_finish_landing()
 		"upgrade":
@@ -556,7 +603,7 @@ func decide(choice: Variant) -> void:
 				stats["tax"] += 1
 				var rent := int(pending["rent"])
 				pending = {}
-				_pay(p, rent, owner_id, "tax")
+				_pay_or_ask(p, rent, owner_id, "tax")
 				_finish_landing()
 		"duel_response":
 			var tile_i := int(pending["tile"])
@@ -571,13 +618,18 @@ func decide(choice: Variant) -> void:
 				var total := int(pending["rent"]) + int(GameData.b("refuse_duel_penalty"))
 				pending = {}
 				_log("%s refuses the duel: rent + %d G penalty." % [p.display_name, int(GameData.b("refuse_duel_penalty"))])
-				_pay(p, total, owner_id2, "refused duel")
+				_pay_or_ask(p, total, owner_id2, "refused duel")
 				_finish_landing()
+		"debt":
+			_answer_debt(choice)
 		"conquest":
 			var ct: BoardTile = tiles[int(pending["tile"])]
 			if String(choice) == "conquest":
 				stats["conquests"] += 1
 				ct.owner_id = p.id
+				ct.lease_left = 0  # a conquered land is owned for good
+				ct.lease_paid = 0
+				ct.level = 0  # the old owner's upgrades are lost: the conqueror starts from plain land
 				_log("CONQUEST! %s takes %s." % [p.display_name, ct.name])
 				_announce_region(p, ct)
 			else:
@@ -645,6 +697,7 @@ func _end_of_round() -> void:
 	PortalSystem.rotate_portals(tiles, rng)
 	_log("--- Round %d. ---" % round_number)
 	_update_market()
+	_tick_leases()
 	_pay_mines()
 	if WorldMods.harvest_per_land > 0:
 		for hp in players:
@@ -667,9 +720,9 @@ func _end_of_round() -> void:
 func _move_player(p: PlayerState, steps: int) -> void:
 	var from := p.position
 	var raw := from + steps
-	p.position = posmod(raw, BoardBuilder.TILES_TOTAL)
+	p.position = posmod(raw, BoardBuilder.tiles_total)
 	player_moved.emit(p.id, from, p.position, false)
-	if steps > 0 and raw >= BoardBuilder.TILES_TOTAL:
+	if steps > 0 and raw >= BoardBuilder.tiles_total:
 		_give_start_bonus(p)
 
 
@@ -739,7 +792,7 @@ func _resolve_landing(p: PlayerState) -> void:
 		BoardTile.Type.AUCTION:
 			_resolve_auction(p)
 		BoardTile.Type.TAX:
-			_pay(p, _apply_tax_passive(p, int(int(GameData.b("tax_flat")) * WorldMods.tax_mult * (float(random_ingame().get("tax_mult", 1.0)) if _is_human(p) else 1.0))), -1, "tax")
+			_pay_or_ask(p, _apply_tax_passive(p, int(int(GameData.b("tax_flat")) * WorldMods.tax_mult * (float(random_ingame().get("tax_mult", 1.0)) if _is_human(p) else 1.0))), -1, "tax")
 		BoardTile.Type.SPECIAL:
 			_resolve_special(p)
 		BoardTile.Type.BANK:
@@ -787,10 +840,17 @@ func _apply_tax_passive(p: PlayerState, amount: int) -> int:
 func _resolve_territory(p: PlayerState, t: BoardTile) -> void:
 	if t.owner_id == -1:
 		var price := _price_for(p, t)
-		if p.gold >= price:
-			_set_pending({"type": "buy", "tile": t.index, "price": price})
+		var lease := mini(EconomySystem.lease_cost(price), price)
+		if p.gold >= price or p.gold >= lease:
+			_set_pending({"type": "buy", "tile": t.index, "price": price, "lease": lease})
 		else:
 			_log("%s cannot afford %s (%d G)." % [p.display_name, t.name, price])
+	elif t.owner_id == p.id and t.lease_left > 0:
+		var rcost := EconomySystem.redeem_cost(t)
+		if p.gold >= rcost:
+			_set_pending({"type": "redeem", "tile": t.index, "price": rcost})
+		else:
+			_log("%s visits their leased land %s (%d rounds left; buying it out costs %d G)." % [p.display_name, t.name, t.lease_left, rcost])
 	elif t.owner_id == p.id:
 		var ucost := EconomySystem.upgrade_cost(t)
 		if ucost < 0:
@@ -891,30 +951,67 @@ func _meet_monster(p: PlayerState, t: BoardTile) -> bool:
 
 
 ## The player fights the monster (or flees); afterwards the landing continues as on any territory.
+## A human fights it in the Battle scene (state AWAIT_DUEL, pending "monster_battle") when `monster_battles_interactive`.
 func _answer_monster(p: PlayerState, choice: Variant) -> void:
 	var mid := String(pending["monster"])
 	var t: BoardTile = tiles[int(pending["tile"])]
 	var m := GameData.get_monster(mid)
-	pending = {}
 	if String(choice) == "fight":
 		stats["monster_fights"] += 1
+		if monster_battles_interactive and not p.is_ai:
+			_log("%s faces the %s in battle!" % [p.display_name, m.get("name", "monster")])
+			pending = {"type": "monster_battle", "actor": p.id, "tile": t.index, "monster": mid}
+			state = State.AWAIT_DUEL
+			state_changed.emit()
+			return
+		pending = {}
 		var res := MonsterSystem.fight(p, mid, rng)
-		if bool(res["won"]):
-			var e := MonsterSystem.entry_at(monsters, t.index)
-			if bool(GameData.b("monster_unique", true)) and not e.is_empty():
-				e["taken"] = true  # this monster is gone for everyone
-			p.monster_id = mid
-			stats["monsters_won"] += 1
-			_log("%s defeats the %s in %d ticks! Monster card won: it fights beside the King in Duels." % [p.display_name, m.get("name", "monster"), int(res["ticks"])])
-			monster_event.emit(p.id, "won", mid)
-		else:
-			var fee := mini(int(GameData.b("monster_defeat_gold")), p.gold)
-			p.gold -= fee
-			_log("%s is beaten by the %s and loses %d G. The monster keeps its lair." % [p.display_name, m.get("name", "monster"), fee])
-			monster_event.emit(p.id, "lost", mid)
+		_monster_fight_result(p, t, mid, bool(res["won"]), int(res["ticks"]))
 	else:
+		pending = {}
 		_log("%s flees from the %s." % [p.display_name, m.get("name", "monster")])
 		monster_event.emit(p.id, "fled", mid)
+	players_changed.emit()
+	tiles_changed.emit()
+	_resolve_territory(p, t)
+	_finish_landing()
+
+
+## Win = the Monster card (the lair is emptied for everyone when `monster_unique`); loss = `monster_defeat_gold`, the monster stays.
+func _monster_fight_result(p: PlayerState, t: BoardTile, mid: String, won: bool, ticks: int) -> void:
+	var m := GameData.get_monster(mid)
+	if won:
+		var e := MonsterSystem.entry_at(monsters, t.index)
+		if bool(GameData.b("monster_unique", true)) and not e.is_empty():
+			e["taken"] = true  # this monster is gone for everyone
+		p.monster_id = mid
+		p.monster_star = p.commander_star  # the ally keeps the King level it was won at
+		stats["monsters_won"] += 1
+		_log("%s defeats the %s in %d ticks! Monster card won (King Lv %d): it fights beside the King in Duels with Lv %d stats." % [p.display_name, m.get("name", "monster"), ticks, p.monster_star, p.monster_star])
+		monster_event.emit(p.id, "won", mid)
+	else:
+		var fee := mini(int(GameData.b("monster_defeat_gold")), p.gold)
+		p.gold -= fee
+		_log("%s is beaten by the %s and loses %d G. The monster keeps its lair." % [p.display_name, m.get("name", "monster"), fee])
+		monster_event.emit(p.id, "lost", mid)
+
+
+func is_monster_battle() -> bool:
+	return state == State.AWAIT_DUEL and String(pending.get("type", "")) == "monster_battle"
+
+
+## The Battle scene reports a monster fight: result = {"won": bool, "ticks": int, "gold_delta": int (gold the battle gave or took)}.
+## Afterwards the landing continues as on any territory.
+func finish_monster_battle(result: Dictionary) -> void:
+	if not is_monster_battle():
+		return
+	var p := players[int(pending["actor"])]
+	var t: BoardTile = tiles[int(pending["tile"])]
+	var mid := String(pending["monster"])
+	p.gold = maxi(0, p.gold + int(result.get("gold_delta", 0)))
+	pending = {}
+	state = State.AWAIT_DECISION
+	_monster_fight_result(p, t, mid, bool(result.get("won", false)), int(result.get("ticks", 0)))
 	players_changed.emit()
 	tiles_changed.emit()
 	_resolve_territory(p, t)
@@ -1035,7 +1132,7 @@ func _resolve_event(p: PlayerState) -> void:
 		"gain_gold":
 			p.gold += value
 		"lose_gold":
-			_pay(p, value, -1, "event")
+			_pay_or_ask(p, value, -1, "event")
 		"move_forward":
 			_move_player(p, value)
 			_nested_resolve(p)
@@ -1063,7 +1160,7 @@ func _resolve_event(p: PlayerState) -> void:
 		"lose_per_land":  # a levy on every territory the player owns
 			var nl := _owned_land_count(p)
 			if nl > 0:
-				_pay(p, value * nl, -1, "event")
+				_pay_or_ask(p, value * nl, -1, "event")
 		"steal_richest":  # take gold from the richest living rival (never a teammate)
 			_special_steal(p, value)
 		"warp_land":
@@ -1130,9 +1227,49 @@ func _collect_from_rivals(p: PlayerState, amount: int, reason: String) -> void:
 			_pay(o, amount, p.id, reason)
 
 
+## Leasing free land: a share of the price buys it for balance "lease_rounds" rounds (rent is collected as usual; no upgrade,
+## no net worth, no region bonus). It is free again when the lease ends, unless it is bought out first.
+func _do_lease(p: PlayerState, t: BoardTile, cost: int) -> void:
+	p.gold -= cost
+	t.owner_id = p.id
+	t.lease_left = int(GameData.b("lease_rounds"))
+	t.lease_paid = cost
+	stats["leases"] = int(stats.get("leases", 0)) + 1
+	_log("%s leases %s for %d G (%d rounds)." % [p.display_name, t.name, cost, t.lease_left])
+	tiles_changed.emit()
+	players_changed.emit()
+
+
+func _do_redeem(p: PlayerState, t: BoardTile, cost: int) -> void:
+	p.gold -= cost
+	t.lease_left = 0
+	t.lease_paid = 0
+	_log("%s buys out the lease of %s for %d G: it is theirs now." % [p.display_name, t.name, cost])
+	_announce_region(p, t)
+	tiles_changed.emit()
+	players_changed.emit()
+
+
+## End of a round: every lease loses a round; expired land becomes free again.
+func _tick_leases() -> void:
+	var expired := false
+	for t in tiles:
+		if t.type == BoardTile.Type.TERRITORY and t.lease_left > 0:
+			t.lease_left -= 1
+			if t.lease_left <= 0:
+				_log("The lease of %s ends: it is free again." % t.name)
+				t.owner_id = -1
+				t.lease_paid = 0
+				expired = true
+	if expired:
+		tiles_changed.emit()
+
+
 func _do_buy(p: PlayerState, t: BoardTile, price: int) -> void:
 	p.gold -= price
 	t.owner_id = p.id
+	t.lease_left = 0
+	t.lease_paid = 0
 	_log("%s buys %s for %d G." % [p.display_name, t.name, price])
 	_announce_region(p, t)
 	tiles_changed.emit()
@@ -1163,9 +1300,9 @@ func _do_upgrade(p: PlayerState, t: BoardTile, cost: int) -> void:
 
 func _announce_region(p: PlayerState, t: BoardTile) -> void:
 	var owned := EconomySystem.region_count(tiles, t.region, p.id)
-	if owned == 10:
+	if owned == BoardBuilder.region_size:
 		_log("*** %s achieves REGIONAL DOMINION over %s! ***" % [p.display_name, _region_name(t.region)])
-	elif owned == int(GameData.b("majority_threshold")):
+	elif owned == BoardBuilder.majority_needed():
 		_log("%s now holds the majority of %s (rent bonus)." % [p.display_name, _region_name(t.region)])
 
 
@@ -1179,10 +1316,94 @@ func _region_name(region: int) -> String:
 func _cheapest_owned(p: PlayerState) -> BoardTile:
 	var best: BoardTile = null
 	for t in tiles:
-		if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id:
+		if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id and t.lease_left <= 0:  # leased land has no resale value
 			if best == null or t.price < best.price:
 				best = t
 	return best
+
+
+## What selling `t` returns (price + upgrades, times sell_ratio).
+func _sell_value(t: BoardTile) -> int:
+	return int((t.price + EconomySystem.upgrade_invested(t)) * float(GameData.b("sell_ratio")))
+
+
+## Sells `t` back to the bank: the land becomes free again at Level 0. Returns the gold paid out.
+func _sell_land(p: PlayerState, t: BoardTile) -> int:
+	var refund := _sell_value(t)
+	t.owner_id = -1
+	t.level = 0
+	t.lease_left = 0
+	t.lease_paid = 0
+	p.gold += refund
+	return refund
+
+
+## Like _pay, but a HUMAN who cannot cover the debt is asked first (sell land / cash out stocks / buy a Life / pay)
+## instead of being sold out automatically. The AI, and a human with nothing left to sell, go straight to _pay.
+func _pay_or_ask(p: PlayerState, amount: int, creditor_id: int, reason: String) -> void:
+	if amount > 0 and p.gold < amount and _is_human(p) and (p.stock_value > 0 or _cheapest_owned(p) != null):
+		_log("%s owes %d G (%s) but has only %d G: sell something, or go bankrupt." % [p.display_name, amount, reason, p.gold])
+		_set_pending({"type": "debt", "actor": p.id, "amount": amount, "creditor": creditor_id, "reason": reason})
+		players_changed.emit()
+		return
+	_pay(p, amount, creditor_id, reason)
+
+
+func _debt_options(p: PlayerState) -> Array:
+	var out: Array = []
+	var amount := int(pending["amount"])
+	out.append({"id": "pay", "label": "Pay %d G" % amount, "enabled": p.gold >= amount})
+	for t in tiles:
+		if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id and t.lease_left <= 0:
+			out.append({"id": "sell_%d" % t.index, "label": "Sell %s%s (+%d G)" % [t.name, " " + t.level_label() if t.level > 0 else "", _sell_value(t)], "enabled": true})
+	if p.stock_value > 0:
+		out.append({"id": "stocks", "label": "Cash out stocks (+%d G)" % p.stock_value, "enabled": true})
+	var hp := heal_price_for(p)
+	out.append({"id": "heal", "label": "Buy a Life (%d G)" % hp, "enabled": p.life < p.max_life and p.gold >= hp})
+	out.append({"id": "bankrupt", "label": "Sell everything and settle", "enabled": true})
+	return out
+
+
+func _answer_debt(choice: Variant) -> void:
+	var p := players[int(pending["actor"])]
+	var c := String(choice)
+	var amount := int(pending["amount"])
+	var creditor := int(pending["creditor"])
+	var reason := String(pending["reason"])
+	if c == "pay" or c == "bankrupt":
+		if c == "pay" and p.gold < amount:
+			return
+		pending = {}
+		_pay(p, amount, creditor, reason)  # "bankrupt": the usual forced sale of every land, then Life loss if still short
+		tiles_changed.emit()
+		_finish_landing()
+		return
+	if c.begins_with("sell_"):
+		var idx := int(c.substr(5))
+		if idx < 0 or idx >= tiles.size():
+			return
+		var t: BoardTile = tiles[idx]
+		if t.type != BoardTile.Type.TERRITORY or t.owner_id != p.id or t.lease_left > 0:
+			return
+		var refund := _sell_land(p, t)
+		_log("%s sells %s for %d G." % [p.display_name, t.name, refund])
+		tiles_changed.emit()
+	elif c == "stocks":
+		if p.stock_value <= 0:
+			return
+		_bank_withdraw(p)
+	elif c == "heal":
+		var price := heal_price_for(p)
+		if p.life >= p.max_life or p.gold < price:
+			return
+		p.gold -= price
+		p.life += 1
+		stats["heals"] += 1
+		_log("%s buys back 1 Life (%d G)." % [p.display_name, price])
+	else:
+		return
+	players_changed.emit()
+	state_changed.emit()
 
 
 ## Takes `amount` from p (selling land if needed). creditor_id -1 = bank.
@@ -1196,10 +1417,7 @@ func _pay(p: PlayerState, amount: int, creditor_id: int, reason: String) -> void
 		var t := _cheapest_owned(p)
 		if t == null:
 			break
-		var refund := int((t.price + EconomySystem.upgrade_invested(t)) * float(GameData.b("sell_ratio")))
-		t.owner_id = -1
-		t.level = 0
-		p.gold += refund
+		var refund := _sell_land(p, t)
 		_log("%s is forced to sell %s for %d G." % [p.display_name, t.name, refund])
 		tiles_changed.emit()
 	var paid := mini(p.gold, amount)
@@ -1234,6 +1452,8 @@ func _eliminate(p: PlayerState) -> void:
 		if t.owner_id == p.id:
 			t.owner_id = -1
 			t.level = 0
+			t.lease_left = 0
+			t.lease_paid = 0
 	_log("%s has been ELIMINATED." % p.display_name)
 	if p.id == current:
 		pending = {}
@@ -1328,8 +1548,8 @@ func get_decision_prompt() -> String:
 	var p := current_player()
 	match String(pending.get("type", "")):
 		"monster":
-			return "A hidden monster attacks! %s\nFight it with your army (if beaten you lose %d G) or flee?" % [
-				MonsterSystem.summary(String(pending["monster"])), int(GameData.b("monster_defeat_gold"))]
+			return "A hidden monster attacks! %s\nFight it in battle (prepare your army first; if beaten you lose %d G) or flee?" % [
+				MonsterSystem.summary(String(pending["monster"]), p.commander_star), int(GameData.b("monster_defeat_gold"))]
 		"encounter":
 			return "%s landed on your %s (rent %d G). Collect Tax, or challenge to a Duel?" % [
 				p.display_name, tiles[int(pending["tile"])].name, int(pending["rent"])]
@@ -1337,6 +1557,9 @@ func get_decision_prompt() -> String:
 			return "%s challenges you to a Duel for %s. Accept, or refuse and pay %d G (rent + penalty)?" % [
 				players[int(pending["owner"])].display_name, tiles[int(pending["tile"])].name,
 				int(pending["rent"]) + int(GameData.b("refuse_duel_penalty"))]
+		"debt":
+			var dp := players[int(pending["actor"])]
+			return "You owe %d G (%s) but have only %d G. Sell land or stocks, buy back a Life, then pay. If you cannot pay you go BANKRUPT and lose 1 Life." % [int(pending["amount"]), String(pending["reason"]), dp.gold]
 		"conquest":
 			return "You won the Duel! Take %s (Conquest) or claim a Victory Reward?" % tiles[int(pending["tile"])].name
 		"auction":
@@ -1346,6 +1569,13 @@ func get_decision_prompt() -> String:
 				lot.name, lot.price,
 				("Highest bid %d G by %s." % [int(pending["bid"]), players[lead].display_name]) if lead >= 0 else "No bids yet.",
 				auction_next_bid()]
+		"buy":
+			var bt: BoardTile = tiles[int(pending["tile"])]
+			return "Free land %s (price %d G). Buy it for good, or lease it for %d G: %d rounds, rent as usual, no upgrades, no net worth, then it is free again." % [
+				bt.name, int(pending["price"]), int(pending.get("lease", 0)), int(GameData.b("lease_rounds"))]
+		"redeem":
+			var rdt: BoardTile = tiles[int(pending["tile"])]
+			return "Your leased land %s (%d rounds left). Buy it out for %d G to own it for good?" % [rdt.name, rdt.lease_left, int(pending["price"])]
 		"upgrade":
 			var ut: BoardTile = tiles[int(pending["tile"])]
 			return "Your land %s (rent %d G). Upgrade it for %d G to raise the rent?" % [ut.name, EconomySystem.rent_of(ut, tiles), int(pending["price"])]
@@ -1364,7 +1594,7 @@ func get_decision_prompt() -> String:
 
 
 func is_human_duel() -> bool:
-	if state != State.AWAIT_DUEL:
+	if state != State.AWAIT_DUEL or String(pending.get("type", "")) == "monster_battle":  # a monster fight is not a duel between rulers
 		return false
 	return not players[int(pending["attacker"])].is_ai or not players[int(pending["defender"])].is_ai
 
@@ -1380,7 +1610,7 @@ func duel_participants() -> Dictionary:
 
 ## Runs an AI-vs-AI duel instantly (no UI). Humans fight through the Battle scene instead.
 func auto_duel() -> void:
-	if state != State.AWAIT_DUEL or is_human_duel():
+	if state != State.AWAIT_DUEL or is_human_duel() or is_monster_battle():
 		return
 	var a := players[int(pending["attacker"])]
 	var d := players[int(pending["defender"])]
@@ -1442,7 +1672,7 @@ func finish_duel(result: Dictionary) -> void:
 		_lose_life(defender, "lost the duel")
 	if state == State.GAME_OVER:
 		return
-	var reward := int(t.price * float(GameData.b("duel_reward_ratio")))
+	var reward := int((t.price + EconomySystem.upgrade_invested(t)) * float(GameData.b("duel_reward_ratio")))  # upgrades count toward the reward
 	pending = {"type": "conquest", "actor": attacker.id, "tile": t.index, "reward": reward}
 	state = State.AWAIT_DECISION
 	players_changed.emit()
@@ -1481,7 +1711,7 @@ func _player_to_dict(p: PlayerState) -> Dictionary:
 		"position": p.position, "gold": p.gold, "life": p.life, "max_life": p.max_life, "level": p.level, "capacity": p.capacity,
 		"tokens": p.reroll_tokens, "skip": p.skip_turns, "alive": p.alive, "team": p.team, "dice": p.special_dice.duplicate(), "move_bonus": p.move_bonus,
 		"cstar": p.commander_star, "mprog": p.mission_progress, "stock": p.stock_value, "sbasis": p.stock_basis,
-		"monster": p.monster_id, "deck": p.deck.to_dict(), "pile": p.battle_deck.pool.duplicate(), "spile": p.battle_deck.support_pool.duplicate(), "hand": p.hand.duplicate(), "units": units}
+		"monster": p.monster_id, "mstar": p.monster_star, "deck": p.deck.to_dict(), "pile": p.battle_deck.pool.duplicate(), "spile": p.battle_deck.support_pool.duplicate(), "hand": p.hand.duplicate(), "units": units}
 
 
 ## Serialises the match. Only possible at a stable moment: start of a turn or end of a turn
@@ -1494,12 +1724,12 @@ func to_dict() -> Dictionary:
 		plist.append(_player_to_dict(p))
 	var tl: Array = []
 	for t in tiles:
-		tl.append([t.owner_id, t.portal_active, t.level])
+		tl.append([t.owner_id, t.portal_active, t.level, t.lease_left, t.lease_paid])
 	return {
 		"version": SAVE_FORMAT, "continent_id": continent["id"], "round": round_number, "current": current,
 		"state": int(state), "last_dice": [last_dice.x, last_dice.y], "winner_id": winner_id,
 		"human_present": human_present, "team_mode": team_mode, "winner_team": winner_team, "roll_double": _roll_was_double, "extra_roll": _extra_roll, "bonus_rolls": _bonus_rolls,
-		"tutorial": tutorial, "difficulty": match_difficulty, "journey": journey, "wager": wager, "wager_odds": wager_odds, "random_map": random_map, "wager_settled": wager_settled, "round_limit": round_limit, "market": market_change, "pot": casino_pot, "tutorial_seen": tutorial_seen.duplicate(),
+		"tutorial": tutorial, "difficulty": match_difficulty, "journey": journey, "wager": wager, "wager_odds": wager_odds, "random_map": random_map, "chaos": chaos, "wager_settled": wager_settled, "round_limit": round_limit, "market": market_change, "pot": casino_pot, "tutorial_seen": tutorial_seen.duplicate(),
 		"monsters": monsters.map(func(e): return [int(e["tile"]), String(e["id"]), bool(e["taken"])]),
 		"deposits": deposits.map(func(e): return [int(e["tile"]), String(e["id"]), bool(e["taken"]), int(e["owner"]), int(e["left"]), int(e["paid"])]),
 		"stats": stats.duplicate(), "players": plist, "tiles": tl, "log": recent_log.duplicate(),
@@ -1513,6 +1743,8 @@ static func from_dict(d: Dictionary) -> MatchController:
 	CardDatabase.set_continent(String(c.continent["id"]))
 	WorldMods.apply(c.continent)
 	GameData.apply_flavor(String(c.continent["id"]))
+	c.chaos = bool(d.get("chaos", false))
+	BoardBuilder.configure(c.chaos)
 	c.tiles = BoardBuilder.build(c.continent)
 	var tl: Array = d["tiles"]
 	for i in range(mini(tl.size(), c.tiles.size())):
@@ -1520,6 +1752,9 @@ static func from_dict(d: Dictionary) -> MatchController:
 		c.tiles[i].portal_active = bool(tl[i][1])
 		if (tl[i] as Array).size() > 2:  # older saves have no upgrade level
 			c.tiles[i].level = int(tl[i][2])
+		if (tl[i] as Array).size() > 4:  # older saves have no leases
+			c.tiles[i].lease_left = int(tl[i][3])
+			c.tiles[i].lease_paid = int(tl[i][4])
 	for me in d.get("monsters", []):  # older saves have no monsters
 		c.monsters.append({"tile": int(me[0]), "id": String(me[1]), "taken": bool(me[2])})
 	for de in d.get("deposits", []):  # older saves have no deposits
@@ -1554,6 +1789,7 @@ static func from_dict(d: Dictionary) -> MatchController:
 		p.commander_star = int(pd.get("cstar", 1))
 		p.mission_progress = int(pd.get("mprog", 0))
 		p.monster_id = String(pd.get("monster", ""))
+		p.monster_star = int(pd.get("mstar", p.commander_star))  # older saves: the current King level
 		p.stock_value = int(pd.get("stock", 0))
 		p.stock_basis = int(pd.get("sbasis", 0))
 		p.deck = Deck.from_dict(pd["deck"])
@@ -1659,10 +1895,10 @@ func _resolve_fate(p: PlayerState, forced_face: int = 0, values: Array = []) -> 
 	match face:
 		1:
 			_log("FATE die: %d - Disaster! %s loses %d G." % [face, p.display_name, -amount])
-			_pay(p, -amount, -1, "fate")
+			_pay(p, -amount, -1, "fate")  # die used before the roll: no debt prompt (it would end the turn)
 		2:
 			_log("FATE die: %d - Bad luck. %s loses %d G." % [face, p.display_name, -amount])
-			_pay(p, -amount, -1, "fate")
+			_pay(p, -amount, -1, "fate")  # die used before the roll: no debt prompt (it would end the turn)
 		3:
 			var steps := int(GameData.b("fate_detour"))
 			_log("FATE die: %d - A detour! %s goes back %d tiles." % [face, p.display_name, steps])

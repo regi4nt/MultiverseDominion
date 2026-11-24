@@ -57,8 +57,42 @@ static func get_theme() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", make_box(Color(COL_PANEL, 0.94), Color("3b3a55"), 2, 16, 10))
 	t.set_color("font_color", "Label", COL_TEXT)
 	t.set_color("default_color", "RichTextLabel", COL_TEXT)
+	_style_scrollbars(t)
 	_theme = t
 	return t
+
+
+## Scroll bar thickness in logical px: a slim indicator on touchscreens (the finger scrolls the content itself), a wider
+## bar that is easy to grab with a mouse everywhere else.
+static func scrollbar_thickness() -> int:
+	return 8 if DisplayServer.is_touchscreen_available() else 12
+
+
+## Every scroll bar of the game (lists, dialogs, the New Match card row, rich text) wears the app's navy + gold look
+## instead of the engine's grey default: a dark rounded track, a dim-gold handle that lights up on hover and while dragged.
+static func _style_scrollbars(t: Theme) -> void:
+	var th := scrollbar_thickness()
+	var track := _bar_box(Color(COL_BG_DEEP, 0.7), Color("2a3158"), th, th / 2.0)
+	var grab := _bar_box(Color(COL_GOLD_DIM, 0.9), Color(COL_GOLD_DIM).darkened(0.35), th, 0.0)
+	var grab_hl := _bar_box(Color(COL_GOLD, 0.95), Color(COL_GOLD).lightened(0.25), th, 0.0)
+	var grab_pr := _bar_box(Color("f0cb55"), Color("fff0b0"), th, 0.0)
+	for kind in ["VScrollBar", "HScrollBar"]:
+		t.set_stylebox("scroll", kind, track)
+		t.set_stylebox("scroll_focus", kind, track)
+		t.set_stylebox("grabber", kind, grab)
+		t.set_stylebox("grabber_highlight", kind, grab_hl)
+		t.set_stylebox("grabber_pressed", kind, grab_pr)
+
+
+static func _bar_box(bg: Color, border: Color, thickness: int, margin: float) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(int(ceil(float(thickness) * 0.5)))
+	sb.anti_aliasing = true
+	sb.set_content_margin_all(margin)  # the track's margins give the bar its thickness (the handle fills the track)
+	return sb
 
 
 static func make_button(text: String, min_h: float = 56.0) -> Button:

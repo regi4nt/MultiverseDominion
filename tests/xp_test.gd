@@ -33,6 +33,12 @@ func _ready() -> void:
 	SaveManager._award_xp(XpSystem.need_for(1) + 5)
 	check(SaveManager.profile_level() == 2 and SaveManager.last_level_up == 2, "an award that crosses a threshold levels up")
 	check("LEVEL UP" in SaveManager.xp_line(), "the result line announces the level up")
+	check(SaveManager.last_level_coins >= XpSystem.level_up_coins(2) and SaveManager.last_level_chests == ["bronze"], "a level-up pays coins and a Bronze chest")
+	check("Level reward" in SaveManager.xp_line(), "the result line shows the level reward")
+	check(XpSystem.level_up_chest(5) == "silver" and XpSystem.level_up_chest(10) == "gold" and XpSystem.level_up_chest(7) == "bronze", "chest grade follows the level (5 = Silver, 10 = Gold)")
+	var coins_before := SaveManager.coins()
+	SaveManager._award_xp(XpSystem.need_for(2) + XpSystem.need_for(3) + 5)  # two levels in one award
+	check(SaveManager.last_level_chests.size() == 2 and SaveManager.coins() - coins_before >= XpSystem.level_up_coins(3) + XpSystem.level_up_coins(4), "several levels at once pay every level")
 	SaveManager._award_xp(5)
 	check(SaveManager.last_level_up == 0 and "LEVEL UP" not in SaveManager.xp_line(), "no level-up flag without a level-up")
 	check(int(SaveManager.data["profile"]["level"]) == SaveManager.profile_level(), "profile.level follows the XP")

@@ -249,6 +249,31 @@ func deploy(u: UnitInstance, cell: Vector2i) -> String:
 	return ""
 
 
+## Swaps the positions of two units: both on the board (cells exchanged) or one on the board and one on the bench
+## (the bench unit takes the cell, the other goes back to the bench). Returns "" or the reason it is not allowed.
+func swap_units(a: UnitInstance, b: UnitInstance) -> String:
+	if a == b or a.cell.x < 0 and b.cell.x < 0:
+		return ""
+	if a.cell.x < 0:  # keep `a` as the unit that is on the board
+		var t := a
+		a = b
+		b = t
+	var ca := a.cell
+	if not Terrain.can_stand(terrain, int(CardDatabase.get_unit(b.card_id)["range"]), ca):
+		return "Highland: ranged units only (Range 2+)."
+	if b.cell.x >= 0:
+		if not Terrain.can_stand(terrain, int(CardDatabase.get_unit(a.card_id)["range"]), b.cell):
+			return "Highland: ranged units only (Range 2+)."
+		a.cell = b.cell
+		b.cell = ca
+		return ""
+	if used_capacity() - CardDatabase.capacity_cost(a.chess()) + CardDatabase.capacity_cost(b.chess()) > capacity():
+		return "Not enough capacity (%d/%d)." % [used_capacity(), capacity()]
+	b.cell = ca
+	a.cell = Vector2i(-1, -1)
+	return ""
+
+
 ## A new duel brings new ground: sets the terrain and moves deployed melee units that now stand on a highland to a free plains cell.
 func set_terrain(t: Dictionary) -> void:
 	terrain = t
@@ -296,8 +321,8 @@ func level_up() -> String:
 	return ""
 
 
-func to_side_cfg(champion_id: String, supports: Array, champion_star: int = 1, monster_id: String = "") -> Dictionary:
+func to_side_cfg(champion_id: String, supports: Array, champion_star: int = 1, monster_id: String = "", monster_star: int = 1) -> Dictionary:
 	var list: Array = []
 	for u in deployed_units():
 		list.append({"card_id": u.card_id, "stars": u.stars, "cell": u.cell})
-	return {"units": list, "champion": champion_id, "supports": supports, "champion_star": champion_star, "monster": monster_id}
+	return {"units": list, "champion": champion_id, "supports": supports, "champion_star": champion_star, "monster": monster_id, "monster_star": monster_star}

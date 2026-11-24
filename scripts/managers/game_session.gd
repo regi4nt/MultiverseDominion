@@ -12,9 +12,11 @@ var difficulty: String = "normal"
 var continent_random: bool = false  # Arena: the continent is drawn at the start (with a coin bonus on a win) instead of chosen
 var random_bonus_active: bool = false  # the match that is running was started with a random map
 var ai_count: int = 3
+var chaos_mode: bool = false  # the Chaos card of New Match (an Arena match on the 40-tile board)
 var update_checked: bool = false  # the update check runs once per app start
 var open_deck_tab: bool = false  # the Card Hub opens on the Deck tab (New Match -> "Change faction")
 var collection_return: String = ""  # scene the Card Hub "Back" button returns to ("" = Main Menu)
+var setup_return: String = ""  # "journey" | "arena": New Match reopens that setup view (not the mode hub) when it is entered again from the Card Hub
 var wager: int = 0  # Aether Coins staked on the next Arena match / Battle Chess battle (already paid when it is set to start)
 var wager_odds: float = 2.0  # win multiplier of that stake (ShopSystem.wager_odds)
 var battle_series: String = "single"  # Battle Chess length: "single" (1 round) | "ten" (10 rounds) | "survival" (until the first defeat)
@@ -41,6 +43,9 @@ func to_match_config() -> Dictionary:
 		"wager": wager if category == "arena" else 0,
 		"wager_odds": wager_odds,
 		"random_map": random_bonus_active and category == "arena",
+		"chaos": chaos_mode and category == "arena",
+		"any_continent_enemies": category == "arena",  # Arena: the AI rulers come from factions of every continent, not only the map's
 		"player_name": SaveManager.data["profile"]["name"],
 		"seed": 0,
+		"round_limit": GameData.round_limit_for(category, difficulty),  # differs per mode (Journey / Arena) and difficulty
 	}

@@ -143,6 +143,20 @@ func _ready() -> void:
 	var c6 := MatchController.new()
 	c6.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 3, "seed": 3, "all_ai": true})
 	check(not c6.tutorial and c6.round_limit == int(GameData.b("max_rounds")), "normal match: no tutorial, normal round limit")
+	# round limit differs per mode and difficulty
+	check(GameData.round_limit_for("journey", "easy") != GameData.round_limit_for("journey", "hard"), "journey: round limit differs per difficulty")
+	check(GameData.round_limit_for("arena", "easy") != GameData.round_limit_for("arena", "hard"), "arena: round limit differs per difficulty")
+	check(GameData.round_limit_for("journey", "normal") != GameData.round_limit_for("arena", "normal"), "round limit differs between journey and arena")
+	var saved_cat: String = GameSession.category
+	var saved_diff: String = GameSession.difficulty
+	GameSession.mode = "custom_ai"
+	for cat in ["journey", "arena"]:
+		for dif in ["easy", "normal", "hard"]:
+			GameSession.category = cat
+			GameSession.difficulty = dif
+			check(int(GameSession.to_match_config()["round_limit"]) == GameData.round_limit_for(cat, dif), "config round_limit %s/%s" % [cat, dif])
+	GameSession.category = saved_cat
+	GameSession.difficulty = saved_diff
 	# no reference cycle between the match and its coach
 	for i in range(3):
 		var w := new_tutorial()

@@ -26,10 +26,10 @@ var grid: BattleGridView
 var status_label: Label
 var message_label: Label
 var shop_box: VBoxContainer
+var lineup_legend: Label  # "[Recommended]" key, shown only when the Support slots of the Lineup tab are filled
 var bench_grid: GridContainer
 var sel_label: Label
 var sell_btn: Button
-var bench_btn: Button
 var reroll_btn: Button
 var level_btn: Button
 var hand_label: Label
@@ -48,6 +48,8 @@ var energy_bar: ProgressBar
 var combo_label: Label
 var king_box: VBoxContainer  # King passive (buff) + manual active skill
 var king_btn: Button
+var monster_btn: Button
+var summon_btn: Button
 var log_view: RichTextLabel
 var timer: Timer
 var _log_index: int = 0
@@ -109,8 +111,11 @@ func _ready() -> void:
 	timer.timeout.connect(_on_tick)
 	add_child(timer)
 	if not duel_context.is_empty():
-		var o: PlayerState = duel_context["opponent"]
-		_duel_msg = "DUEL at %s - you %s %s." % [duel_context["tile"], "attack" if duel_context["human_attacks"] else "defend against", o.display_name]
+		if duel_context.has("monster"):  # monster hunt: the enemy is a wild monster, not a ruler
+			_duel_msg = "MONSTER at %s - %s" % [duel_context["tile"], MonsterSystem.summary(String(duel_context["monster"]), commander_star)]
+		else:
+			var o: PlayerState = duel_context["opponent"]
+			_duel_msg = "DUEL at %s - you %s %s." % [duel_context["tile"], "attack" if duel_context["human_attacks"] else "defend against", o.display_name]
 		if _own_monster_id() != "":
 			_duel_msg += "  Monster card: %s joins your King in Last Stand." % GameData.get_monster(_own_monster_id()).get("name", "?")
 	_msg("")
@@ -198,7 +203,7 @@ func _build_ui() -> void:
 	prep_panel.add_theme_constant_override("separation", 6)
 	prep_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(prep_panel)
-	sel_label = UiTheme.make_label("Select a unit (bench or board), then tap a cell in your area.", 14, UiTheme.COL_MUTED)
+	sel_label = UiTheme.make_label("Select a unit from the bench, then tap a cell in your area. Tap a unit on the board, then another unit to swap places, or the preparation area to take it back.", 14, UiTheme.COL_MUTED)
 	sel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sel_label.max_lines_visible = 5
 	sel_label.custom_minimum_size.y = 90
@@ -231,7 +236,7 @@ func _build_ui() -> void:
 	level_btn.pressed.connect(_on_level_up)
 	prep_panel.add_child(level_btn)
 
-	# ---- right column: shop + bench on top, To Bench / Sell / Lock Formation in the bottom-right corner
+	# ---- right column: shop + bench on top, Sell / Lock Formation in the bottom-right corner
 	prep_left = VBoxContainer.new()
 	prep_left.add_theme_constant_override("separation", 4)
 	prep_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -242,6 +247,11 @@ func _build_ui() -> void:
 		var ll := UiTheme.make_label("\u25A0 %s" % String(r).capitalize(), 12, UiTheme.rarity_color(r))
 		ll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		legend.add_child(ll)
+	lineup_legend = UiTheme.make_label("[Recommended]", 12, UiTheme.COL_GOLD)
+	lineup_legend.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lineup_legend.tooltip_text = "Support cards that belong to the Support slots you set in the Lineup tab of the Card Hub"
+	lineup_legend.visible = false
+	legend.add_child(lineup_legend)
 	prep_left.add_child(legend)
 	shop_box = VBoxContainer.new()
 	shop_box.add_theme_constant_override("separation", 3)
@@ -255,11 +265,7 @@ func _build_ui() -> void:
 	prep_actions.add_child(message_label)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 6)
-	prep_left.add_child(row2)  # To Bench / Sell sit directly below the unit offers
-	bench_btn = UiTheme.make_button("To Bench", 44)
-	bench_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bench_btn.pressed.connect(_on_to_bench)
-	row2.add_child(bench_btn)
+	prep_left.add_child(row2)  # Sell sits directly below the unit offers
 	sell_btn = UiTheme.make_button("Sell", 44)
 	sell_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sell_btn.pressed.connect(_on_sell)
@@ -275,7 +281,7 @@ func _build_ui() -> void:
 	battle_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	battle_panel.visible = false
 	right.add_child(battle_panel)
-	var speeds := HBoxContainer.new()  # Pause / 1x / 2x / 4x: added under the log (bottom-right corner)
+	var speeds := HBoxContainer.new()  # Pause / 1x / 2x / 4x: bottom-left corner, under the King / Support hand
 	speeds.add_theme_constant_override("separation", 6)
 	var sg := ButtonGroup.new()
 	for s in [["Pause", 0.0], ["1x", 1.0], ["2x", 2.0], ["4x", 4.0]]:
@@ -292,18 +298,15 @@ func _build_ui() -> void:
 	support_box = VBoxContainer.new()
 	support_box.add_theme_constant_override("separation", 4)
 	battle_panel.add_child(support_box)
+	var speed_gap := Control.new()  # pushes the speed buttons to the bottom-left corner
+	speed_gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	battle_panel.add_child(speed_gap)
+	battle_panel.add_child(speeds)
 	battle_left = VBoxContainer.new()
 	battle_left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	battle_left.visible = false
 	left.add_child(battle_left)
-	var lp := PanelContainer.new()
-	lp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	battle_left.add_child(lp)
-	log_view = RichTextLabel.new()
-	log_view.scroll_following = true
-	log_view.add_theme_font_size_override("normal_font_size", 14)
-	lp.add_child(log_view)
-	# Bottom-right corner: combo + energy bar, player/enemy status, then the speed buttons.
+	# Info block (combo, energy bar, player/enemy status) sits above the history; it is NOT part of the history panel.
 	combo_label = UiTheme.make_label("", 14, UiTheme.COL_GOLD)
 	combo_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	battle_left.add_child(combo_label)
@@ -318,7 +321,15 @@ func _build_ui() -> void:
 	battle_status = UiTheme.make_label("", 16)
 	battle_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long HP totals must not clip at the panel edge
 	battle_left.add_child(battle_status)
-	battle_left.add_child(speeds)
+	battle_left.move_child(battle_status, 0)  # You / Enemy status on top, the combo hint below the energy bar
+	battle_left.move_child(combo_label, battle_left.get_child_count() - 1)
+	var lp := PanelContainer.new()  # history panel (log only)
+	lp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	battle_left.add_child(lp)
+	log_view = RichTextLabel.new()
+	log_view.scroll_following = true
+	log_view.add_theme_font_size_override("normal_font_size", 14)
+	lp.add_child(log_view)
 
 	_leave_dialog = UiDialog.new()
 	_leave_dialog.title = "Leave battle?"
@@ -379,6 +390,7 @@ func _on_start_pressed() -> void:
 
 func _refresh_prep() -> void:
 	status_label.text = "%sGold %d | Budget %d\nLevel %d | Capacity %d/%d" % [_round_line(), prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
+	lineup_legend.visible = deck != null and deck.has_support_lineup()
 	for c in shop_box.get_children():
 		shop_box.remove_child(c)
 		c.queue_free()
@@ -402,6 +414,14 @@ func _refresh_prep() -> void:
 				b.text = "%s  [%s %s %s]  %d\u00A0G" % [card["name"], String(card["rarity"]).capitalize(), String(card["chess"]).capitalize(), card["role"], prep.unit_price(id)]
 				UiTheme.apply_rarity(b, String(card["rarity"]))
 			b.disabled = prep.can_buy(i) != ""
+			# Recommendation from the Lineup tab: Support offers that sit in the player's Support slots get a gold "Recommended" tag
+			# with their slot number (not for a card already in the hand; units are never recommended).
+			var pick := deck.is_lineup_pick(id) and not hand.has(id)
+			if pick:
+				b.text = "[Recommended #%d] " % (deck.support_slot_of(id) + 1) + b.text
+				b.tooltip_text = deck.lineup_hint(id)
+				for col_name in ["font_color", "font_hover_color", "font_pressed_color"]:
+					b.add_theme_color_override(col_name, UiTheme.COL_GOLD)
 		b.pressed.connect(_on_buy.bind(i))
 		shop_box.add_child(b)
 	reroll_btn.text = "Reroll (%d G)" % (0 if prep.free_reroll else int(GameData.b("battle_reroll_price")))
@@ -441,12 +461,13 @@ func _refresh_prep() -> void:
 			b.pressed.connect(_on_select.bind(u))
 		else:
 			b.text = "-"
-			b.disabled = true
+			b.disabled = selected == null or selected.cell.x < 0  # an empty slot is a drop target while a deployed unit is selected
+			b.pressed.connect(_on_bench_slot)
 		bench_grid.add_child(b)
 	if selected != null and not prep.roster.units.has(selected):
 		selected = null
 	if selected == null:
-		sel_label.text = "Select a unit (bench or board), then tap a cell in your area (rows below the gold line).\nHighland (peak tiles): ranged units only, +%d%% ATK. Plains: any unit." % int(float(GameData.b("highland_atk_bonus", 0.15)) * 100.0)
+		sel_label.text = "Select a unit from the bench, then tap a cell in your area (rows below the gold line). Tap a unit on the board, then another unit to swap places, or the preparation area to take it back.\nHighland (peak tiles): ranged units only, +%d%% ATK. Plains: any unit." % int(float(GameData.b("highland_atk_bonus", 0.15)) * 100.0)
 		sel_label.add_theme_color_override("font_color", UiTheme.COL_MUTED)
 	else:
 		var card := CardDatabase.get_unit(selected.card_id)
@@ -465,7 +486,6 @@ func _refresh_prep() -> void:
 	else:
 		sell_btn.text = "Sell"
 	sell_btn.disabled = selected == null and selected_support < 0
-	bench_btn.disabled = selected == null or selected.cell.x < 0
 	hand_label.text = "Support hand (%d/%d) - tap a card, then Sell:" % [prep.hand.size(), int(GameData.b("hand_max"))]
 	for c in hand_box.get_children():
 		hand_box.remove_child(c)
@@ -585,16 +605,27 @@ func _on_auto() -> void:
 	_refresh_prep()
 
 
+## Tapping the preparation area while a unit on the board is selected sends that unit back (replaces the "To Bench" button).
+func _on_bench_slot() -> void:
+	if selected != null and selected.cell.x >= 0:
+		var err := prep.return_to_bench(selected)
+		_msg(err)
+		if err == "":
+			selected = null
+		_refresh_prep()
+
+
 func _on_select(u: UnitInstance) -> void:
+	if selected != null and selected.cell.x >= 0 and u != selected:
+		var serr := prep.swap_units(selected, u)  # a deployed unit is selected: it trades places with the tapped bench unit
+		_msg(serr)
+		if serr == "":
+			selected = null
+		_refresh_prep()
+		return
 	selected = u
 	selected_support = -1
 	_refresh_prep()
-
-
-func _on_to_bench() -> void:
-	if selected != null:
-		_msg(prep.return_to_bench(selected))
-		_refresh_prep()
 
 
 func _on_sell() -> void:
@@ -622,7 +653,14 @@ func _on_cell(cell: Vector2i) -> void:
 		return
 	for u in prep.deployed_units():
 		if u.cell == cell:
-			selected = u  # tapping a deployed unit selects it
+			if selected != null and selected != u and selected.cell.x >= 0:  # a unit on the board is selected: swap the two
+				var serr := prep.swap_units(selected, u)
+				_msg(serr)
+				if serr == "":
+					selected = null
+				_refresh_prep()
+				return
+			selected = u  # tapping a deployed unit selects it; tap the preparation area to send it back
 			selected_support = -1
 			_refresh_prep()
 			return
@@ -637,21 +675,25 @@ func _on_start_battle() -> void:
 	var enemy_cfg: Dictionary
 	if duel_context.is_empty():
 		var diff := String(GameSession.difficulty)
-		var enemy_level := prep.level + (1 if diff == "hard" else 0) + ShopSystem.series_level_bonus(_round)
+		var enemy_level := prep.level  # the enemy's level (shop level / capacity) follows OURS, not the King level; it grows only through its budget
 		var enemy_prep := BattleAI.build_enemy(diff, enemy_level, rng, deck, terrain, ShopSystem.series_budget_mult(_round))
 		_enemy_champion = BattleAI.pick_champion(rng, champion_id)
 		_enemy_hand = BattleAI.pick_hand(deck, rng, 2)
-		enemy_cfg = enemy_prep.to_side_cfg(_enemy_champion, _enemy_hand)
+		commander_star = ShopSystem.series_king_star(_series, _round)  # Battle Chess series: both Kings level up as the rounds go on
+		enemy_cfg = enemy_prep.to_side_cfg(_enemy_champion, _enemy_hand, commander_star)
 	else:
 		var me: PlayerState = duel_context["human"]
 		prep.finish()  # unbought offers go back to the pile; spending is permanent
 		me.gold = prep.gold
 		me.level = prep.level
 		me.capacity = prep.capacity()
-		enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1, terrain)
+		if duel_context.has("monster"):
+			enemy_cfg = {"units": [], "champion": "", "supports": [], "foes": [String(duel_context["monster"])], "foe_star": commander_star}  # same side config as MonsterSystem.fight
+		else:
+			enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1, terrain)
 	engine = BattleEngine.new()
 	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "manual_king": [true, false], "terrain": terrain, "sides": [
-		prep.to_side_cfg(champion_id, hand, commander_star, _own_monster_id()), enemy_cfg]})
+		prep.to_side_cfg(champion_id, hand, commander_star, _own_monster_id(), _own_monster_star()), enemy_cfg]})
 	phase = "battle"
 	_set_tip(TutorialGuide.BATTLE["fight"])
 	prep_panel.visible = false
@@ -730,6 +772,13 @@ func _update_battle_ui() -> void:
 	grid.queue_redraw()
 
 
+## King level the human duelist's Monster card was won at (its ally stats).
+func _own_monster_star() -> int:
+	if duel_context.is_empty():
+		return 1
+	return (duel_context["human"] as PlayerState).monster_star
+
+
 ## Monster card of the human duelist ("" in Battle Chess or when none was won): it joins the King in Last Stand.
 func _own_monster_id() -> String:
 	if duel_context.is_empty():
@@ -743,6 +792,8 @@ func _rebuild_king() -> void:
 		king_box.remove_child(c)
 		c.queue_free()
 	king_btn = null
+	monster_btn = null
+	summon_btn = null
 	var ch := GameData.get_champion(champion_id)
 	if ch.is_empty():
 		return
@@ -759,20 +810,36 @@ func _rebuild_king() -> void:
 		king_box.add_child(pl)
 	var mid := _own_monster_id()
 	if mid != "":
-		var ml := UiTheme.make_label("Monster card - %s\nJoins your King when he enters Last Stand." % MonsterSystem.summary(mid, true), 13, UiTheme.COL_GOLD)
+		var ml := UiTheme.make_label("Monster card - %s\nJoins your King when he enters Last Stand; its skill is cast by hand below." % MonsterSystem.summary(mid, _own_monster_star()), 13, UiTheme.COL_GOLD)
 		ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		king_box.add_child(ml)
+	summon_btn = UiTheme.make_button("", 56)
+	summon_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	summon_btn.add_theme_font_size_override("font_size", 14)
+	summon_btn.pressed.connect(_on_summon_king)
+	king_box.add_child(summon_btn)
 	king_btn = UiTheme.make_button("", 64)
 	king_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	king_btn.add_theme_font_size_override("font_size", 14)
 	king_btn.pressed.connect(_on_king_skill)
 	king_box.add_child(king_btn)
+	if mid != "":  # the Monster card has its own active skill, cast like the King skill
+		monster_btn = UiTheme.make_button("", 64)
+		monster_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		monster_btn.add_theme_font_size_override("font_size", 14)
+		monster_btn.pressed.connect(_on_monster_skill)
+		king_box.add_child(monster_btn)
 	_refresh_king_btn()
 
 
 func _refresh_king_btn() -> void:
 	if king_btn == null:
 		return
+	if summon_btn != null:
+		var cost := engine.king_summon_cost()
+		summon_btn.visible = not bool(engine.king_entered[0])
+		summon_btn.text = "[%d E] SUMMON KING now\n(skip waiting for Last Stand; %d/%d energy)" % [cost, int(engine.energy[0]), cost]
+		summon_btn.disabled = not engine.can_summon_king(0)
 	var ch := GameData.get_champion(champion_id)
 	var base := "[%d E] %s - %s" % [engine.king_energy_cost(), ch.get("active_name", "King skill"), ch.get("active_desc", "")]
 	if bool(engine.king_skill_used[0]):
@@ -784,6 +851,36 @@ func _refresh_king_btn() -> void:
 	else:
 		king_btn.text = "USE: %s" % base
 	king_btn.disabled = not engine.can_use_king_skill(0)
+	_refresh_monster_btn()
+
+
+func _refresh_monster_btn() -> void:
+	if monster_btn == null:
+		return
+	var m := GameData.get_monster(_own_monster_id())
+	var cost := engine.monster_energy_cost()
+	var base := "[%d E] %s - %s" % [cost, m.get("active_name", "Monster skill"), m.get("active_desc", "")]
+	if bool(engine.monster_skill_used[0]):
+		monster_btn.text = "%s (used)" % m.get("active_name", "Monster skill")
+	elif engine.monster_unit[0] == null:
+		monster_btn.text = "%s\n(available once the Monster joins the King)" % base
+	elif engine.ally_monster(0) == null:
+		monster_btn.text = "%s\n(the Monster has fallen)" % base
+	elif int(engine.energy[0]) < cost:
+		monster_btn.text = "%s\n(not enough energy: %d/%d)" % [base, int(engine.energy[0]), cost]
+	else:
+		monster_btn.text = "USE: %s" % base
+	monster_btn.disabled = not engine.can_use_monster_skill(0)
+
+
+func _on_summon_king() -> void:
+	var err := engine.summon_king(0)
+	if err != "":
+		log_view.add_text(err + "\n")
+		Sfx.play("error")
+	grid.notify_tick()
+	_battle_sounds()
+	_update_battle_ui()
 
 
 func _on_king_skill() -> void:
@@ -796,11 +893,21 @@ func _on_king_skill() -> void:
 	_update_battle_ui()
 
 
+func _on_monster_skill() -> void:
+	var err := engine.use_monster_skill(0)
+	if err != "":
+		log_view.add_text(err + "\n")
+		Sfx.play("error")
+	grid.notify_tick()
+	_battle_sounds()
+	_update_battle_ui()
+
+
 func _rebuild_supports() -> void:
 	for c in support_box.get_children():
 		support_box.remove_child(c)
 		c.queue_free()
-	for id in hand:
+	for id in deck.order_hand(hand):  # follows the Support slots of the Lineup tab
 		var s := CardDatabase.get_support(id)
 		var b := UiTheme.make_button("[%d E] %s - %s" % [engine.support_energy_cost(id), s["name"], s["description"]], 64)
 		b.set_meta("sid", id)
@@ -881,6 +988,11 @@ func _show_result() -> void:
 		_result_dim = dim
 		_result_rewards(v, won)
 	else:
+		if duel_context.has("monster"):
+			var mt := "You win the Monster card: it fights beside your King in Duels." if won else "The monster holds its lair and you lose %d G." % int(GameData.b("monster_defeat_gold"))
+			var ml := UiTheme.make_label(mt, 16, UiTheme.COL_GOLD if won else UiTheme.COL_DANGER)
+			ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			v.add_child(ml)
 		var cont := UiTheme.make_button("Continue", 60)
 		cont.pressed.connect(_finish_duel)
 		v.add_child(cont)
@@ -913,7 +1025,9 @@ func _result_rewards(v: VBoxContainer, won: bool) -> void:
 		v.add_child(UiTheme.make_label("Aether Coins: +%d  (total %d)" % [coins, SaveManager.coins()], 20, UiTheme.COL_GOLD))
 	if goes_on:
 		var income := ShopSystem.series_income(_round)
-		v.add_child(UiTheme.make_label("Next: round %d. You get +%d gold and keep your army; the enemy grows stronger." % [_round + 1, income], 16, UiTheme.COL_MUTED))
+		var next_star := ShopSystem.series_king_star(_series, _round + 1)
+		var king_up := "  Both Kings reach %s." % CommanderSystem.star_text(next_star) if next_star > ShopSystem.series_king_star(_series, _round) else ""
+		v.add_child(UiTheme.make_label("Next: round %d. You get +%d gold and keep your army; the enemy grows stronger.%s" % [_round + 1, income, king_up], 16, UiTheme.COL_MUTED))
 		var nxt := UiTheme.make_button("Next Round", 60)
 		nxt.pressed.connect(_next_round)
 		v.add_child(nxt)
@@ -992,6 +1106,9 @@ func _next_round() -> void:
 ## Duel mode: report the result to the Territory Board (winner is a PLAYER id, -1 = draw).
 func _finish_duel() -> void:
 	var me: PlayerState = duel_context["human"]
+	if duel_context.has("monster"):  # monster hunt: only a victory counts (a draw / timeout = the monster holds its lair)
+		battle_finished.emit({"monster": true, "won": engine.winner == 0, "ticks": engine.tick, "gold_delta": int(engine.gold_delta[0])})
+		return
 	var opp: PlayerState = duel_context["opponent"]
 	var winner_pid := -1
 	var bonus := 0

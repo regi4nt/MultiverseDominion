@@ -46,5 +46,41 @@ func _ready() -> void:
 		long_notes += "* change number %d\n" % i
 	var ln := UpdateCheck.clean_notes(long_notes, 100)
 	check(ln.length() <= 110 and ln.ends_with("..."), "long notes cut at a line boundary")
+	# Hide must not cancel: the download belongs to the SceneTree root, not to the screen that started it.
+	await get_tree().process_frame  # the root is still busy setting up children inside _ready
+	var screen := Control.new()
+	add_child(screen)
+	UpdateCheck.start_in_app_update(screen, {"version": "9.9.9", "apk_url": "http://127.0.0.1:9/x.apk", "page_url": ""})
+	var inst: UpdateInstaller = UpdateCheck._running
+	check(inst != null and inst.get_parent() == get_tree().root, "downloader is a child of the root, not of the screen")
+	var dlg: UiDialog = UpdateCheck._progress_dlg
+	check(dlg.visible, "progress dialog is shown")
+	dlg.confirmed.emit()  # the Hide button
+	dlg.hide()
+	check(UpdateCheck._pill != null and is_instance_valid(UpdateCheck._running), "Hide keeps the download and shows a pill")
+	screen.queue_free()  # the player leaves the screen
+	check(is_instance_valid(UpdateCheck._running) and is_instance_valid(inst), "leaving the screen does not kill the download")
+	UpdateCheck.start_in_app_update(self, {})
+	check(UpdateCheck._progress_dlg == dlg and dlg.visible and UpdateCheck._pill == null, "starting again just re-opens the progress dialog")
+	dlg.canceled.emit()  # Android Back
+	check(is_instance_valid(UpdateCheck._running) and UpdateCheck._pill != null, "Android Back hides instead of cancelling")
+	dlg.custom_action.emit(&"cancel")  # Cancel download
+	check(UpdateCheck._running == null and UpdateCheck._pill == null, "Cancel download stops it and removes the pill")
+	await get_tree().process_frame
+
+	# Installer: waits for the foreground, reports a refused launch.
+	var ins := UpdateInstaller.new()
+	add_child(ins)
+	check(UpdateInstaller.can_install(), "install permission is not asked off Android")
+	ins.path = "/nonexistent/x.apk"
+	var reasons: Array[String] = []
+	ins.install_failed.connect(func(r: String): reasons.append(r))
+	ins.focused = false
+	ins.install_when_possible()
+	check(reasons.is_empty() and ins._pending, "in the background the install waits")
+	ins._notification(Node.NOTIFICATION_APPLICATION_FOCUS_IN)
+	check(ins.focused and not ins._pending, "coming back to the foreground starts it once")
+	ins.queue_free()
+
 	print("UPDATE TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(0 if failures == 0 else 1)

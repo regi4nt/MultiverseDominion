@@ -1,11 +1,13 @@
 extends Control
-## Shop (one screen, six tabs): Support Gacha, Unit Gacha, Buy Support, Buy Unit, Exchange (penukaran) and Gamble (judi).
+## Shop (one screen, four tabs): Card Gacha (Support + unit cards), Buy Card (Support + unit cards in one list), Gamble (judi) and Exchange (penukaran).
 ## Gacha pulls cards with Aether Coins or Gacha Tickets (duplicates turn into Card Fragments, pity timer). Buy pays a locked card with
-## coins or Crystals, or exchanges Card Fragments for it. Exchange converts the currencies into each other (ShopSystem.EXCHANGES).
+## Crystals, or exchanges Card Fragments for it. Exchange converts the currencies into each other (ShopSystem.EXCHANGES).
 ## Unit cards are locked at the start: the Shop sells the ones of the continents opened on the Journey trophy road.
 ## Coins are earned by playing matches (see SaveManager.record_match).
 
-const TABS := [["gacha_support", "Support Gacha"], ["gacha_unit", "Unit Gacha"], ["buy_support", "Buy Support"], ["buy_unit", "Buy Unit"], ["exchange", "Exchange"], ["gamble", "Gamble"]]
+const GambleStage := preload("res://scripts/ui/gamble_stage.gd")
+const GachaStage := preload("res://scripts/ui/gacha_stage.gd")
+const TABS := [["gacha", "Card Gacha"], ["buy_card", "Buy Card"], ["gamble", "Gamble"], ["exchange", "Exchange"]]
 
 var _wallet_labels: Dictionary = {}
 var _tab_buttons: Dictionary = {}
@@ -26,16 +28,25 @@ class CardBack extends Control:
 		draw_string(ThemeDB.fallback_font, Vector2(0, size.y * 0.5 + 18.0), "?", HORIZONTAL_ALIGNMENT_CENTER, size.x, 52, Color(UiTheme.COL_GOLD, 0.55))
 
 
-## One Gacha: kind "support" or "unit". Pay with coins or tickets, pull x1 / x10, reveal the cards one by one.
+## The Card Gacha with 3 pools (Unit + Support, Unit, Support; see `mode`). Pay with Gacha Tickets, pull x1 / x10, reveal the cards one by one.
 class GachaPanel extends HBoxContainer:
 	signal changed
 
 	const RARITY_TITLES := {"common": "", "rare": "RARE PULL", "epic": "EPIC PULL!", "legendary": "LEGENDARY!!"}
 	const RARITY_SFX := {"common": "click", "rare": "coin", "epic": "magic", "legendary": "victory"}
 
-	var kind: String = "support"
+	const MODE_TITLES := {"mix": "Unit + Support", "unit": "Unit", "support": "Support"}
+	const MODE_INFO := {
+		"mix": "Support cards and unit cards in one pool (units: Rare / Epic of the continents you opened on the Journey trophy road). Duplicates become fragments. The 10-pull always holds a Rare.",
+		"unit": "Only unit cards of the continents you opened on the Journey trophy road (Rare / Epic). Duplicates become fragments.",
+		"support": "Only Support cards. Duplicates become fragments. The 10-pull always holds a Rare.",
+	}
+
+	var mode: String = "mix"  # pool: "mix" (Unit + Support) | "unit" | "support"
 	var rng: RandomNumberGenerator
-	var pay: String = "coins"
+	var _mode_buttons: Dictionary = {}
+	var _chips: HFlowContainer
+	var _info: Label
 	var pull1: Button
 	var pull10: Button
 	var pity_label: Label
@@ -43,9 +54,9 @@ class GachaPanel extends HBoxContainer:
 	var result_flow: HFlowContainer
 	var result_banner: Label
 	var stage: PanelContainer
+	var fx: Control  # GachaStage: the summon animation drawn over the stage
 
-	func _init(k: String, r: RandomNumberGenerator) -> void:
-		kind = k
+	func _init(r: RandomNumberGenerator) -> void:
 		rng = r
 		size_flags_vertical = Control.SIZE_EXPAND_FILL
 		add_theme_constant_override("separation", 12)
@@ -59,26 +70,26 @@ class GachaPanel extends HBoxContainer:
 		var lbox := VBoxContainer.new()
 		lbox.add_theme_constant_override("separation", 10)
 		left.add_child(lbox)
-		lbox.add_child(UiTheme.make_label("SUPPORT GACHA" if kind == "support" else "UNIT GACHA", 26, UiTheme.COL_GOLD))
-		var chips := HFlowContainer.new()
-		chips.add_theme_constant_override("h_separation", 6)
-		chips.add_theme_constant_override("v_separation", 6)
-		lbox.add_child(chips)
-		var rates: Dictionary = ShopSystem.RATES if kind == "support" else ShopSystem.UNIT_RATES
-		for rr in rates:
-			var c := UiTheme.rarity_color(rr)
-			var chip := UiTheme.make_label("%s %d%%" % [String(rr).capitalize(), rates[rr]], 16, c.lightened(0.35))
-			var sb := UiTheme.make_box(Color(c, 0.16), c, 2, 8)
-			sb.set_content_margin_all(5)
-			chip.add_theme_stylebox_override("normal", sb)
-			chips.add_child(chip)
-		var info_text := "Duplicates become fragments. The 10-pull always holds a Rare." if kind == "support" else \
-			"Only unit cards of the continents you opened on the Journey trophy road. Duplicates become fragments."
-		var info := UiTheme.make_label(info_text, 15, UiTheme.COL_MUTED)
-		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lbox.add_child(info)
+		lbox.add_child(UiTheme.make_label("CARD GACHA", 26, UiTheme.COL_GOLD))
+		var group := ButtonGroup.new()
+		var mode_row := HFlowContainer.new()
+		mode_row.add_theme_constant_override("h_separation", 6)
+		mode_row.add_theme_constant_override("v_separation", 6)
+		lbox.add_child(mode_row)
+		for m in ShopSystem.GACHA_MODES:
+			var mb := UiTheme.make_toggle(String(MODE_TITLES[m]), group, 44)
+			mb.button_pressed = (m == mode)
+			mb.pressed.connect(set_mode.bind(m))
+			mode_row.add_child(mb)
+			_mode_buttons[m] = mb
+		_chips = HFlowContainer.new()
+		_chips.add_theme_constant_override("h_separation", 6)
+		_chips.add_theme_constant_override("v_separation", 6)
+		lbox.add_child(_chips)
+		_info = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
+		_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbox.add_child(_info)
 		pity_bar = ProgressBar.new()
-		pity_bar.max_value = ShopSystem.PITY_LIMIT if kind == "support" else ShopSystem.UNIT_PITY_LIMIT
 		pity_bar.show_percentage = false
 		pity_bar.custom_minimum_size = Vector2(0, 14)
 		pity_bar.add_theme_stylebox_override("fill", UiTheme.make_box(Color("a65cf0"), Color("a65cf0"), 0, 7))
@@ -90,19 +101,7 @@ class GachaPanel extends HBoxContainer:
 		var sp := Control.new()
 		sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		lbox.add_child(sp)
-		lbox.add_child(UiTheme.make_label("Pay with", 16, UiTheme.COL_MUTED))
-		var prow := HBoxContainer.new()
-		prow.add_theme_constant_override("separation", 8)
-		lbox.add_child(prow)
-		var group := ButtonGroup.new()
-		for spec in [["coins", "Coins"], ["tickets", "Tickets"]]:
-			var pb := UiTheme.make_toggle(spec[1], group, 44)
-			pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			pb.button_pressed = (spec[0] == pay)
-			pb.pressed.connect(func():
-				pay = String(spec[0])
-				refresh())
-			prow.add_child(pb)
+		lbox.add_child(UiTheme.make_label("Costs Gacha Tickets (get them in Exchange or from chests and missions)", 15, UiTheme.COL_MUTED))
 		pull1 = UiTheme.make_button("", 60)
 		pull1.pressed.connect(_on_pull.bind(1))
 		lbox.add_child(pull1)
@@ -132,7 +131,32 @@ class GachaPanel extends HBoxContainer:
 		result_flow.add_theme_constant_override("h_separation", 12)
 		result_flow.add_theme_constant_override("v_separation", 12)
 		rbox.add_child(result_flow)
+		fx = GachaStage.new()  # last child of the stage = drawn on top of the cards
+		stage.add_child(fx)
+		set_mode(mode)
+
+	## Switches the pool (Unit + Support / Unit / Support): rate chips, info text and pity follow, the stage is cleared.
+	func set_mode(m: String) -> void:
+		if not ShopSystem.GACHA_MODES.has(m):
+			return
+		mode = m
+		for id in _mode_buttons:
+			(_mode_buttons[id] as Button).set_pressed_no_signal(id == m)
+		for c in _chips.get_children():
+			_chips.remove_child(c)
+			c.queue_free()
+		var rates: Dictionary = ShopSystem.UNIT_RATES if m == "unit" else ShopSystem.RATES
+		for rr in rates:
+			var c := UiTheme.rarity_color(rr)
+			var chip := UiTheme.make_label("%s %d%%" % [String(rr).capitalize(), rates[rr]], 16, c.lightened(0.35))
+			var sb := UiTheme.make_box(Color(c, 0.16), c, 2, 8)
+			sb.set_content_margin_all(5)
+			chip.add_theme_stylebox_override("normal", sb)
+			_chips.add_child(chip)
+		_info.text = String(MODE_INFO[m])
+		pity_bar.max_value = ShopSystem.UNIT_PITY_LIMIT if m == "unit" else ShopSystem.PITY_LIMIT
 		_show_idle()
+		refresh()
 
 	func _set_stage_color(c: Color) -> void:
 		stage.add_theme_stylebox_override("panel", UiTheme.make_box(Color(c.darkened(0.8), 0.95), c, 2, 14))
@@ -143,6 +167,8 @@ class GachaPanel extends HBoxContainer:
 			c.queue_free()
 
 	func _show_idle() -> void:
+		if fx != null:
+			fx.stop()
 		_clear_results()
 		_set_stage_color(UiTheme.COL_GOLD_DIM)
 		result_banner.text = "Pull to reveal cards"
@@ -159,43 +185,65 @@ class GachaPanel extends HBoxContainer:
 		result_banner.add_theme_color_override("font_color", UiTheme.COL_DANGER)
 
 	func _on_pull(count: int) -> void:
-		if kind == "unit" and not ShopSystem.unit_gacha_ready():
+		if mode == "unit" and not ShopSystem.unit_gacha_ready():
 			_fail("No unit card is in the Shop yet.")
 			return
-		var results := ShopSystem.pull_batch(count, rng, kind, pay)
+		var results := ShopSystem.pull_batch(count, rng, mode)
 		if results.is_empty():
-			_fail("Not enough Gacha Tickets." if pay == "tickets" else "Not enough Aether Coins.")
+			_fail("Not enough Gacha Tickets.")
 			return
 		_clear_results()
 		var best := 0
 		var new_n := 0
 		var frags := 0
 		var order: Array = ShopSystem.RARITY_ORDER
-		for i in range(results.size()):
-			var r: Dictionary = results[i]
-			var rarity := String(r["rarity"])
-			best = maxi(best, order.find(rarity))
+		for r in results:
+			best = maxi(best, order.find(String(r["rarity"])))
 			if bool(r["new"]):
 				new_n += 1
 			else:
 				frags += int(r["fragments"])
-			var slot := _make_slot(r)
-			result_flow.add_child(slot)
-			_reveal(slot, i, rarity)
 		var best_r: String = order[best]
 		var col := UiTheme.rarity_color(best_r)
-		_set_stage_color(col)
+		var lite := FxMode.is_lite()
+		# Pro: a graphic summon (magic circle, charging orb, burst in the rarity colour) plays first; the cards appear as it bursts.
+		var lead := 0.0
+		if not lite:
+			fx.play(best_r, col)  # not awaited: the cards are created at once, only revealed after `lead`
+			lead = fx.lead_time()
+			if best >= 1:
+				Sfx.play("magic")
+			else:
+				Sfx.play("click")
+		for i in range(results.size()):
+			var r: Dictionary = results[i]
+			var slot := _make_slot(r)
+			result_flow.add_child(slot)
+			_reveal(slot, i, String(r["rarity"]), lead)
 		var title: String = RARITY_TITLES[best_r]
 		var total_delay := 0.11 * results.size()
-		result_banner.text = "%s%d new  |  +%d fragments" % [title + "   " if title != "" else "", new_n, frags]
-		result_banner.add_theme_color_override("font_color", col.lightened(0.4))
-		if FxMode.is_lite():  # Lite: the summary shows at once
+		var final_text := "%s%d new  |  +%d fragments" % [title + "   " if title != "" else "", new_n, frags]
+		var final_col := col.lightened(0.4)
+		if lite:  # Lite: the summary shows at once
+			_set_stage_color(col)
+			result_banner.text = final_text
+			result_banner.add_theme_color_override("font_color", final_col)
 			result_banner.modulate.a = 1.0
 			result_banner.scale = Vector2.ONE
 			changed.emit()
 			return
-		result_banner.modulate.a = 0.0
+		_set_stage_color(UiTheme.COL_GOLD_DIM)
+		result_banner.text = "Summoning..."
+		result_banner.add_theme_color_override("font_color", UiTheme.COL_MUTED)
+		result_banner.modulate.a = 1.0
+		result_banner.scale = Vector2.ONE
 		var bt := result_banner.create_tween()
+		bt.tween_interval(lead)
+		bt.tween_callback(func():  # the burst: the stage frame and the summary take the rarity colour
+			_set_stage_color(col)
+			result_banner.text = final_text
+			result_banner.add_theme_color_override("font_color", final_col)
+			result_banner.modulate.a = 0.0)
 		bt.tween_interval(total_delay)  # the summary lands after the last card
 		bt.tween_property(result_banner, "modulate:a", 1.0, 0.2)
 		if best >= 2:
@@ -220,7 +268,8 @@ class GachaPanel extends HBoxContainer:
 		v.add_theme_constant_override("separation", 4)
 		frame.add_child(v)
 		var cv := CardView.new()
-		cv.setup(ShopSystem.card_by_id(String(r["id"])), kind == "support", 1)
+		var card := ShopSystem.card_by_id(String(r["id"]))
+		cv.setup(card, not ShopSystem.is_unit_card(card), 1)
 		v.add_child(cv)
 		var tag := UiTheme.make_label("NEW" if bool(r["new"]) else "+%d fragments" % int(r["fragments"]), 16,
 			Color("59cd90") if bool(r["new"]) else Color("a98be0"))
@@ -228,7 +277,7 @@ class GachaPanel extends HBoxContainer:
 		v.add_child(tag)
 		return frame
 
-	func _reveal(slot: Control, index: int, rarity: String) -> void:
+	func _reveal(slot: Control, index: int, rarity: String, lead: float = 0.0) -> void:
 		if FxMode.is_lite():  # Lite: cards appear instantly (the rarity sound still plays)
 			if index == 0 or rarity != "common":  # no 10 clicks at once on a multi-pull
 				Sfx.play(RARITY_SFX.get(rarity, "click"))
@@ -236,55 +285,59 @@ class GachaPanel extends HBoxContainer:
 		slot.modulate.a = 0.0
 		slot.scale = Vector2(0.4, 0.4)
 		slot.resized.connect(func(): slot.pivot_offset = slot.size * 0.5)
-		var delay := 0.11 * index
+		var delay := lead + 0.11 * index
 		var t := slot.create_tween().set_parallel(true)  # bound to the slot: a new pull frees it and kills the tween
 		t.tween_property(slot, "modulate:a", 1.0, 0.18).set_delay(delay)
 		t.tween_property(slot, "scale", Vector2.ONE, 0.32).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		t.tween_callback(func(): Sfx.play(RARITY_SFX.get(rarity, "click"))).set_delay(delay)
 
 	func refresh() -> void:
-		var coins := SaveManager.coins()
 		var tix := SaveManager.tickets()
-		var by_tickets := pay == "tickets"
-		var ready_ok := kind == "support" or ShopSystem.unit_gacha_ready()
-		pull1.text = "Pull x1  (%s)" % (("%d ticket" % ShopSystem.ticket_price(1)) if by_tickets else ("%d" % ShopSystem.batch_price(1)))
-		pull10.text = "Pull x10  (%s)" % (("%d tickets" % ShopSystem.ticket_price(10)) if by_tickets else ("%d" % ShopSystem.batch_price(10)))
-		pull1.disabled = not ready_ok or (tix < ShopSystem.ticket_price(1) if by_tickets else coins < ShopSystem.batch_price(1))
-		pull10.disabled = not ready_ok or (tix < ShopSystem.ticket_price(10) if by_tickets else coins < ShopSystem.batch_price(10))
-		if kind == "support":
-			pity_bar.value = ShopSystem.pity()
-			pity_label.text = "Epic+ guaranteed in %d pull%s" % [ShopSystem.pulls_to_pity(), "" if ShopSystem.pulls_to_pity() == 1 else "s"]
-		else:
+		var ready_ok := mode != "unit" or ShopSystem.unit_gacha_ready()
+		pull1.text = "Pull x1  (%d ticket)" % ShopSystem.ticket_price(1)
+		pull10.text = "Pull x10  (%d tickets)" % ShopSystem.ticket_price(10)
+		pull1.disabled = not ready_ok or tix < ShopSystem.ticket_price(1)
+		pull10.disabled = not ready_ok or tix < ShopSystem.ticket_price(10)
+		var units := ShopSystem.shop_units("", false).size()
+		if mode == "unit":
 			pity_bar.value = ShopSystem.unit_pity()
-			pity_label.text = "Epic guaranteed in %d pull%s   |   %d unit cards in the Shop" % [
-				ShopSystem.unit_pulls_to_pity(), "" if ShopSystem.unit_pulls_to_pity() == 1 else "s", ShopSystem.shop_units("", false).size()]
+			pity_label.text = "Epic guaranteed in %d pull%s   |   %d unit cards in the pool" % [ShopSystem.unit_pulls_to_pity(), "" if ShopSystem.unit_pulls_to_pity() == 1 else "s", units]
+		else:
+			pity_bar.value = ShopSystem.pity()
+			pity_label.text = "Epic+ guaranteed in %d pull%s%s" % [ShopSystem.pulls_to_pity(), "" if ShopSystem.pulls_to_pity() == 1 else "s", "   |   %d unit cards in the pool" % units if mode == "mix" else ""]
 
 
-## Buy tab for one kind of card ("support" or "unit"): a grid of locked cards, a detail panel, buy with coins / crystals, or exchange fragments.
+## Buy Card tab: Support and unit cards in one list. Two filter rows: type (All / Unit / Support) and, under Unit or Support,
+## the continents opened on the trophy road or the Support categories. A grid of locked cards, a detail panel, buy with crystals, or exchange fragments.
 class BuyPanel extends VBoxContainer:
 	signal changed
 
-	var kind: String = "support"
-	var filter: String = "all"
+	const KIND_OPTIONS := [["all", "All"], ["unit", "Unit"], ["support", "Support"]]
+
+	var kind: String = "all"  # type filter: "all" | "unit" | "support"
+	var filter: String = "all"  # sub filter: continent id (kind unit) or Support category (kind support)
 	var grid: HFlowContainer
 	var detail: RichTextLabel
-	var buy_btn: Button
 	var crystal_btn: Button
 	var frag_btn: Button
 	var msg: Label
 	var note: Label
 	var selected_id: String = ""
 	var card_views: Dictionary = {}
+	var kind_row: HFlowContainer
 	var filter_row: HFlowContainer
+	var kind_group: ButtonGroup
 	var filter_group: ButtonGroup
 
-	func _init(k: String) -> void:
-		kind = k
+	func _init() -> void:
 		size_flags_vertical = Control.SIZE_EXPAND_FILL
 		add_theme_constant_override("separation", 8)
 		_build()
 
 	func _build() -> void:
+		kind_row = HFlowContainer.new()
+		kind_row.add_theme_constant_override("h_separation", 6)
+		add_child(kind_row)
 		filter_row = HFlowContainer.new()
 		filter_row.add_theme_constant_override("h_separation", 6)
 		add_child(filter_row)
@@ -318,19 +371,33 @@ class BuyPanel extends VBoxContainer:
 		msg = UiTheme.make_label("", 15, UiTheme.COL_DANGER)
 		msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		pbox.add_child(msg)
-		buy_btn = UiTheme.make_primary("Buy", 56)
-		buy_btn.pressed.connect(_on_pay.bind("coins"))
-		pbox.add_child(buy_btn)
-		crystal_btn = UiTheme.make_button("Buy with Crystals", 56)
+		crystal_btn = UiTheme.make_primary("Buy with Crystals", 56)
 		crystal_btn.add_theme_color_override("font_color", Color("7fd8ff"))
-		crystal_btn.pressed.connect(_on_pay.bind("crystals"))
+		crystal_btn.pressed.connect(_on_buy)
 		pbox.add_child(crystal_btn)
 		frag_btn = UiTheme.make_button("Exchange fragments", 56)
 		frag_btn.add_theme_color_override("font_color", Color("cdb8ff"))
 		frag_btn.pressed.connect(_on_exchange)
 		pbox.add_child(frag_btn)
 
-	## Filter chips: Support = categories, unit = the continents opened on the trophy road.
+	## Type chips (All / Unit / Support).
+	func _build_kind_row() -> void:
+		for c in kind_row.get_children():
+			kind_row.remove_child(c)
+			c.queue_free()
+		kind_group = ButtonGroup.new()
+		for o in KIND_OPTIONS:
+			var b := UiTheme.make_toggle(String(o[1]), kind_group, 44)
+			b.custom_minimum_size.x = 110
+			b.button_pressed = (String(o[0]) == kind)
+			b.pressed.connect(func():
+				kind = String(o[0])
+				filter = "all"
+				msg.text = ""
+				rebuild())
+			kind_row.add_child(b)
+
+	## Sub filter chips: unit = the continents opened on the trophy road, Support = categories. Hidden under "All".
 	func _build_filters() -> void:
 		for c in filter_row.get_children():
 			filter_row.remove_child(c)
@@ -341,15 +408,18 @@ class BuyPanel extends VBoxContainer:
 		if kind == "support":
 			for cat in CardDatabase.SUPPORT_CATEGORIES:
 				opts.append([String(cat), String(cat).capitalize()])
-		else:
+		elif kind == "unit":
 			for cont in GameData.continents:
 				if cont.get("playable", false) and SaveManager.is_continent_unlocked(String(cont["id"])):
 					opts.append([String(cont["id"]), String(cont["name"]).capitalize()])
+		filter_row.visible = (kind != "all")
 		var valid := false
 		for o in opts:
 			valid = valid or String(o[0]) == filter
 		if not valid:
 			filter = "all"
+		if kind == "all":
+			return
 		for o in opts:
 			var b := UiTheme.make_toggle(String(o[1]), filter_group, 44)
 			b.custom_minimum_size.x = 110
@@ -359,13 +429,17 @@ class BuyPanel extends VBoxContainer:
 				rebuild())
 			filter_row.add_child(b)
 
+	## Locked cards of the current view: unit cards first, then Support cards.
 	func _listed() -> Array:
-		if kind == "support":
-			return ShopSystem.locked_supports(filter)
-		return ShopSystem.shop_units("" if filter == "all" else filter, true)
+		var out: Array = []
+		if kind != "support":
+			out.append_array(ShopSystem.shop_units("" if (kind == "all" or filter == "all") else filter, true))
+		if kind != "unit":
+			out.append_array(ShopSystem.locked_supports("all" if kind == "all" else filter))
+		return out
 
 	func _locked_continent_note() -> String:
-		if kind != "unit":
+		if kind == "support":
 			return ""
 		var next := SaveManager.next_continent_goal()
 		if next == "":
@@ -374,6 +448,7 @@ class BuyPanel extends VBoxContainer:
 			SaveManager.trophies(), SaveManager.continent_trophies(next), String(GameData.get_continent(next)["name"]).capitalize()]
 
 	func rebuild() -> void:
+		_build_kind_row()
 		_build_filters()
 		note.text = _locked_continent_note()
 		for c in grid.get_children():
@@ -384,7 +459,7 @@ class BuyPanel extends VBoxContainer:
 		var still_listed := false
 		for s in list:
 			var v := CardView.new()
-			v.setup(s, kind == "support", 0)
+			v.setup(s, not ShopSystem.is_unit_card(s), 0)
 			v.pressed.connect(_on_card)
 			v.set_selected(String(s["id"]) == selected_id)
 			grid.add_child(v)
@@ -403,9 +478,8 @@ class BuyPanel extends VBoxContainer:
 		refresh_detail()
 
 	func _card_text(s: Dictionary) -> String:
-		var price := ShopSystem.buy_price(s)
-		var cost := "Price: %d coins\nor %d crystals\nor %d fragments" % [price, ShopSystem.crystal_price(s), ShopSystem.fragment_price(s)]
-		if kind == "support":
+		var cost := "Price: %d crystals\nor %d fragments" % [ShopSystem.crystal_price(s), ShopSystem.fragment_price(s)]
+		if not ShopSystem.is_unit_card(s):
 			return "[color=#d4af37][b]%s[/b][/color]\n%s - %s\nUses per battle: %d\n\n%s\n\n%s" % [
 				s["name"], s["category"], String(s["rarity"]).capitalize(), int(s["uses"]), s["description"], cost]
 		var skill: Dictionary = s.get("skill", {})
@@ -415,15 +489,17 @@ class BuyPanel extends VBoxContainer:
 			int(GameData.b("unit_copies")), cost]
 
 	func refresh_detail() -> void:
-		var what := "Support card" if kind == "support" else "unit card"
+		var what := "card"
+		if kind == "support":
+			what = "Support card"
+		elif kind == "unit":
+			what = "unit card"
 		if selected_id == "":
 			if card_views.is_empty():
 				detail.text = "[color=#59cd90]Every %s of this view is unlocked.[/color]" % what
 			else:
 				detail.text = "Tap a locked card to see its details and price.\n\n[color=#8d93ad]%d %s%s still locked in this view.[/color]" % [
 					card_views.size(), what, "" if card_views.size() == 1 else "s"]
-			buy_btn.disabled = true
-			buy_btn.text = "Buy"
 			crystal_btn.disabled = true
 			crystal_btn.text = "Buy with Crystals"
 			frag_btn.disabled = true
@@ -431,7 +507,6 @@ class BuyPanel extends VBoxContainer:
 			return
 		var s := ShopSystem.card_by_id(selected_id)
 		detail.text = _card_text(s)
-		buy_btn.text = "Buy  (%d coins)" % ShopSystem.buy_price(s)
 		crystal_btn.text = "Buy  (%d crystals)" % ShopSystem.crystal_price(s)
 		frag_btn.text = "Exchange  (%d fragments)" % ShopSystem.fragment_price(s)
 		refresh_buttons()
@@ -440,12 +515,11 @@ class BuyPanel extends VBoxContainer:
 		if selected_id == "":
 			return
 		var s := ShopSystem.card_by_id(selected_id)
-		buy_btn.disabled = SaveManager.coins() < ShopSystem.buy_price(s)
 		crystal_btn.disabled = SaveManager.crystals() < ShopSystem.crystal_price(s)
 		frag_btn.disabled = SaveManager.fragments() < ShopSystem.fragment_price(s)
 
-	func _on_pay(pay: String) -> void:
-		_done(ShopSystem.buy(selected_id, pay) if selected_id != "" else "-")
+	func _on_buy() -> void:
+		_done(ShopSystem.buy(selected_id) if selected_id != "" else "-")
 
 	func _on_exchange() -> void:
 		_done(ShopSystem.exchange(selected_id) if selected_id != "" else "-")
@@ -465,22 +539,22 @@ class BuyPanel extends VBoxContainer:
 		changed.emit()
 
 
-## Exchange tab: one row per ShopSystem.EXCHANGES entry with x1 / x5 / x10 packs.
+## Exchange tab: one row per ShopSystem.EXCHANGES entry. The number of packs to convert is picked with a slider, with - / + beside it.
 class ExchangePanel extends VBoxContainer:
 	signal changed
 
-	const PACKS := [1, 5, 10]
-	var rows: Dictionary = {}  # exchange id -> {"buttons": Array[Button]}
+	var rows: Dictionary = {}  # exchange id -> {"slider", "minus", "plus", "convert", "summary"}
 	var msg: Label
 
 	func _init() -> void:
 		size_flags_vertical = Control.SIZE_EXPAND_FILL
 		add_theme_constant_override("separation", 8)
-		var hint := UiTheme.make_label("Exchange your currencies. Each pack converts the amount shown; going back and forth always costs a little.", 16, UiTheme.COL_MUTED)
+		var hint := UiTheme.make_label("Exchange your currencies. Drag the slider or use - / + to choose how many packs; going back and forth always costs a little.", 16, UiTheme.COL_MUTED)
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		add_child(hint)
 		var scroll := UiTheme.make_scroll()
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		add_child(scroll)
 		var list := VBoxContainer.new()
 		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -493,25 +567,69 @@ class ExchangePanel extends VBoxContainer:
 		add_child(msg)
 
 	func _make_row(e: Dictionary) -> Control:
+		var id := String(e["id"])
 		var panel := PanelContainer.new()
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		panel.add_child(row)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 6)
+		panel.add_child(col)
 		var from_name: String = ShopSystem.CURRENCY_NAMES[String(e["from"])]
 		var to_name: String = ShopSystem.CURRENCY_NAMES[String(e["to"])]
-		var label := UiTheme.make_label("%s x%d   >   %s x%d" % [from_name, int(e["from_n"]), to_name, int(e["to_n"])], 20, UiTheme.COL_TEXT)
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var label := UiTheme.make_label("%s x%d   >   %s x%d   (1 pack)" % [from_name, int(e["from_n"]), to_name, int(e["to_n"])], 20, UiTheme.COL_TEXT)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		row.add_child(label)
-		var buttons: Array[Button] = []
-		for n in PACKS:
-			var b := UiTheme.make_button("x%d" % n, 52)
-			b.custom_minimum_size.x = 84
-			b.pressed.connect(_on_convert.bind(String(e["id"]), int(n)))
-			row.add_child(b)
-			buttons.append(b)
-		rows[String(e["id"])] = {"buttons": buttons}
+		col.add_child(label)
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 10)
+		col.add_child(line)
+		var minus := UiTheme.make_button("-", 52)
+		minus.custom_minimum_size.x = 64
+		line.add_child(minus)
+		var slider := HSlider.new()
+		slider.min_value = 1
+		slider.max_value = 1
+		slider.step = 1
+		slider.value = 1
+		slider.custom_minimum_size = Vector2(160, 40)
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		slider.scrollable = false  # the mouse wheel must scroll the page, not change the value
+		line.add_child(slider)
+		var plus := UiTheme.make_button("+", 52)
+		plus.custom_minimum_size.x = 64
+		line.add_child(plus)
+		var summary := UiTheme.make_label("", 18, UiTheme.COL_GOLD)
+		summary.custom_minimum_size.x = 250
+		summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		summary.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		line.add_child(summary)
+		var convert := UiTheme.make_primary("Exchange", 52)
+		convert.custom_minimum_size.x = 150
+		line.add_child(convert)
+		minus.pressed.connect(func(): slider.value -= 1)
+		plus.pressed.connect(func(): slider.value += 1)
+		slider.value_changed.connect(func(_v: float): _update_row(id))
+		convert.pressed.connect(func(): _on_convert(id, int(slider.value)))
+		rows[id] = {"slider": slider, "minus": minus, "plus": plus, "convert": convert, "summary": summary}
+		_update_row(id)
 		return panel
+
+	## Packs the player can pay right now (0 = none).
+	func _max_packs(id: String) -> int:
+		var e := ShopSystem.exchange_spec(id)
+		return SaveManager.currency(String(e["from"])) / int(e["from_n"])
+
+	## Slider range, - / + / Exchange state and the "pay > get" text of one row.
+	func _update_row(id: String) -> void:
+		var e := ShopSystem.exchange_spec(id)
+		var r: Dictionary = rows[id]
+		var slider: HSlider = r["slider"]
+		var most := _max_packs(id)
+		slider.max_value = maxi(most, 1)
+		slider.editable = most >= 1
+		var n := int(slider.value)
+		(r["minus"] as Button).disabled = most < 1 or n <= 1
+		(r["plus"] as Button).disabled = most < 1 or n >= most
+		(r["convert"] as Button).disabled = most < 1
+		(r["summary"] as Label).text = "x%d:  %d  >  %d" % [n, int(e["from_n"]) * n, int(e["to_n"]) * n] if most >= 1 else "Not enough %s" % ShopSystem.CURRENCY_NAMES[String(e["from"])]
 
 	func _on_convert(exchange_id: String, packs: int) -> void:
 		var e := ShopSystem.exchange_spec(exchange_id)
@@ -528,9 +646,7 @@ class ExchangePanel extends VBoxContainer:
 
 	func refresh() -> void:
 		for id in rows:
-			var buttons: Array = rows[id]["buttons"]
-			for i in range(buttons.size()):
-				buttons[i].disabled = not ShopSystem.can_convert(String(id), int(PACKS[i]))
+			_update_row(String(id))
 
 
 ## Gamble tab: quick mini games (Coin Flip, Dice, Slots) played with Chips only. Winnings come back as Chips (Exchange turns them into coins).
@@ -550,6 +666,8 @@ class GamblePanel extends HBoxContainer:
 	var headline: Label
 	var detail: Label
 	var net_label: Label
+	var busy := false
+	var gfx: Control  # GambleStage: the drawn coin / dice / reels
 
 	const GAME_NAMES := {"coin": "Coin Flip", "dice": "Dice", "slots": "Slots"}
 	const CHOICES := {
@@ -600,7 +718,7 @@ class GamblePanel extends HBoxContainer:
 		var bg := ButtonGroup.new()
 		for amount in ShopSystem.GAMBLE_BETS:
 			var bb := UiTheme.make_toggle(str(amount), bg, 46)
-			bb.custom_minimum_size.x = 84
+			bb.custom_minimum_size.x = 68
 			bb.button_pressed = (amount == bet)
 			bb.pressed.connect(func():
 				bet = int(amount)
@@ -625,7 +743,10 @@ class GamblePanel extends HBoxContainer:
 		headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		headline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sbox.add_child(headline)
-		detail = UiTheme.make_label("", 30, UiTheme.COL_TEXT)
+		gfx = GambleStage.new()
+		gfx.sound.connect(func(n: String): Sfx.play(n))
+		sbox.add_child(gfx)
+		detail = UiTheme.make_label("", 22, UiTheme.COL_TEXT)
 		detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sbox.add_child(detail)
@@ -658,6 +779,7 @@ class GamblePanel extends HBoxContainer:
 				rules.text = "Two dice. Low (2-6) or High (8-12) pays x%.1f, exactly Seven pays x%.1f." % [ShopSystem.DICE_PAYOUT["low"], ShopSystem.DICE_PAYOUT["seven"]]
 			"slots":
 				rules.text = "Three reels. Three 7s pay x%d, any other three alike x%d, two alike x%.1f." % [int(ShopSystem.SLOT_JACKPOT), int(ShopSystem.SLOT_TRIPLE), ShopSystem.SLOT_PAIR]
+		gfx.set_idle(g)
 		headline.text = "Place your bet"
 		headline.add_theme_color_override("font_color", UiTheme.COL_GOLD)
 		detail.text = ""
@@ -665,13 +787,63 @@ class GamblePanel extends HBoxContainer:
 		_set_stage_color(UiTheme.COL_GOLD_DIM)
 		refresh()
 
+	## Locks / unlocks the pickers while an animation plays.
+	func _set_busy(b: bool) -> void:
+		busy = b
+		for row in [game_row, choice_row, bet_row]:
+			for c in row.get_children():
+				(c as Button).disabled = b
+		if b:
+			play_btn.disabled = true
+		else:
+			refresh()
+
+	func _wait(sec: float) -> void:
+		await get_tree().create_timer(sec).timeout
+
+	## Suspense before the result: the graphic stage flips the coin, tumbles the dice or spins the reels. The outcome is already
+	## decided (ShopSystem.gamble); this only plays it back. Lite effects mode skips it.
+	func _animate(r: Dictionary) -> void:
+		headline.text = {"coin": "Flipping...", "dice": "Rolling...", "slots": "Spinning..."}[game]
+		headline.add_theme_color_override("font_color", UiTheme.COL_MUTED)
+		net_label.text = ""
+		detail.text = ""
+		_set_stage_color(UiTheme.COL_GOLD_DIM)
+		if game == "dice":
+			Sfx.play("dice")
+		await gfx.play(game, r["detail"])
+
+	## Pop for a win (bigger for a jackpot), shake for a loss.
+	func _celebrate(net: int, jackpot: bool) -> void:
+		headline.pivot_offset = headline.size * 0.5
+		var tw := create_tween()
+		if net > 0:
+			headline.scale = Vector2(0.6, 0.6)
+			tw.tween_property(headline, "scale", Vector2(1.25 if jackpot else 1.12, 1.25 if jackpot else 1.12), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(headline, "scale", Vector2.ONE, 0.15)
+			if jackpot:
+				var fl := create_tween()
+				fl.tween_property(stage, "modulate", Color(1.6, 1.5, 1.0), 0.12)
+				fl.tween_property(stage, "modulate", Color.WHITE, 0.35)
+		elif net < 0:
+			for dx in [10.0, -10.0, 6.0, -6.0, 0.0]:
+				tw.tween_property(headline, "position:x", dx, 0.04).as_relative()
+			tw.tween_callback(func(): headline.scale = Vector2.ONE)
+
 	func _on_play() -> void:
+		if busy:
+			return
 		var r := ShopSystem.gamble(game, choice, bet, rng)
 		if not bool(r["ok"]):
 			Sfx.play("error")
 			headline.text = String(r["error"])
 			headline.add_theme_color_override("font_color", UiTheme.COL_DANGER)
 			return
+		_set_busy(true)
+		if not FxMode.is_lite():
+			await _animate(r)
+			if not is_inside_tree():
+				return
 		var d: Dictionary = r["detail"]
 		match game:
 			"coin":
@@ -703,6 +875,10 @@ class GamblePanel extends HBoxContainer:
 				continue
 			l.modulate.a = 0.0
 			l.create_tween().tween_property(l, "modulate:a", 1.0, 0.25)
+		if not FxMode.is_lite():
+			_celebrate(net, String(d.get("kind", "")) == "jackpot")
+			gfx.celebrate(net > 0, String(d.get("kind", "")) == "jackpot")
+		_set_busy(false)
 		changed.emit()
 
 	func refresh() -> void:
@@ -749,22 +925,20 @@ func _ready() -> void:
 	for spec in TABS:
 		var mb := UiTheme.make_toggle(spec[1], group, 52)
 		mb.custom_minimum_size.x = 176
-		mb.button_pressed = (spec[0] == "gacha_support")
+		mb.button_pressed = (spec[0] == "gacha")
 		mb.pressed.connect(_show_tab.bind(spec[0]))
 		modes.add_child(mb)
 		_tab_buttons[spec[0]] = mb
 
-	var gs := GachaPanel.new("support", _rng)
-	var gu := GachaPanel.new("unit", _rng)
-	var bs := BuyPanel.new("support")
-	var bu := BuyPanel.new("unit")
+	var gs := GachaPanel.new(_rng)
+	var bc := BuyPanel.new()
 	var ex := ExchangePanel.new()
 	var gb := GamblePanel.new(_rng)
-	_views = {"gacha_support": gs, "gacha_unit": gu, "buy_support": bs, "buy_unit": bu, "exchange": ex, "gamble": gb}
+	_views = {"gacha": gs, "buy_card": bc, "gamble": gb, "exchange": ex}
 	for id in _views:
 		root.add_child(_views[id])
 		_views[id].changed.connect(_refresh)
-	_show_tab("gacha_support")
+	_show_tab("gacha")
 	_refresh()
 
 
@@ -773,7 +947,7 @@ func _show_tab(which: String) -> void:
 		_views[id].visible = (id == which)
 	if _tab_buttons.has(which):
 		_tab_buttons[which].set_pressed_no_signal(true)
-	if which == "buy_support" or which == "buy_unit":
+	if which == "buy_card":
 		_views[which].rebuild()
 	_refresh()
 

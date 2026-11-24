@@ -29,6 +29,7 @@ var stock_basis: int = 0  # gold put in (for the profit / loss display)
 var move_bonus: int = 0  # Swift Die: added to the next move
 var commander_star: int = 1  # Commander stars 1..3, raised by missions (see CommanderSystem)
 var mission_progress: int = 0  # progress of the ACTIVE Commander mission
+var monster_star: int = 1  # King level (Commander star) when the Monster card was won: the ally keeps that level
 var monster_id: String = ""  # Monster card won on a hidden territory monster (max one); it joins the King in a Duel
 
 # Persistent army (Phase 5): units bought with Dominion Gold stay between duels.

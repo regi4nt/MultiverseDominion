@@ -3,9 +3,14 @@ extends RefCounted
 ## Reward chests. Winning an Arena match drops a chest (grade Bronze / Silver / Gold, odds depend on the difficulty).
 ## A chest sits in one of SLOT_COUNT slots, must be unlocked by a real-time timer (one chest unlocks at a time, the timer
 ## keeps running while the game is closed) and is opened for a random bundle of coins, fragments, chips, tickets, crystals and XP.
+## When every slot is full a new chest waits in the Storage (STORAGE_CAPACITY places) until a slot is free; only a full Storage turns it into coins.
+## Drops are limited: after DROP_LIMIT chests no more drop until DROP_REFRESH_SECONDS (1 hour) after the limit was hit; then the allowance resets.
 ## A Crystal skips the rest of a timer. All state lives in SaveManager.data["chests"]; every number is a constant here.
 
 const SLOT_COUNT := 4
+const DROP_LIMIT := 6  # chests an Arena win can drop before the limit is hit
+const DROP_REFRESH_SECONDS := 3600  # after the limit is hit, this long until the allowance is refreshed
+const STORAGE_CAPACITY := 12  # unopened chests that wait in the Storage when every slot is full
 const GRADES: Array[String] = ["bronze", "silver", "gold"]
 const SKIP_SECONDS_PER_CRYSTAL := 1800  # 1 Crystal per started half hour that is still left
 
@@ -28,7 +33,7 @@ const GRADE_DATA := {
 		"rewards": {"coins": [150, 300, 100], "fragments": [20, 45, 100], "chips": [150, 400, 70], "tickets": [1, 2, 40], "crystals": [1, 1, 20], "xp": [60, 110, 100]},
 	},
 	"gold": {
-		"name": "Gold Chest", "color": Color("f2c230"), "seconds": 14400, "full_coins": 400, "card_chance": 25,
+		"name": "Gold Chest", "color": Color("f2c230"), "seconds": 14400, "full_coins": 400, "card_chance": 0,
 		"rewards": {"coins": [400, 800, 100], "fragments": [60, 140, 100], "chips": [500, 1200, 90], "tickets": [2, 4, 80], "crystals": [1, 3, 60], "xp": [150, 260, 100]},
 	},
 }
@@ -98,8 +103,16 @@ static func reward_summary(grade: String) -> String:
 static func _store() -> Dictionary:
 	var d: Dictionary = SaveManager.data
 	if not d.has("chests") or not (d["chests"] is Dictionary):
-		d["chests"] = {"slots": [], "opened": 0}
+		d["chests"] = {"slots": [], "opened": 0, "storage": []}
 	var c: Dictionary = d["chests"]
+	if not c.has("storage") or not (c["storage"] is Array):
+		c["storage"] = []
+	for k in ["drops", "limit_at"]:
+		if not c.has(k):
+			c[k] = 0
+	if int(c["limit_at"]) > 0 and now() >= int(c["limit_at"]) + DROP_REFRESH_SECONDS:  # refresh after the wait
+		c["drops"] = 0
+		c["limit_at"] = 0
 	if not c.has("slots") or not (c["slots"] is Array):
 		c["slots"] = []
 	var slots: Array = c["slots"]
@@ -113,6 +126,28 @@ static func _store() -> Dictionary:
 ## The slots: null (empty) or {"grade", "start" (0 = not unlocking yet), "ready" (unix time the timer ends)}.
 static func slots() -> Array:
 	return _store()["slots"]
+
+
+## The Storage: grade names (String) of unopened chests waiting for a free slot, oldest first.
+static func storage() -> Array:
+	return _store()["storage"]
+
+
+static func storage_count() -> int:
+	return storage().size()
+
+
+## Chests dropped in the current allowance (0..DROP_LIMIT).
+static func drops_used() -> int:
+	return int(_store()["drops"])
+
+
+## Seconds until the drop allowance refreshes (0 = the limit is not hit, chests can drop).
+static func limit_seconds_left() -> int:
+	var c := _store()
+	if int(c["drops"]) < DROP_LIMIT or int(c["limit_at"]) <= 0:
+		return 0
+	return maxi(0, int(c["limit_at"]) + DROP_REFRESH_SECONDS - now())
 
 
 static func opened_total() -> int:
@@ -189,12 +224,21 @@ static func roll_grade(difficulty: String, rng: RandomNumberGenerator) -> String
 	return GRADES[0]
 
 
-## The chest of an Arena victory. Goes into the first empty slot (waiting, not unlocking yet). With every slot full the chest
-## turns into coins at once so a win never pays nothing. Returns {"status": "added"|"full", "grade", "slot" | "coins"}.
+## The chest of an Arena victory. Goes into the first empty slot (waiting, not unlocking yet). With every slot full it goes to the
+## Storage; with the Storage full too it turns into coins at once so a win never pays nothing.
+## Returns {"status": "added"|"stored"|"full", "grade", "slot" | "storage" (place, 0-based) | "coins"},
+## or {"status": "limit", "wait": seconds} when the drop allowance is used up (no chest at all until it refreshes).
 static func award(difficulty: String, rng: RandomNumberGenerator = null) -> Dictionary:
+	var wait := limit_seconds_left()
+	if wait > 0:
+		return {"status": "limit", "wait": wait}
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
+	var c := _store()
+	c["drops"] = int(c["drops"]) + 1
+	if int(c["drops"]) >= DROP_LIMIT:
+		c["limit_at"] = now()
 	return award_grade(roll_grade(difficulty, rng))
 
 
@@ -205,10 +249,29 @@ static func award_grade(grade: String) -> Dictionary:
 			arr[i] = {"grade": grade, "start": 0, "ready": 0}
 			SaveManager.save_game()
 			return {"status": "added", "grade": grade, "slot": i}
+	var stock := storage()
+	if stock.size() < STORAGE_CAPACITY:
+		stock.append(grade)
+		SaveManager.save_game()
+		return {"status": "stored", "grade": grade, "storage": stock.size() - 1}
 	var coins := int(GRADE_DATA[grade]["full_coins"])
 	SaveManager.add_coins(coins)
 	SaveManager.save_game()
 	return {"status": "full", "grade": grade, "coins": coins}
+
+
+## Moves a chest of the Storage into the first empty slot (waiting, not unlocking yet). Returns "" or the reason it failed.
+static func move_to_slot(storage_index: int) -> String:
+	var stock := storage()
+	if storage_index < 0 or storage_index >= stock.size():
+		return "No such chest in the Storage."
+	for i in range(SLOT_COUNT):
+		if slots()[i] == null:
+			slots()[i] = {"grade": String(stock[storage_index]), "start": 0, "ready": 0}
+			stock.remove_at(storage_index)
+			SaveManager.save_game()
+			return ""
+	return "Every slot is full. Open a chest first."
 
 
 # --- timer ------------------------------------------------------------------

@@ -34,6 +34,9 @@ func _ready() -> void:
 	check(ShopSystem.series_budget_mult(5) > ShopSystem.series_budget_mult(2), "later rounds are stronger")
 	check(ShopSystem.series_budget_mult(500) <= 3.5, "enemy budget multiplier is capped")
 	check(ShopSystem.series_level_bonus(1) == 0 and ShopSystem.series_level_bonus(4) == 1 and ShopSystem.series_level_bonus(7) == 2, "enemy gains a shop level every 3 rounds")
+	check(ShopSystem.series_king_star("ten", 1) == 1 and ShopSystem.series_king_star("ten", 3) == 1 and ShopSystem.series_king_star("ten", 4) == 2 \
+			and ShopSystem.series_king_star("survival", 7) == 3 and ShopSystem.series_king_star("survival", 20) == CommanderSystem.max_star() and ShopSystem.series_king_star("single", 9) == 1, \
+			"the Battle Chess Kings are Lv 1 (rounds 1-3), Lv 2 (4-6), Lv 3 (7+); a single battle stays Lv 1")
 	check(ShopSystem.series_coin_bonus("single", 5) == 0 and ShopSystem.series_coin_bonus("ten", 1) == 0 and ShopSystem.series_coin_bonus("ten", 3) > 0, "round bonus only in runs, from round 2")
 	check(ShopSystem.series_income(2) > ShopSystem.series_income(1), "gold income grows with the round")
 

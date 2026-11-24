@@ -15,6 +15,9 @@ var unit_ids: Array[String] = []  # the 15 chosen unit types; empty = default of
 ## Custom lineup (Lineup tab): where each unit type stands on the deployment area; Auto Deploy follows it.
 ## Entries: {"id": unit card id, "x": column 0..7, "y": row 4..7}. Empty = the default AI formation.
 var lineup: Array = []
+## Support lineup (Lineup tab): the Support cards of the deck in the order they are listed in battle (slot 0 first).
+## One String per slot, "" = empty slot; a card can sit in one slot only.
+var support_lineup: Array = []
 ## The player's collection (card id -> copies), set by SaveManager.get_deck: unit cards that are not owned (they come from the
 ## Shop) are never used. Empty = no restriction (AI decks, tests).
 var owned_filter: Dictionary = {}
@@ -127,21 +130,96 @@ func validate(collection: Dictionary = {}) -> Array[String]:
 func valid_lineup() -> Array:
 	var types := effective_unit_ids()
 	var seen := {}
+	var used_ids := {}  # each unit may be placed only once: copies of a unit are dropped
 	var out: Array = []
 	for e in lineup:
 		if typeof(e) != TYPE_DICTIONARY:
 			continue
 		var id := String(e.get("id", ""))
 		var cell := Vector2i(int(e.get("x", -1)), int(e.get("y", -1)))
-		if not types.has(id) or cell.x < 0 or cell.x >= 8 or cell.y < 4 or cell.y > 7 or seen.has(cell):
+		if not types.has(id) or cell.x < 0 or cell.x >= 8 or cell.y < 4 or cell.y > 7 or seen.has(cell) or used_ids.has(id):
 			continue
 		seen[cell] = true
+		used_ids[id] = true
 		out.append({"id": id, "x": cell.x, "y": cell.y})
 	return out
 
 
+## The support lineup with only Support cards of the deck, no copies, one slot per card of the battle hand (`hand_max`, "" = empty).
+func valid_support_lineup() -> Array:
+	var slots := maxi(int(GameData.b("hand_max")), 1)
+	var out: Array = []
+	var used := {}
+	for i in range(slots):
+		var id := String(support_lineup[i]) if i < support_lineup.size() else ""
+		if id != "" and (not support_ids.has(id) or used.has(id)):
+			id = ""
+		if id != "":
+			used[id] = true
+		out.append(id)
+	return out
+
+
+## True when the player filled the Lineup tab (any unit on the grid or any Support card in the slots).
+func has_lineup() -> bool:
+	if not valid_lineup().is_empty():
+		return true
+	for id in valid_support_lineup():
+		if String(id) != "":
+			return true
+	return false
+
+
+## Where a unit card stands in the Lineup grid: Vector2i(column, row 4..7), or Vector2i(-1, -1) when it is not in the lineup.
+func lineup_cell_of(id: String) -> Vector2i:
+	for e in valid_lineup():
+		if String(e["id"]) == id:
+			return Vector2i(int(e["x"]), int(e["y"]))
+	return Vector2i(-1, -1)
+
+
+## Slot (0-based) of a Support card in the Support lineup, -1 when it is not in the lineup.
+func support_slot_of(id: String) -> int:
+	return valid_support_lineup().find(id) if id != "" else -1
+
+
+## True when at least one Support slot of the Lineup tab is filled.
+func has_support_lineup() -> bool:
+	for id in valid_support_lineup():
+		if String(id) != "":
+			return true
+	return false
+
+
+## A Battle Shop offer the Lineup recommends: only Support cards, those placed in the Support slots of the Lineup tab.
+## Nothing is recommended while the Support slots are empty (units are never recommended).
+func is_lineup_pick(id: String) -> bool:
+	if id == "" or not BattlePrep.is_support_id(id) or not has_support_lineup():
+		return false
+	return support_slot_of(id) >= 0
+
+
+## Tooltip / hint of a recommended offer ("" = not recommended).
+func lineup_hint(id: String) -> String:
+	if not is_lineup_pick(id):
+		return ""
+	return "Recommended by your lineup: Support slot %d." % (support_slot_of(id) + 1)
+
+
+## A hand in battle order: cards of the support lineup first (slot order), then the rest in their own order.
+func order_hand(hand: Array) -> Array:
+	var out: Array = []
+	var rest: Array = hand.duplicate()
+	for id in valid_support_lineup():
+		if id != "" and rest.has(id):
+			out.append(id)
+			rest.erase(id)
+	out.append_array(rest)
+	return out
+
+
 func to_dict() -> Dictionary:
-	return {"champion": champion_id, "supports": support_ids.duplicate(), "continent": continent_id, "units": unit_ids.duplicate(), "lineup": lineup.duplicate(true)}
+	return {"champion": champion_id, "supports": support_ids.duplicate(), "continent": continent_id, "units": unit_ids.duplicate(), "lineup": lineup.duplicate(true), "support_lineup": support_lineup.duplicate()}
 
 
 static func from_dict(d: Dictionary) -> Deck:
@@ -155,4 +233,6 @@ static func from_dict(d: Dictionary) -> Deck:
 	for e in d.get("lineup", []):
 		if typeof(e) == TYPE_DICTIONARY:
 			deck.lineup.append({"id": String(e.get("id", "")), "x": int(e.get("x", -1)), "y": int(e.get("y", -1))})
+	for id in d.get("support_lineup", []):
+		deck.support_lineup.append(String(id))
 	return deck

@@ -6,6 +6,12 @@ func _ready() -> void:
 	var coll: Control = load("res://scenes/card_collection/card_collection.tscn").instantiate()
 	add_child(coll)
 	await get_tree().process_frame
+	# The Card Hub opens on the Lineup tab (first tab), not on the Collection.
+	if not coll._lineup_view.visible or coll._collection_view.visible or coll._deck_view.visible or not coll._tab_buttons["lineup"].button_pressed:
+		fails += 1
+		push_error("the Card Hub should open on the Lineup tab")
+	coll._show_tab("collection")
+	await get_tree().process_frame
 	for f in ["pawn", "queen", "king", "support", "all"]:
 		coll._filter = f
 		coll._rebuild()
@@ -49,7 +55,7 @@ func _ready() -> void:
 		if not coll._info_text.text.contains(word):
 			fails += 1
 			push_error("the Territory section should explain '%s'" % word)
-	if not coll._info_text.text.contains("%d Dominion Gold" % int(GameData.b("start_gold"))) or coll._info_text.text.contains("%s"):
+	if not coll._info_text.text.contains("Easy %d G" % GameData.gold_for("easy")) or coll._info_text.text.contains("%s"):
 		fails += 1
 		push_error("the Territory section should show live numbers from balance.json")
 	coll._show_info("synergy")

@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_dice()
 	_test_unlocks()
 	_test_upgrades()
+	_test_lease()
 	_test_commander()
 	_test_bank_casino()
 	_test_continent_flavor()
@@ -309,6 +310,95 @@ func _test_bank_casino() -> void:
 	c.pending = {}
 	var c2 := MatchController.from_dict(c.to_dict())
 	check(c2.players[0].stock_value == 120 and c2.players[0].stock_basis == 100 and absf(c2.market_change - 0.12) < 0.001 and c2.casino_pot == 777, "save / load keeps bank + casino state")
+
+
+func _free_land(c: MatchController, region: int = 0) -> BoardTile:
+	for t in c.tiles:
+		if t.type == BoardTile.Type.TERRITORY and t.owner_id == -1 and t.region == region:
+			return t
+	return null
+
+
+func _land_on_tile(c: MatchController, pid: int, t: BoardTile) -> void:
+	c.current = pid
+	c.players[pid].position = t.index
+	c.state = MatchController.State.ROLLED
+	c._resolve_landing(c.players[pid])
+
+
+## Free land: Buy or Lease. A lease costs a share of the price, lasts "lease_rounds" rounds and can be bought out.
+func _test_lease() -> void:
+	var c := new_match(31)
+	var t := _free_land(c)
+	var p := c.players[0]
+	p.gold = 5000
+	_land_on_tile(c, 0, t)
+	check(String(c.pending.get("type", "")) == "buy" and int(c.pending["lease"]) > 0, "free land offers Buy and Lease")
+	var ids: Array = c.get_decision_options().map(func(o): return o["id"])
+	check(ids == ["buy", "lease", "skip"], "options: Buy / Lease / Skip (%s)" % str(ids))
+	var price := int(c.pending["price"])
+	var lease := int(c.pending["lease"])
+	check(lease < price and lease == EconomySystem.lease_cost(price), "a lease costs less than the price (%d vs %d G)" % [lease, price])
+	var gold0 := p.gold
+	c.decide("lease")
+	check(t.owner_id == 0 and t.lease_left == int(GameData.b("lease_rounds")) and p.gold == gold0 - lease and c.pending.is_empty(), "leasing pays the lease and takes the land for a few rounds")
+	check(t.is_leased() and EconomySystem.region_count(c.tiles, t.region, 0) == 0, "leased land does not count toward a region bonus")
+	var nw_before := c.networth(p)
+	check(nw_before == p.gold + p.stock_value, "leased land is not net worth")
+	# rent is collected as usual
+	var rent := EconomySystem.rent_of(t, c.tiles)
+	check(rent > 0, "leased land still charges rent (%d G)" % rent)
+	# own leased land offers a buy-out, not an upgrade
+	_land_on_tile(c, 0, t)
+	check(String(c.pending.get("type", "")) == "redeem" and int(c.pending["price"]) == t.price - lease, "own leased land offers a buy-out for the rest of the price")
+	var g1 := p.gold
+	c.decide("redeem")
+	check(t.lease_left == 0 and t.owner_id == 0 and p.gold == g1 - (price - lease), "buying out makes the land permanent")
+	check(c.networth(p) == p.gold + p.stock_value + t.price, "bought-out land counts as net worth again")
+	# a lease ends after its rounds and the land is free again
+	var t2 := _free_land(c)
+	_land_on_tile(c, 0, t2)
+	c.decide("lease")
+	for i in range(int(GameData.b("lease_rounds"))):
+		check(t2.owner_id == 0, "lease still running (round %d)" % i)
+		c._tick_leases()
+	check(t2.owner_id == -1 and t2.lease_left == 0 and t2.lease_paid == 0, "the lease ends: the land is free again")
+	# forced sales never touch leased land
+	var t3 := _free_land(c)
+	_land_on_tile(c, 0, t3)
+	c.decide("lease")
+	var cheapest := c._cheapest_owned(p)
+	check(cheapest != t3, "leased land is never force-sold")
+	# a player who cannot afford the price can still lease
+	var c2 := new_match(32)
+	var t4 := _free_land(c2)
+	c2.players[1].gold = EconomySystem.lease_cost(t4.price) + 5
+	_land_on_tile(c2, 1, t4)
+	var opts := c2.get_decision_options()
+	check(String(c2.pending.get("type", "")) == "buy" and not opts[0]["enabled"] and opts[1]["enabled"], "too poor to buy: only Lease is enabled")
+	c2.decide("buy")  # refused: stays pending
+	check(not c2.pending.is_empty() and t4.owner_id == -1, "an unaffordable purchase is refused")
+	c2.decide("skip")
+	# save and resume keep the lease
+	var c3 := new_match(33)
+	var t5 := _free_land(c3)
+	c3.players[0].gold = 5000
+	_land_on_tile(c3, 0, t5)
+	c3.decide("lease")
+	t5.lease_left = 2
+	var r := MatchController.from_dict(c3.to_dict())
+	check(r != null and r.tiles[t5.index].lease_left == 2 and r.tiles[t5.index].lease_paid == t5.lease_paid and r.tiles[t5.index].owner_id == 0, "a saved match keeps its leases")
+	# AI games with leases still finish
+	var leases := 0
+	for g in range(6):
+		var ac := new_match(500 + g)
+		var steps := 0
+		while ac.state != MatchController.State.GAME_OVER and steps < 60000:
+			AIController.step(ac)
+			steps += 1
+		check(ac.state == MatchController.State.GAME_OVER, "AI game %d with leases finishes" % g)
+		leases += int(ac.stats.get("leases", 0))
+	check(leases > 0, "AIs lease land in full games (%d leases in 6 games)" % leases)
 
 
 func _test_commander() -> void:
@@ -579,15 +669,15 @@ func _test_unlocks() -> void:
 	var expected_locked := CardDatabase.all_supports().size() - CardDatabase.default_support_ids().size()
 	check(locked == expected_locked and locked == 90, "a new profile has 90 locked Support cards of 105 (%d)" % locked)
 	var got: Array[String] = []
-	for i in range(locked + 2):
+	for i in range(5):
 		var id := SaveManager.record_match(true, 10, 100, "")
 		if id != "":
 			got.append(id)
-	check(got.size() == locked, "%d victories unlock the %d locked cards, then nothing more (%d)" % [locked, locked, got.size()])
-	var distinct := {}
-	for id in got:
-		distinct[id] = true
-	check(distinct.size() == locked, "every unlock is a different card")
+	var still_locked := 0
+	for s in CardDatabase.all_supports():
+		if SaveManager.owned_count(s["id"]) == 0:
+			still_locked += 1
+	check(got.is_empty() and still_locked == locked, "victories no longer unlock Support cards (%d locked before and after)" % locked)
 	var before: int = SaveManager.data["stats"]["wins"]
 	check(SaveManager.record_match(false, 10, 100, "") == "" and SaveManager.data["stats"]["wins"] == before, "a defeat unlocks nothing")
 	SaveManager.data = saved

@@ -109,6 +109,15 @@ func _test_prep() -> void:
 	check(prep.deploy(u, Vector2i(3, 4)) == "", "deploy inside area")
 	check(prep.deployed_units().size() == 1 and prep.bench_units().size() == 0, "unit moved bench -> board")
 	check(prep.return_to_bench(u) == "" and prep.bench_units().size() == 1, "return unit to bench")
+	# swap: board <-> board, then board <-> bench
+	check(prep.buy(1) == "" or prep.buy(2) == "", "buy a second unit")
+	var u2: UnitInstance = prep.bench_units()[prep.bench_units().size() - 1]
+	if u2 != u:
+		prep.terrain = {}
+		check(prep.deploy(u, Vector2i(3, 4)) == "" and prep.deploy(u2, Vector2i(5, 5)) == "", "deploy two units")
+		check(prep.swap_units(u, u2) == "" and u.cell == Vector2i(5, 5) and u2.cell == Vector2i(3, 4), "swap two deployed units")
+		prep.return_to_bench(u2)
+		check(prep.swap_units(u, u2) == "" and u2.cell == Vector2i(5, 5) and u.cell.x < 0, "swap deployed unit with a bench unit")
 	# capacity: fill with queens-cost units via direct roster manipulation
 	var p2 := BattlePrep.new(Deck.create_default(), rng, 9999, 9999, 3)
 	for i in range(3):

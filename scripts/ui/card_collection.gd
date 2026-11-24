@@ -14,6 +14,7 @@ var _selected_id: String = ""
 var _views: Dictionary = {}
 
 var deck: Deck
+var _back_to: String = "res://scenes/main_menu/main_menu.tscn"  # scene the Back button returns to
 var _save_btn: Button
 var _message: Label
 var _collection_view: Control
@@ -22,6 +23,8 @@ var _lineup_view: Control
 var _info_view: Control
 ## Set by a host screen (Territory Board) that shows this screen as an overlay: called instead of changing scene on "Back".
 var embedded_close: Callable = Callable()
+var _tab_history: Array = []  # tabs visited before the current one; Android Back walks it backwards
+var _current_tab: String = ""
 var _tab_buttons: Dictionary = {}
 ## True while this screen is an overlay on the Territory Board (mid-match): Deck and Lineup can be viewed but not changed.
 var read_only: bool = false
@@ -53,6 +56,7 @@ func _ready() -> void:
 	var back := UiTheme.make_button("Back", 48)
 	back.custom_minimum_size.x = 140
 	var back_to := GameSession.collection_return if GameSession.collection_return != "" else "res://scenes/main_menu/main_menu.tscn"
+	_back_to = back_to
 	if embedded_close.is_valid():  # overlay on the Territory Board: close it, the match stays untouched
 		back.pressed.connect(func(): embedded_close.call())
 	else:
@@ -68,7 +72,7 @@ func _ready() -> void:
 	for spec in [["lineup", "Lineup"], ["deck", "Deck"], ["collection", "Collection"], ["info", "Info"]]:
 		var mb := UiTheme.make_toggle(spec[1], mgroup, 52)
 		mb.custom_minimum_size.x = 200
-		mb.button_pressed = (spec[0] == ("deck" if GameSession.open_deck_tab else "collection"))
+		mb.button_pressed = (spec[0] == ("deck" if GameSession.open_deck_tab else "lineup"))
 		mb.pressed.connect(_show_tab.bind(spec[0]))
 		modes.add_child(mb)
 		_tab_buttons[spec[0]] = mb
@@ -120,9 +124,22 @@ func _ready() -> void:
 	root.add_child(_lineup_view)
 	_info_view = _build_info_view()
 	root.add_child(_info_view)
-	_show_tab("deck" if GameSession.open_deck_tab else "collection")
+	_show_tab("deck" if GameSession.open_deck_tab else "lineup")  # the Card Hub opens on the Lineup tab
 	GameSession.open_deck_tab = false
 	_rebuild()
+
+
+## Android Back / Esc does the same as the Back button: closes the overlay or returns to the screen the Card Hub was opened from
+## (New Match -> "Change faction in Deck" comes back to that setup view; otherwise the Main Menu).
+func on_back_requested() -> void:
+	if not _tab_history.is_empty():  # first step back to the tab the player came from (Deck -> Lineup), not out of the screen
+		var prev: String = _tab_history.pop_back()
+		_show_tab(prev, false)
+		return
+	if embedded_close.is_valid():
+		embedded_close.call()
+	else:
+		get_tree().change_scene_to_file(_back_to)
 
 
 func _rebuild() -> void:
@@ -267,9 +284,9 @@ func _king_buff_text(id: String) -> String:
 func _describe_king(id: String) -> String:
 	var ch := GameData.get_champion(id)
 	var fac := GameData.find_faction(String(ch.get("faction", "")))  # a King of any continent
-	return "[color=#d4af37][b]%s[/b][/color]\n%s - King - %s\nCapacity cost: %d (enters only in Last Stand)\nHP %d (x%d in battle)   ATK %d\n\n[b]%s:[/b] %s\n[b]%s:[/b] %s%s\n\nPiece 8 of 8 of the %s faction." % [
+	return "[color=#d4af37][b]%s[/b][/color]\n%s - King - %s\nCapacity cost: %d (enters only in Last Stand)\nHP %d   ATK %d\n\n[b]%s:[/b] %s\n[b]%s:[/b] %s%s\n\nPiece 8 of 8 of the %s faction." % [
 		ch["name"], String(fac.get("name", ch.get("faction", ""))), String(ch.get("rarity", "legendary")).capitalize(), CardDatabase.capacity_cost("king"),
-		int(ch["hp"]), int(GameData.b("champion_hp_mult")), int(ch["atk"]), ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"], _king_buff_text(id), String(fac.get("name", ""))]
+		int(ch["hp"]), int(ch["atk"]), ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"], _king_buff_text(id), String(fac.get("name", ""))]
 
 
 ## "Continent buff" paragraph of a unit card (every unit card has one buff on its continent).
@@ -280,7 +297,10 @@ func _buff_text(id: String) -> String:
 	return "\n\n[color=#d4af37][b]Buff - %s:[/b][/color] %s" % [bf["name"], bf["desc"]]
 
 
-func _show_tab(which: String) -> void:
+func _show_tab(which: String, record := true) -> void:
+	if record and which != _current_tab and _current_tab != "":
+		_tab_history.append(_current_tab)
+	_current_tab = which
 	_collection_view.visible = (which == "collection")
 	_deck_view.visible = (which == "deck")
 	_lineup_view.visible = (which == "lineup")
@@ -292,7 +312,7 @@ func _show_tab(which: String) -> void:
 
 
 # ------------------------------------------------------------------ lineup tab (custom Battle Chess lineup)
-## Pick a unit type, tap a cell of the 8x4 deployment area to place it (tap the same type again to remove it).
+## Pick a unit, tap a cell of the 8x4 deployment area to place it (tap it again to remove it). Each unit can be placed once only (no copies).
 ## Auto Deploy in Battle Chess / duels follows this lineup: units of these types go to their cells first, the rest is filled automatically.
 
 const LINEUP_COLS := 8
@@ -304,6 +324,8 @@ var _lineup_palette: VBoxContainer
 var _lineup_grid: GridContainer
 var _lineup_info: Label
 var _lineup_msg: Label
+var _support_slots: Array = []  # slot -> Support card id ("" = empty); working copy, Save lineup writes it
+var _support_row: HFlowContainer
 
 
 func _build_lineup_view() -> Control:
@@ -336,6 +358,11 @@ func _build_lineup_view() -> Control:
 	_lineup_grid.add_theme_constant_override("h_separation", 4)
 	_lineup_grid.add_theme_constant_override("v_separation", 4)
 	right.add_child(_lineup_grid)
+	right.add_child(UiTheme.make_label("Support slots - cards are listed in this order in battle", 18, UiTheme.COL_GOLD))
+	_support_row = HFlowContainer.new()
+	_support_row.add_theme_constant_override("h_separation", 4)
+	_support_row.add_theme_constant_override("v_separation", 4)
+	right.add_child(_support_row)
 	_lineup_info = UiTheme.make_label("", 17, UiTheme.COL_TEXT)
 	_lineup_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(_lineup_info)
@@ -364,8 +391,9 @@ func _refresh_lineup() -> void:
 	_lineup.clear()
 	for e in deck.valid_lineup():  # entries of unit types no longer in the deck are dropped
 		_lineup[Vector2i(int(e["x"]), int(e["y"]))] = String(e["id"])
+	_support_slots = deck.valid_support_lineup()
 	var types: Array[String] = deck.effective_unit_ids()
-	if _lineup_pick != "" and not types.has(_lineup_pick):
+	if _lineup_pick != "" and not types.has(_lineup_pick) and not deck.support_ids.has(_lineup_pick):
 		_lineup_pick = ""
 	_lineup_msg.text = ""
 	_rebuild_lineup()
@@ -387,12 +415,26 @@ func _rebuild_lineup() -> void:
 			for v in _lineup.values():
 				if v == id:
 					placed += 1
-			var b := UiTheme.make_toggle("%s  [%s] x%d" % [u["name"], String(u["chess"]).substr(0, 1).to_upper(), placed], group, 46)
+			var b := UiTheme.make_toggle("%s  [%s]%s" % [u["name"], String(u["chess"]).substr(0, 1).to_upper(), "  (placed)" if placed > 0 else ""], group, 46)
 			b.button_pressed = (id == _lineup_pick)
 			b.disabled = read_only  # the palette only exists to place units
 			b.tooltip_text = "%s - %s\nCapacity %d" % [u["name"], u["role"], CardDatabase.capacity_cost(String(u["chess"]))]
 			b.pressed.connect(func(): _lineup_pick = String(id))
 			_lineup_palette.add_child(b)
+	# Support cards of the deck: they go to the Support slots under the grid (one slot each, no copies).
+	_lineup_palette.add_child(UiTheme.make_label("Support cards (%d)" % deck.support_ids.size(), 20, UiTheme.COL_GOLD))
+	for sid in deck.support_ids:
+		var sc := CardDatabase.get_support(sid)
+		if sc.is_empty():
+			continue
+		var sb := UiTheme.make_toggle("%s  [%s]%s" % [sc["name"], String(sc["category"]), "  (placed)" if _support_slots.has(sid) else ""], group, 46)
+		sb.button_pressed = (sid == _lineup_pick)
+		sb.disabled = read_only
+		sb.tooltip_text = "%s - %s\n%s" % [sc["name"], String(sc.get("rarity", "common")).capitalize(), sc["description"]]
+		UiTheme.apply_rarity(sb, String(sc.get("rarity", "common")))
+		sb.pressed.connect(func(): _lineup_pick = String(sid))
+		_lineup_palette.add_child(sb)
+	_rebuild_support_slots()
 	for c in _lineup_grid.get_children():
 		_lineup_grid.remove_child(c)
 		c.queue_free()
@@ -407,18 +449,65 @@ func _rebuild_lineup() -> void:
 			cb.add_theme_font_size_override("font_size", 14)
 			if id != "":
 				var u := CardDatabase.get_unit(id)
-				cb.tooltip_text = String(u.get("name", id))
+				cb.tooltip_text = "%s (%s)" % [String(u.get("name", id)), String(u.get("rarity", "common")).capitalize()]
+				# A placed unit is shown by its logo (chess-piece icon tinted by rarity) instead of text.
+				UiTheme.apply_rarity(cb, String(u.get("rarity", "common")))
+				var icon := PieceIcon.new(String(u.get("chess", "pawn")), UiTheme.rarity_color(String(u.get("rarity", "common"))))
+				icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+				icon.offset_left = 4.0
+				icon.offset_right = -4.0
+				icon.offset_top = 6.0
+				icon.offset_bottom = -4.0
+				cb.add_child(icon)
 			if not read_only:
 				cb.pressed.connect(_on_lineup_cell.bind(cell))
 			_lineup_grid.add_child(cb)
 	_update_lineup_info()
 
 
+## The Support slots under the grid: one button per slot, numbered in the order the cards are listed in battle.
+func _rebuild_support_slots() -> void:
+	for c in _support_row.get_children():
+		_support_row.remove_child(c)
+		c.queue_free()
+	for i in range(_support_slots.size()):
+		var sid := String(_support_slots[i])
+		var sb := UiTheme.make_button("%d" % (i + 1) if sid == "" else "%d. %s" % [i + 1, String(CardDatabase.get_support(sid).get("name", sid))], 56)
+		sb.custom_minimum_size.x = 150
+		sb.clip_text = true
+		sb.add_theme_font_size_override("font_size", 14)
+		if sid != "":
+			var sc := CardDatabase.get_support(sid)
+			sb.tooltip_text = "%s (%s)\n%s" % [sc.get("name", sid), String(sc.get("rarity", "common")).capitalize(), sc.get("description", "")]
+			UiTheme.apply_rarity(sb, String(sc.get("rarity", "common")))
+		if not read_only:
+			sb.pressed.connect(_on_support_slot.bind(i))
+		_support_row.add_child(sb)
+
+
+func _on_support_slot(i: int) -> void:
+	if read_only:
+		return
+	var cur := String(_support_slots[i])
+	if cur != "" and (_lineup_pick == "" or cur == _lineup_pick or not deck.support_ids.has(_lineup_pick)):
+		_support_slots[i] = ""  # tap a placed Support card again to remove it
+	elif _lineup_pick != "" and deck.support_ids.has(_lineup_pick):
+		if _support_slots.has(_lineup_pick):  # no copies: one slot per Support card
+			_lineup_msg.text = "This Support card is already placed. Tap it in the slots to remove it first."
+			return
+		_support_slots[i] = _lineup_pick
+	else:
+		_lineup_msg.text = "Pick a Support card on the left first."
+		return
+	_lineup_msg.text = ""
+	_rebuild_lineup()
+
+
+## Cell button text: "+" for an empty cell; a placed unit has no text, its logo is drawn instead.
 func _cell_label(id: String) -> String:
 	if id == "":
 		return "+"
-	var u := CardDatabase.get_unit(id)
-	return "%s\n%s" % [String(u.get("name", id)).get_slice(" ", 0), String(u.get("chess", "")).substr(0, 1).to_upper()]
+	return ""  # a placed unit is drawn as a PieceIcon logo on the cell button (see _rebuild_lineup)
 
 
 func _on_lineup_cell(cell: Vector2i) -> void:
@@ -428,7 +517,16 @@ func _on_lineup_cell(cell: Vector2i) -> void:
 	if cur != "" and (_lineup_pick == "" or cur == _lineup_pick):
 		_lineup.erase(cell)  # tap a placed unit again to remove it
 	elif _lineup_pick != "":
+		if deck.support_ids.has(_lineup_pick) and not deck.effective_unit_ids().has(_lineup_pick):
+			_lineup_msg.text = "Support cards go in the Support slots under the grid."
+			return
+		if _lineup.values().has(_lineup_pick):  # no copies: a unit can be placed once only
+			_lineup_msg.text = "This unit is already placed. Tap it on the grid to remove it first."
+			return
 		_lineup[cell] = _lineup_pick
+		_lineup_msg.text = ""
+		_rebuild_lineup()
+		return
 	_lineup_msg.text = ""
 	_rebuild_lineup()
 
@@ -437,6 +535,8 @@ func _on_lineup_clear() -> void:
 	if read_only:
 		return
 	_lineup.clear()
+	for i in range(_support_slots.size()):
+		_support_slots[i] = ""
 	_lineup_msg.text = ""
 	_rebuild_lineup()
 
@@ -454,7 +554,10 @@ func _update_lineup_info() -> void:
 		cost += CardDatabase.capacity_cost(String(CardDatabase.get_unit(String(v)).get("chess", "")))
 	var per := int(GameData.b("capacity_per_level"))
 	var need_lv := maxi(int(ceil(float(cost) / float(maxi(per, 1)))), int(GameData.b("start_level")))
-	_lineup_info.text = "%d units placed - Capacity %d (needs level %d). If your capacity or army is smaller, the strongest units are deployed first; with an empty lineup Auto Deploy uses its default formation." % [_lineup.size(), cost, need_lv]
+	var sup_placed := 0
+	for x in _support_slots:
+		sup_placed += 1 if String(x) != "" else 0
+	_lineup_info.text = "%d Support cards in slots. " % sup_placed + "%d units placed - Capacity %d (needs level %d). If your capacity or army is smaller, the strongest units are deployed first; with an empty lineup Auto Deploy uses its default formation." % [_lineup.size(), cost, need_lv]
 
 
 func _on_lineup_save() -> void:
@@ -463,7 +566,10 @@ func _on_lineup_save() -> void:
 	deck.lineup = _lineup_entries()
 	deck.lineup = deck.valid_lineup()
 	SaveManager.set_lineup(deck.deck_continent(), deck.lineup)
-	_lineup_msg.text = "Lineup saved." if not deck.lineup.is_empty() else "Lineup cleared (default formation)."
+	deck.support_lineup = _support_slots.duplicate()
+	deck.support_lineup = deck.valid_support_lineup()
+	SaveManager.set_support_lineup(deck.support_lineup)
+	_lineup_msg.text = "Lineup saved." if not (deck.lineup.is_empty() and not deck.support_lineup.any(func(x): return String(x) != "")) else "Lineup cleared (default formation)."
 
 
 # ------------------------------------------------------------------ deck editor
@@ -831,7 +937,7 @@ func _toggle_unit(id: String) -> void:
 	if deck.unit_ids.has(id):
 		deck.unit_ids.erase(id)
 	elif SaveManager.owned_count(id) < 1:
-		_say("That unit card is locked. Get it in the Shop (Unit Gacha / Buy Unit).")
+		_say("That unit card is locked. Get it in the Shop (Card Gacha / Buy Card).")
 		return
 	elif deck.unit_ids.size() >= UNIT_SLOTS:
 		_pending = id
@@ -954,7 +1060,7 @@ func _refresh() -> void:
 
 # ------------------------------------------------------------------ info tab
 
-const INFO_SECTIONS := [["overview", "Overview"], ["territory", "Territory"], ["roles", "Roles & Skills"], ["synergy", "Synergies"], ["battle", "Battle"]]
+const INFO_SECTIONS := [["overview", "Overview"], ["lineup", "Lineup"], ["territory", "Territory"], ["roles", "Roles & Skills"], ["synergy", "Synergies"], ["battle", "Battle"]]
 ## Plain-language description of each role skill (base values; factions vary the numbers slightly).
 const MECHANIC_INFO := {
 	"bulwark": "On its first action, taunts adjacent enemies (about 6 ticks): they can only attack this unit.",
@@ -1014,6 +1120,8 @@ func _info_head(text: String) -> String:
 
 func _info_content(which: String) -> String:
 	match which:
+		"lineup":
+			return _info_lineup()
 		"territory":
 			return _info_territory()
 		"roles":
@@ -1030,7 +1138,7 @@ func _info_overview() -> String:
 	var cost := ""
 	for chess in CardDatabase.CHESS_ORDER + ["king"]:
 		cost += "%s %d   " % [String(chess).capitalize(), CardDatabase.capacity_cost(chess)]
-	return "%s\nA battle deck holds %d unit types x %d copies = %d unit cards, 1 King and %d Support cards (%d in total). The units come from one continent; its factions can be mixed freely, the King and the Support cards are not tied to a continent.\n\n%s\n1-star = %d card, 2-star = %d copies merged, 3-star = %d copies merged. Stars multiply HP and ATK.\n\n%s\nEvery piece costs Capacity when you deploy it: %s\n\n%s\n[b]Collection[/b] lists every card with its stats and skill. [b]Deck[/b] is where you build the deck and pick your faction. Save needs exactly 15 unit types and 15 Support cards." % [
+	return "%s\nA battle deck holds %d unit types x %d copies = %d unit cards, 1 King and %d Support cards (%d in total). The units come from one continent; its factions can be mixed freely, the King and the Support cards are not tied to a continent.\n\n%s\n1-star = %d card, 2-star = %d copies merged, 3-star = %d copies merged. Stars multiply HP and ATK.\n\n%s\nEvery piece costs Capacity when you deploy it: %s\n\n%s\n[b]Lineup[/b] places your units on the deployment grid and sets the order of your Support cards (see the Lineup section). [b]Deck[/b] is where you build the deck and pick your faction; Save needs exactly 15 unit types and 15 Support cards. [b]Collection[/b] lists every card with its stats and skill. [b]Info[/b] is this guide." % [
 		_info_head("Deck rules"), 15, int(GameData.b("unit_copies")), 15 * int(GameData.b("unit_copies")), 15, 15 * int(GameData.b("unit_copies")) + 1 + 15,
 		_info_head("Stars"), int(copies[0]), int(copies[1]), int(copies[2]),
 		_info_head("Capacity"), cost.strip_edges(),
@@ -1050,15 +1158,17 @@ func _info_territory() -> String:
 	var rent_txt := ""
 	for i in range(1, up_rent.size()):
 		rent_txt += "%sx%s" % ["" if i == 1 else " / ", str(float(up_rent[i]))]
-	return "%s\nThe Territory Board is a loop of tiles around the continent. Everyone starts with %d Dominion Gold and Life by difficulty (Easy %d / Normal %d / Hard %d). Roll 2 dice and move that many tiles; a double (or a Time Surge event) gives another roll, up to %d bonus rolls. A Reroll Token lets you roll again before you move. Tap any tile to inspect it.\n\n%s\n[b]Territory[/b]: buy it if it is free; if an opponent owns it you must pay Tax or face a Duel (below).\n[b]START[/b]: passing or landing gives %d G.   [b]Sanctuary[/b]: rest and receive %d G.\n[b]Rift[/b]: you skip your next turn.   [b]Crossroads[/b]: free warp to a random active portal.\n[b]Portal[/b]: each side has ONE portal (4 in total); it warps you to another portal.\n[b]Bank & Stocks[/b]: invest gold (100 / 250 / 500) in the stock market. The market moves every round (-20%% to +30%%); sell on any Bank tile. Stocks count toward net worth and are cashed out automatically to pay debts.   [b]Casino[/b]: place a 50 G bet to win x2, x4 or the whole pot.\n[b]Event[/b]: draws a random event card.   [b]Auction[/b]: a random free territory is auctioned to all living players, opening at %d%% of its price and rising %d%% per bid.\n[b]Tax[/b]: pay %d G to the bank.   [b]Special[/b]: a random gift, teleport or tribute.\n[b]Territory Shop[/b]: Reroll Token %d G, restore 1 Life %d G, Special Die %d G (carry up to %d, used before rolling).\n\n%s\nRent is %d%% of a territory's price. Own %d or more tiles of one region for x%s rent; own the whole region (Regional Dominion) for x%s rent. You can upgrade a territory %d times (cost %s of its price); each level raises its rent (%s). Selling a territory returns %d%% of its price.\n\n%s\nWhen you stop on an opponent's territory, its owner chooses Tax or Duel. Tax is just the rent. If the owner picks Duel you may Accept or Refuse; refusing costs the rent plus %d G.\nA Duel is an automatic battle between both players' permanent armies (the units you buy with Dominion Gold are kept between duels). The loser loses 1 Life.\nIf the attacker wins they choose Conquest (take the territory) or Victory Reward (%d%% of its price in gold, the territory stays). If the attacker loses, the territory stays.\nIf you cannot pay, your territories are sold automatically; if that is still not enough you lose 1 Life and receive a %d G bailout. At 0 Life you are eliminated.\n\n%s\nThe last player alive wins, or after round %d the player with the highest net worth." % [
-		_info_head("The board"), int(GameData.b("start_gold")), GameData.life_for("easy"), GameData.life_for("normal"), GameData.life_for("hard"), int(GameData.b("max_bonus_rolls")),
-		_info_head("Tiles"), int(GameData.b("start_bonus")), int(GameData.b("sanctuary_bonus")),
+	return "%s\nThe Territory Board is a loop of tiles around the continent. Everyone starts with Dominion Gold and Life by difficulty (Easy %d G / %d Life, Normal %d G / %d Life, Hard %d G / %d Life). Roll 2 dice and move that many tiles; a double (or a Time Surge event) gives another roll, up to %d bonus rolls. A Reroll Token lets you roll again before you move. Tap any tile to inspect it.\nChaos Mode (Arena option): a 40-tile board with 4 territories per region (majority 3, Dominion 4); everything else is the same.\n\n%s\n[b]Territory[/b]: if it is free you may [b]Buy[/b] it, or [b]Lease[/b] it for %d%% of its price for %d rounds (rent as usual, but no upgrades, no net worth, no region bonus; it is free again afterwards, and landing on it lets you buy it out for the rest of the price); if an opponent owns it you must pay Tax or face a Duel (below).\n[b]START[/b]: passing or landing gives %d G.   [b]Sanctuary[/b]: rest and receive %d G.\n[b]Rift[/b]: you skip your next turn.   [b]Crossroads[/b]: free warp to a random active portal.\n[b]Portal[/b]: each side has ONE portal (4 in total); it warps you to another portal.\n[b]Bank & Stocks[/b]: invest gold (100 / 250 / 500) in the stock market. The market moves every round (-20%% to +30%%); sell on any Bank tile. Stocks count toward net worth and are cashed out automatically to pay debts.   [b]Casino[/b]: place a 50 G bet to win x2, x4 or the whole pot.\n[b]Event[/b]: draws a random event card.   [b]Auction[/b]: a random free territory is auctioned to all living players, opening at %d%% of its price and rising %d%% per bid.\n[b]Tax[/b]: pay %d G to the bank.   [b]Special[/b]: a random gift, teleport or tribute.\n[b]Territory Shop[/b]: Reroll Token %d G, restore 1 Life %d G, Special Die %d G (carry up to %d, used before rolling).\n\n%s\nRent is %d%% of a territory's price. Own %d or more tiles of one region for x%s rent; own the whole region (Regional Dominion) for x%s rent. You can upgrade a territory %d times (cost %s of its price); each level raises its rent (%s). Selling a territory returns %d%% of its price.\n\n%s\nWhen you stop on an opponent's territory, its owner chooses Tax or Duel. Tax is just the rent. If the owner picks Duel you may Accept or Refuse; refusing costs the rent plus %d G.\nA Duel is an automatic battle between both players' permanent armies (the units you buy with Dominion Gold are kept between duels). The loser loses 1 Life.\nIf the attacker wins they choose Conquest (take the territory) or Victory Reward (%d%% of its price plus its upgrades in gold, the territory and its level stay); Conquest resets the territory to Level 0. If the attacker loses, the territory stays.\nIf you cannot pay, your territories are sold automatically; if that is still not enough you lose 1 Life and receive a %d G bailout. At 0 Life you are eliminated.\n\n%s\nThe last player alive wins, or when the round limit is reached the player with the highest net worth wins.\nRound limit - Journey: Easy %d / Normal %d / Hard %d.   Arena: Easy %d / Normal %d / Hard %d." % [
+		_info_head("The board"), GameData.gold_for("easy"), GameData.life_for("easy"), GameData.gold_for("normal"), GameData.life_for("normal"), GameData.gold_for("hard"), GameData.life_for("hard"), int(GameData.b("max_bonus_rolls")),
+		_info_head("Tiles"), int(round(float(GameData.b("lease_cost_ratio")) * 100.0)), int(GameData.b("lease_rounds")), int(GameData.b("start_bonus")), int(GameData.b("sanctuary_bonus")),
 		_pct("auction_start_ratio"), _pct("auction_step_ratio"), int(GameData.b("tax_flat")),
 		int(GameData.b("reroll_price")), int(GameData.b("heal_price")), int(GameData.b("special_die_price")), int(GameData.b("max_special_dice")),
 		_info_head("Rent and regions"), _pct("rent_rate"), int(GameData.b("majority_threshold")), str(float(GameData.b("majority_rent_mult"))), str(float(GameData.b("dominion_rent_mult"))),
 		int(GameData.b("max_tile_level")), cost_txt, rent_txt, _pct("sell_ratio"),
 		_info_head("Tax, Duel and Conquest"), int(GameData.b("refuse_duel_penalty")), _pct("duel_reward_ratio"), int(GameData.b("bailout_gold")),
-		_info_head("How to win"), int(GameData.b("max_rounds"))]
+		_info_head("How to win"),
+		GameData.round_limit_for("journey", "easy"), GameData.round_limit_for("journey", "normal"), GameData.round_limit_for("journey", "hard"),
+		GameData.round_limit_for("arena", "easy"), GameData.round_limit_for("arena", "normal"), GameData.round_limit_for("arena", "hard")]
 
 
 func _info_roles() -> String:
@@ -1070,6 +1180,12 @@ func _info_roles() -> String:
 			String(MECHANIC_INFO.get(String(b["mechanic"]), "")), String(ROLE_TARGETING.get(role, "Attacks the nearest enemy."))]
 	out += "[color=#9aa0b5]Pawns have their own small skills (for example Moon Chill slows its target). Each unit card also carries one continent Buff, shown on its detail card.[/color]"
 	return out
+
+
+func _info_lineup() -> String:
+	var slots := int(GameData.b("hand_max"))
+	return "%s\nPick a unit on the left, then tap a cell of the 8x4 deployment grid to place it; tap it again to remove it. A placed unit is shown by its logo (chess piece, coloured by rarity). Each unit can be placed once only: no copies. Auto Deploy in Battle Chess and duels puts these units on their cells first and fills the rest by itself. With an empty grid it uses its default formation. The grid is saved per continent.\n\n%s\nBelow the grid are %d Support slots, one per card of the battle hand. Pick a Support card of your deck and tap a slot; each Support card fits one slot only. In battle your Support hand is listed in slot order, and the cards you did not slot follow after them. The Support slots are shared by every continent, like the Support cards.\n\n%s\nWhile at least one Support slot is filled, Support offers in the Battle Shop that sit in your slots get a gold [lb]Recommended #slot[rb] tag. Only Support cards are recommended, never units, and a card already in your hand is not tagged again.\n\n%s\nSave lineup stores the grid and the slots; Clear empties both. During a match the Lineup can be viewed but not changed." % [
+		_info_head("Unit grid"), _info_head("Support slots"), slots, _info_head("Recommendations in the Battle Shop"), _info_head("Saving")]
 
 
 func _info_synergy() -> String:
@@ -1088,5 +1204,5 @@ func _info_synergy() -> String:
 
 
 func _info_battle() -> String:
-	return "%s\nBattles are fought automatically on an 8x8 grid (1 tick = 0.25 s). Your units start on your 4 rows, the enemy on the other 4. Units walk and attack by themselves: they move toward a target, attack inside their range and use their skill.\n\n%s\nThe King does not start on the grid. It enters only when all your regular units have fallen, and then casts its active skill. If your King falls, you lose the battle.\n\n%s\nSupport cards are played by hand during the battle and cost Energy, which refills over time. Playing cards of the same category in a row gives a combo refund.\n\n%s\nIf nobody wins before the time limit, the side with more total HP wins." % [
-		_info_head("How a battle works"), _info_head("King and Last Stand"), _info_head("Support cards"), _info_head("Time limit")]
+	return "%s\nBattles are fought automatically on an 8x8 grid (1 tick = 0.25 s). Your units start on your 4 rows, the enemy on the other 4. Units walk and attack by themselves: they move toward a target, attack inside their range and use their skill.\n\n%s\nThe King does not start on the grid. It enters only when all your regular units have fallen, and then casts its active skill. If your King falls, you lose the battle.\n\n%s\nSupport cards are bought in the Battle Shop during preparation (the hand holds up to %d) and played by hand during the battle. They cost Energy, which refills over time. Playing cards of the same category in a row gives a combo refund. The hand is listed in the order of the Support slots of your Lineup.\n\n%s\nIf nobody wins before the time limit, the side with more total HP wins." % [
+		_info_head("How a battle works"), _info_head("King and Last Stand"), _info_head("Support cards"), int(GameData.b("hand_max")), _info_head("Time limit")]

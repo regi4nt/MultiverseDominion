@@ -162,19 +162,19 @@ static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: in
 	var prep := BattlePrep.new(p.deck, rng, p.gold, budget, p.level, p.roster, p.battle_deck, p.hand)
 	prep.price_mult = p.battle_price_mult()
 	prep.terrain = terrain
-	if p.difficulty != "easy":
-		var total_cost := 0
-		for u in p.roster.units:
-			total_cost += CardDatabase.capacity_cost(u.chess())
-		if total_cost >= prep.capacity() - 1 and prep.level < 7 and prep.budget_left >= prep.level_up_cost() + 50:
-			prep.level_up()
+	# Every difficulty (Easy too) levels up once its army fills the capacity; the battle budget ratio still limits how often Easy can afford it.
+	var total_cost := 0
+	for u in p.roster.units:
+		total_cost += CardDatabase.capacity_cost(u.chess())
+	if total_cost >= prep.capacity() - 1 and prep.level < 7 and prep.budget_left >= prep.level_up_cost() + 50:
+		prep.level_up()
 	_shop_loop(prep, p.difficulty, rng)
 	auto_deploy(prep, side)
 	prep.finish()
 	p.gold = prep.gold
 	p.level = prep.level
 	p.capacity = prep.capacity()
-	return prep.to_side_cfg(p.champion_id, p.hand, p.commander_star, p.monster_id)
+	return prep.to_side_cfg(p.champion_id, p.hand, p.commander_star, p.monster_id, p.monster_star)
 
 
 static func pick_champion(rng: RandomNumberGenerator, exclude: String = "") -> String:

@@ -1,19 +1,21 @@
 extends Control
 ## New Match. Two views in one scene:
-##  - HUB: OFFLINE tab (Journey, Arena, Battle Chess, Tutorial) and ONLINE tab (Classic, Ranked, Battle Chess: coming soon).
+##  - HUB: OFFLINE tab (Journey, Arena, Chaos, Battle Chess, Tutorial; 4 cards show at once, swipe the row for the rest) and ONLINE tab (Classic, Ranked, Battle Chess: coming soon).
 ##  - SETUP (Journey / Arena): players -> difficulty -> continent -> START MATCH. There is no faction choice here: the
 ##    faction (and its King) is chosen in Card Hub -> Deck -> Faction; locked factions cannot be picked.
 ## Journey = 1vs1 story path: win on a continent with each of its 4 factions to master it; every mastered continent lets the
-## player CHOOSE one locked continent to open. Arena = free match (1vs1, 2vs2, 4 player) on open continents, unlocks nothing.
+## player CHOOSE one locked continent to open. Chaos = the same free match on the 40-tile board (it is an Arena setup with GameSession.chaos_mode).
+## Arena = free match (1vs1, 2vs2, 4 player) on open continents, unlocks nothing.
 ## Battle Chess opens the 8x8 auto-battle (pays Aether Coins); Tutorial starts the guided match.
 
 const BOARD_SCENE := "res://scenes/territory_board/territory_board.tscn"
 const BATTLE_SCENE := "res://scenes/battle_board/battle_board.tscn"
 const MENU_SCENE := "res://scenes/main_menu/main_menu.tscn"
-const CARD_MAX_H := 470.0  # on tall screens (tablets) the mode cards stop growing and are centred instead
+const CARD_MAX_H := 470.0
+const CARDS_VISIBLE := 4  # mode cards on screen at once; the rest is reached by swiping the row sideways  # on tall screens (tablets) the mode cards stop growing and are centred instead
 
 const ACCENT := {
-	"journey": Color("e0b64a"), "arena": Color("e0644f"), "battle_chess": Color("3fb5a3"), "tutorial": Color("69c46d"),
+	"journey": Color("e0b64a"), "arena": Color("e0644f"), "chaos": Color("d94fa3"), "battle_chess": Color("3fb5a3"), "tutorial": Color("69c46d"),
 	"classic": Color("6f8fd6"), "ranked": Color("b07ad6"), "online_chess": Color("5fa8c8"),
 }
 
@@ -32,6 +34,7 @@ var _margin: MarginContainer
 var _root: VBoxContainer
 var _cards_holder: VBoxContainer
 var _cards_row: HBoxContainer
+var _cards_scroll: ScrollContainer  # the row scrolls sideways when it has more than CARDS_VISIBLE cards
 var _tab_note: Label
 var _tab_buttons: Dictionary = {}
 var _champion_text: RichTextLabel
@@ -47,15 +50,24 @@ var _home_note: Label
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
-	GameSession.difficulty = String(SaveManager.get_setting("default_difficulty"))
-	GameSession.wager = 0  # a wager is chosen per match; nothing carries over
+	# Coming back from the Card Hub ("Change faction in Deck"): reopen the Journey / Arena setup the player left, with its choices.
+	var back_kind := GameSession.setup_return
+	GameSession.setup_return = ""
+	if back_kind != "journey" and back_kind != "arena":
+		back_kind = ""
+		GameSession.difficulty = String(SaveManager.get_setting("default_difficulty"))
+		GameSession.wager = 0  # a wager is chosen per match; nothing carries over
+		GameSession.chaos_mode = false
 	if GameSession.mode == "tutorial":  # a normal match must not inherit the tutorial config
 		GameSession.mode = "ffa_ai"
 		GameSession.ai_count = 3
 	add_child(UiTheme.make_background())
 	_margin = UiTheme.make_margin(24)
 	add_child(_margin)
-	_show_hub()
+	if back_kind != "":
+		_show_setup(back_kind)
+	else:
+		_show_hub()
 
 
 ## Android Back / Esc: from the setup view go back to the mode hub, from the hub leave to the Main Menu.
@@ -116,11 +128,20 @@ func _show_hub() -> void:
 	_cards_holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_cards_holder.alignment = BoxContainer.ALIGNMENT_CENTER
 	_root.add_child(_cards_holder)
+	_cards_scroll = UiTheme.make_scroll()  # swipes that start on a card scroll the row
+	_cards_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_cards_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_cards_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_cards_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_cards_scroll.name = "CardsScroll"
+	_cards_holder.add_child(_cards_scroll)
 	_cards_row = HBoxContainer.new()
 	_cards_row.add_theme_constant_override("separation", 14)
+	_cards_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_cards_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_cards_holder.add_child(_cards_row)
+	_cards_scroll.add_child(_cards_row)
 	_root.resized.connect(_cap_cards)
+	_cards_scroll.resized.connect(_size_cards)
 
 	var bottom := HBoxContainer.new()
 	_root.add_child(bottom)
@@ -134,18 +155,33 @@ func _show_hub() -> void:
 
 ## Cards fill the free height on phones; on tall screens they are capped at CARD_MAX_H and centred.
 func _cap_cards() -> void:
-	if _root == null or _cards_row == null or _cards_holder == null:
+	if _root == null or _cards_row == null or _cards_holder == null or _cards_scroll == null:
 		return
 	var fixed := 0.0
 	for ch in _root.get_children():
 		if ch != _cards_holder:
 			fixed += (ch as Control).get_combined_minimum_size().y + 10.0
 	if _root.size.y - fixed > CARD_MAX_H:
-		_cards_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		_cards_row.custom_minimum_size.y = CARD_MAX_H
+		_cards_scroll.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_cards_scroll.custom_minimum_size.y = CARD_MAX_H
 	else:
-		_cards_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		_cards_row.custom_minimum_size.y = 0.0
+		_cards_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_cards_scroll.custom_minimum_size.y = 0.0
+	_size_cards()
+
+
+## With more than CARDS_VISIBLE cards every card is as wide as 1/CARDS_VISIBLE of the row, so exactly that many show and the rest
+## is a swipe away (a peek of the next card is not wanted: the scroll bar under the row shows there is more). Fewer cards share the width.
+func _size_cards() -> void:
+	if _cards_row == null or _cards_scroll == null:
+		return
+	var n := _cards_row.get_child_count()
+	var sep := float(_cards_row.get_theme_constant("separation"))
+	var w := 0.0
+	if n > CARDS_VISIBLE:
+		w = maxf(0.0, (_cards_scroll.size.x - sep * float(CARDS_VISIBLE - 1)) / float(CARDS_VISIBLE))
+	for ch in _cards_row.get_children():
+		(ch as Control).custom_minimum_size.x = w
 
 
 func _set_tab(id: String) -> void:
@@ -163,6 +199,9 @@ func _fill_cards() -> void:
 	_tab_note.text = "Online matches are not available yet. Everything under OFFLINE is fully playable." if online else "Choose how you want to play."
 	for c in (_online_cards() if online else _offline_cards()):
 		_cards_row.add_child(_make_card(c, online))
+	if _cards_scroll != null:
+		_cards_scroll.scroll_horizontal = 0
+	_size_cards.call_deferred()
 
 
 func _offline_cards() -> Array:
@@ -171,8 +210,11 @@ func _offline_cards() -> Array:
 			"desc": "Climb the trophy road in 1 vs 1 matches: wins earn trophies, defeats lose some. Trophies open new continents and their unit cards.",
 			"chips": ["1 vs 1", "Trophy road"], "status": _journey_status()},
 		{"id": "arena", "icon": "king", "title": "ARENA", "sub": "Free match",
-			"desc": "Play a free match against AI on any unlocked continent. Nothing to unlock, just fight for the crown.",
+			"desc": "Play a free match against AI on any continent, all open. Nothing to unlock (Kings and Pawns stay locked), just fight for the crown.",
 			"chips": ["1 vs 1", "2 vs 2", "4 Player"], "status": "%d of %d continents open" % [_open_continent_count(), GameData.continents.size()]},
+		{"id": "chaos", "icon": "bishop", "title": "CHAOS", "sub": "Free match  ·  40 tiles",
+			"desc": "A short, frantic Arena match on a 40-tile board: 4 territories per region, and the Gate comes round again and again.",
+			"chips": ["40 tiles", "1 vs 1", "2 vs 2", "4 Player"], "status": "Same rules as Arena"},
 		{"id": "battle_chess", "icon": "rook", "title": "BATTLE CHESS", "sub": "8 x 8 auto battle",
 			"desc": "Buy units, build a formation and watch the armies fight on the 8x8 board. No land, pure battle.",
 			"chips": ["8 x 8", "Auto battle", "Earns coins"],
@@ -198,12 +240,9 @@ func _online_cards() -> Array:
 	]
 
 
+## Arena: every playable continent is open. Opening it for play does NOT unlock it (Journey does that), so its Kings and Pawns stay locked.
 func _open_continent_count() -> int:
-	var n := 0
-	for c in GameData.continents:
-		if c.get("playable", false) and SaveManager.is_continent_unlocked(String(c["id"])):
-			n += 1
-	return n
+	return _open_continents().size()
 
 
 func _journey_status() -> String:
@@ -216,7 +255,11 @@ func _journey_status() -> String:
 func _on_card(id: String) -> void:
 	match id:
 		"journey", "arena":
+			GameSession.chaos_mode = false
 			_show_setup(id)
+		"chaos":
+			GameSession.chaos_mode = true  # Chaos is an Arena match on the 40-tile board (same continents, wager and rewards)
+			_show_setup("arena")
 		"battle_chess":
 			_ask_battle_wager()
 		"tutorial":
@@ -374,7 +417,7 @@ func _show_setup(kind: String) -> void:
 		if not known:
 			GameSession.mode = "ffa_ai"
 			GameSession.ai_count = 3
-		if not SaveManager.is_continent_unlocked(GameSession.continent_id):
+		if not GameData.get_continent(GameSession.continent_id).get("playable", false):
 			GameSession.continent_id = "aetherion"
 	_reset_root()
 
@@ -382,7 +425,8 @@ func _show_setup(kind: String) -> void:
 	head.add_theme_constant_override("separation", 6)
 	_root.add_child(head)
 	head.add_child(UiTheme.make_label("NEW MATCH", 40, UiTheme.COL_GOLD))
-	var crumb := UiTheme.make_label("   >   OFFLINE   >   %s" % kind.to_upper(), 24, ACCENT[kind].lightened(0.2))
+	var crumb_id := "chaos" if (kind == "arena" and GameSession.chaos_mode) else kind
+	var crumb := UiTheme.make_label("   >   OFFLINE   >   %s" % crumb_id.to_upper(), 24, ACCENT[crumb_id].lightened(0.2))
 	crumb.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	head.add_child(crumb)
 	_root.add_child(UiTheme.make_divider())
@@ -460,7 +504,10 @@ func _column(parent: Control, title: String, ratio: float) -> VBoxContainer:
 func _build_match_column(parent: Control) -> void:
 	var c := _column(parent, "Match", 0.85)
 	if _kind == "arena":
-		var note := UiTheme.make_label("Free match against AI. Wins here do not unlock continents.", 15, UiTheme.COL_MUTED)
+		var note_text := "Free match against AI. Wins here do not unlock continents."
+		if GameSession.chaos_mode:
+			note_text = "CHAOS: a free match on a 40-tile board, 4 territories per region (majority 3, Dominion 4). You pass the Gate far more often. Wins here do not unlock continents."
+		var note := UiTheme.make_label(note_text, 15, UiTheme.COL_MUTED)
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		c.add_child(note)
 		c.add_child(UiTheme.make_label("Players", 20, UiTheme.COL_TEXT))
@@ -545,7 +592,7 @@ func _build_continent_column(parent: Control) -> void:
 	var c := _column(parent, "Journey Map" if _kind == "journey" else "Continent", 1.0)
 	var cnote: Label
 	if _kind == "arena":
-		cnote = UiTheme.make_label("Locked continents open with trophies from the Journey.", 15, UiTheme.COL_MUTED)
+		cnote = UiTheme.make_label("Every continent is open in Arena. Its King and Pawn cards stay locked until you open it in the Journey.", 15, UiTheme.COL_MUTED)
 	else:
 		cnote = UiTheme.make_label("Trophies: %d.  Win +%d / defeat %d (%s).  Continents open at their trophy count." % [
 			SaveManager.trophies(), SaveManager.trophy_delta(true, String(GameSession.difficulty)), SaveManager.trophy_delta(false, String(GameSession.difficulty)),
@@ -575,14 +622,14 @@ func _build_continent_column(parent: Control) -> void:
 			hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			c.add_child(hint)
 		elif random_on:
-			var hint2 := UiTheme.make_label("Drawn from your %d open continents at the start. Each continent gives its own bonus in the game and on a win." % _open_continents().size(), 15, UiTheme.COL_GOLD)
+			var hint2 := UiTheme.make_label("Drawn from the %d continents at the start. Each continent gives its own bonus in the game and on a win." % _open_continents().size(), 15, UiTheme.COL_GOLD)
 			hint2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			c.add_child(hint2)
 	var group := ButtonGroup.new()
 	for i in range(GameData.continents.size()):
 		var cont: Dictionary = GameData.continents[i]
 		var id := String(cont["id"])
-		var open: bool = cont.get("playable", false) and SaveManager.is_continent_unlocked(id)
+		var open: bool = _is_continent_open(cont)
 		var state := _continent_state(id, open)
 		if random_on and open:  # random mode: each open continent shows the bonus it would pay
 			state = ShopSystem.random_bonus_lines(id)
@@ -597,11 +644,19 @@ func _build_continent_column(parent: Control) -> void:
 		c.add_child(b)
 
 
-## Playable continents the player has unlocked (the pool of the Arena random map).
+## Open for the current setup: Journey needs the continent unlocked; Arena plays on every playable continent
+## (it never unlocks anything, so the King and Pawn cards of a continent still locked in Journey stay locked).
+func _is_continent_open(cont: Dictionary) -> bool:
+	if not cont.get("playable", false):
+		return false
+	return _kind == "arena" or SaveManager.is_continent_unlocked(String(cont["id"]))
+
+
+## Continents of the Arena random map pool: every playable one.
 func _open_continents() -> Array:
 	var out: Array = []
 	for cont in GameData.continents:
-		if cont.get("playable", false) and SaveManager.is_continent_unlocked(String(cont["id"])):
+		if cont.get("playable", false):
 			out.append(String(cont["id"]))
 	return out
 
@@ -610,7 +665,7 @@ func _continent_state(id: String, open: bool) -> String:
 	if not open:
 		return "Locked  -  %d trophies" % SaveManager.continent_trophies(id)
 	if _kind != "journey":
-		return "Open"
+		return "Open" if SaveManager.is_continent_unlocked(id) else "Open  -  King & Pawn stay locked"
 	return "Open  -  from %d trophies" % SaveManager.continent_trophies(id)
 
 
@@ -647,6 +702,7 @@ func _build_champion_column(parent: Control) -> void:
 
 
 func _open_deck() -> void:
+	GameSession.setup_return = _kind  # Back in the Card Hub returns to this Journey / Arena setup
 	GameSession.open_deck_tab = true
 	GameSession.collection_return = "res://scenes/match_setup/match_setup.tscn"
 	get_tree().change_scene_to_file("res://scenes/card_collection/card_collection.tscn")

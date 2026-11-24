@@ -6,9 +6,19 @@ extends RefCounted
 static func region_count(tiles: Array[BoardTile], region: int, owner_id: int) -> int:
 	var n := 0
 	for t in tiles:
-		if t.type == BoardTile.Type.TERRITORY and t.region == region and t.owner_id == owner_id:
+		if t.type == BoardTile.Type.TERRITORY and t.region == region and t.owner_id == owner_id and t.lease_left <= 0:  # leased land never counts toward a region bonus
 			n += 1
 	return n
+
+
+## Gold to lease free land `price` for balance "lease_rounds" rounds (a share of the price, multiple of 5).
+static func lease_cost(price: int) -> int:
+	return maxi(5, int(round(float(price) * float(GameData.b("lease_cost_ratio")) / 5.0)) * 5)
+
+
+## Gold still needed to buy out a leased land (the price minus what the lease already cost).
+static func redeem_cost(t: BoardTile) -> int:
+	return maxi(5, t.price - t.lease_paid)
 
 
 ## Rent multiplier of an upgrade level (0 = plain land).
@@ -46,9 +56,9 @@ static func upgrade_invested(t: BoardTile) -> int:
 static func rent_of(t: BoardTile, tiles: Array[BoardTile]) -> int:
 	var rent := float(t.price) * float(GameData.b("rent_rate"))
 	var owned := region_count(tiles, t.region, t.owner_id)
-	if owned >= 10:
+	if owned >= BoardBuilder.region_size:
 		rent *= float(GameData.b("dominion_rent_mult"))
-	elif owned >= int(GameData.b("majority_threshold")):
+	elif owned >= BoardBuilder.majority_needed():
 		rent *= float(GameData.b("majority_rent_mult"))
 	rent *= level_rent_mult(t.level)
 	rent *= WorldMods.rent_mult
@@ -58,6 +68,6 @@ static func rent_of(t: BoardTile, tiles: Array[BoardTile]) -> int:
 static func networth(tiles: Array[BoardTile], p: PlayerState) -> int:
 	var total := p.gold + p.stock_value
 	for t in tiles:
-		if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id:
+		if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id and t.lease_left <= 0:  # leased land is not owned wealth
 			total += t.price + upgrade_invested(t)
 	return total

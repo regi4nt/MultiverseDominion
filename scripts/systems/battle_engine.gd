@@ -5,7 +5,7 @@ extends RefCounted
 ##
 ## Unit behaviour: target priority by role, attack range (Chebyshev distance), movement
 ## (BFS, up to `move` cells per tick), skills, faction + role synergy bonuses, Support cards.
-## The Champion (King) enters ONLY when every regular unit of its side has fallen (Last Stand),
+## The Champion (King) enters when every regular unit of its side has fallen (Last Stand), or earlier if the side pays `king_summon_energy`,
 ## casting its active skill on entry. A side loses when its Champion falls.
 
 const COLS := 8
@@ -41,6 +41,9 @@ var side_passive: Array = [{}, {}]  # battle passive of each side's King (data/k
 var king_skill_used: Array = [false, false]
 var manual_king: Array = [false, false]  # true = that side's King skill is cast by hand (human); false = on entry (AI / tests)
 var king_entry_tick: Array = [-1, -1]
+var monster_unit: Array = [null, null]  # the allied Monster unit on the field (set when it joins the King)
+var monster_skill_used: Array = [false, false]  # Monster card active skill, cast once per battle like the King skill (manual_king decides hand / auto)
+var monster_star: Array = [1, 1]  # King level the Monster card was won at: its ally stats use those Commander star multipliers
 var monster_card: Array = ["", ""]  # Monster card of each side: that monster joins the King when he enters Last Stand
 var regulars_alive_at_entry: Array = [-1, -1]  # test hook: must always be 0
 var hands: Array = [[], []]
@@ -94,6 +97,7 @@ func setup(cfg: Dictionary) -> void:
 		king_data[side] = String(sc.get("champion", ""))
 		king_star[side] = clampi(int(sc.get("champion_star", 1)), 1, CommanderSystem.max_star())
 		monster_card[side] = String(sc.get("monster", ""))
+		monster_star[side] = clampi(int(sc.get("monster_star", 1)), 1, CommanderSystem.max_star())
 		side_passive[side] = GameData.king_passives.get(king_data[side], {})
 		hands[side] = (sc.get("supports", []) as Array).duplicate()
 		for sid in hands[side]:
@@ -119,7 +123,7 @@ func setup(cfg: Dictionary) -> void:
 			var fc := MonsterSystem.FOE_CELL + Vector2i(i, 0)
 			if side == 0:
 				fc = Vector2i(fc.x, 7 - fc.y)
-			_spawn_monster(side, String(foes[i]), fc, false)
+			_spawn_monster(side, String(foes[i]), fc, clampi(int(cfg["sides"][side].get("foe_star", 1)), 1, CommanderSystem.max_star()))
 	for u in units:  # Queen of Machina: the side starts with shields
 		if u.extra == "opening_shield":
 			for a in units_of(u.side):
@@ -230,12 +234,12 @@ func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: 
 	return u
 
 
-## A monster of data/monsters.json as a battle unit. `ally` = a tamed Monster card (stats x monster_ally_stat_mult).
-func _spawn_monster(side: int, monster_id: String, cell: Vector2i, ally: bool) -> BattleUnit:
+## A monster of data/monsters.json as a battle unit at King level `star` (wild: the challenger's level, ally: the level it was won at); an ally = a tamed Monster card (stats = wild stats x the King level multipliers of `star`, see MonsterSystem.stats).
+func _spawn_monster(side: int, monster_id: String, cell: Vector2i, star: int = 1) -> BattleUnit:
 	var m := GameData.get_monster(monster_id)
 	if m.is_empty():
 		return null
-	var st := MonsterSystem.stats(monster_id, ally)
+	var st := MonsterSystem.stats(monster_id, star)
 	var u := BattleUnit.new()
 	_uid += 1
 	u.uid = _uid
@@ -256,6 +260,8 @@ func _spawn_monster(side: int, monster_id: String, cell: Vector2i, ally: bool) -
 	var bf: Dictionary = m.get("buff", {})
 	u.extra = String(bf.get("type", ""))
 	u.extra_value = float(bf.get("value", 0.0))
+	u.active_id = String(m.get("skill_id", ""))
+	u.active_value = float(m.get("active_value", 0.0))
 	_init_buff(u)
 	if u.buff_next_tick != 0:
 		u.buff_next_tick = tick + BUFF_INTERVAL
@@ -414,6 +420,8 @@ func step() -> void:
 			_act(u)
 	for side in range(2):
 		_auto_king_skill(side)
+		_auto_monster_skill(side)
+	_auto_wild_skills()
 	if ai_supports[0] or ai_supports[1]:
 		_ai_use_supports()
 	_check_king_entries()
@@ -831,8 +839,9 @@ func _enter_king(side: int) -> void:
 	if monster_card[side] != "":  # the Monster card answers the King's call and fights beside him
 		var mc := _free_cell_near(u.cell)
 		if mc.x >= 0:
-			var mu := _spawn_monster(side, String(monster_card[side]), mc, true)
+			var mu := _spawn_monster(side, String(monster_card[side]), mc, int(monster_star[side]))
 			if mu != null:
+				monster_unit[side] = mu
 				events.append({"type": "fx", "cells": [mc]})
 				_log("%s joins %s!" % [mu.display_name, u.display_name])
 	_log("LAST STAND! %s enters the arena (side %d)." % [u.display_name, side])
@@ -842,6 +851,35 @@ func _enter_king(side: int) -> void:
 		_log("%s waits for the King skill (%s)." % [u.display_name, String(ch.get("active_name", "skill"))])
 	else:
 		_auto_king_skill(side)  # AI / auto sides cast it on entry, or as soon as they can pay for it
+
+
+## Early summon: a side with enough energy may call its King into the arena while regular units are still alive
+## (cost `king_summon_energy`). Last Stand stays free: the King still enters by himself once the last regular falls.
+func can_summon_king(side: int) -> bool:
+	return not finished and king_data[side] != "" and not bool(king_entered[side]) and regulars_alive(side) > 0 \
+			and int(energy[side]) >= king_summon_cost()
+
+
+## Returns "" on success or the reason it failed.
+func summon_king(side: int) -> String:
+	if finished:
+		return "The battle is over."
+	if king_data[side] == "":
+		return "This side has no King."
+	if king_entered[side]:
+		return "The King is already in the arena."
+	var cost := king_summon_cost()
+	if int(energy[side]) < cost:
+		return "Not enough energy to summon the King (%d/%d)." % [int(energy[side]), cost]
+	energy[side] = int(energy[side]) - cost
+	_log("Side %d spends %d energy to summon its King early." % [side, cost])
+	_enter_king(side)
+	return ""
+
+
+## Energy needed to summon the King before Last Stand (data/balance.json `king_summon_energy`).
+func king_summon_cost() -> int:
+	return 0 if free_supports else clampi(int(GameData.b("king_summon_energy", 8)), 0, energy_max())
 
 
 func _auto_king_skill(side: int) -> void:
@@ -859,10 +897,14 @@ func _cast_king_skill(side: int) -> void:
 	var u: BattleUnit = kings[side]
 	king_skill_used[side] = true
 	_log("King skill: %s (side %d)." % [String(GameData.get_champion(king_data[side]).get("active_name", u.skill_id)), side])
+	_apply_active_skill(u, side, u.skill_id, u.skill_value)
+
+
+## The effect of an active skill (King skill or Monster skill): `u` is the caster, `skill_id` / `v` its mechanic and strength.
+func _apply_active_skill(u: BattleUnit, side: int, skill_id: String, v: float) -> void:
 	events.append({"type": "fx", "cells": [u.cell]})
-	var v := u.skill_value
 	var foes := units_of(1 - side)
-	match u.skill_id:
+	match skill_id:
 		"sun_judgment":  # damage to all enemies
 			for e in foes:
 				_damage(e, int(round(u.base_atk * v)))
@@ -934,6 +976,90 @@ func use_king_skill(side: int) -> String:
 	energy[side] = int(energy[side]) - cost
 	_cast_king_skill(side)
 	return ""
+
+
+## Energy the Monster card's active skill costs (data/balance.json `monster_skill_energy`).
+func monster_energy_cost() -> int:
+	return 0 if free_supports else clampi(int(GameData.b("monster_skill_energy", 5)), 0, energy_max())
+
+
+## The allied Monster of a side if it is in the arena and alive, else null.
+func ally_monster(side: int) -> BattleUnit:
+	var mu: BattleUnit = monster_unit[side]
+	if mu != null and mu.alive:
+		return mu
+	return null
+
+
+## True while the side's Monster card is in the arena, alive, and its active skill is still unused.
+func can_use_monster_skill(side: int) -> bool:
+	var mu := ally_monster(side)
+	return not finished and mu != null and mu.active_id != "" and not bool(monster_skill_used[side]) \
+			and int(energy[side]) >= monster_energy_cost()
+
+
+## Manual Monster skill (same rules as the King skill: once, costs energy). Returns "" on success or the reason it failed.
+func use_monster_skill(side: int) -> String:
+	if finished:
+		return "The battle is over."
+	if monster_unit[side] == null:
+		return "There is no Monster in the arena."
+	if bool(monster_skill_used[side]):
+		return "The Monster skill was already used."
+	var mu := ally_monster(side)
+	if mu == null:
+		return "The Monster has fallen."
+	if mu.active_id == "":
+		return "This Monster has no active skill."
+	var cost := monster_energy_cost()
+	if int(energy[side]) < cost:
+		return "Not enough energy for the Monster skill (%d/%d)." % [int(energy[side]), cost]
+	energy[side] = int(energy[side]) - cost
+	_cast_monster_skill(side, mu)
+	return ""
+
+
+func _cast_monster_skill(side: int, mu: BattleUnit) -> void:
+	monster_skill_used[side] = true
+	mu.active_used = true
+	_log("Monster skill: %s - %s (side %d)." % [mu.display_name, String(GameData.get_monster(mu.card_id).get("active_name", mu.active_id)), side])
+	_apply_active_skill(mu, side, mu.active_id, mu.active_value)
+
+
+## An auto (AI) side's Monster casts its skill once the King skill is done (or the King is gone) and the energy is there.
+func _auto_monster_skill(side: int) -> void:
+	if manual_king[side] or bool(monster_skill_used[side]) or not bool(king_entered[side]):
+		return
+	var mu := ally_monster(side)
+	if mu == null or mu.active_id == "":
+		return
+	if _king_waiting(side):
+		return  # the King's skill gets the energy first
+	var cost := monster_energy_cost()
+	if int(energy[side]) < cost:
+		return
+	energy[side] = int(energy[side]) - cost
+	_cast_monster_skill(side, mu)
+
+
+## A Monster card that is still waiting for energy (auto side), so Support cards do not drain the bar.
+func _monster_waiting(side: int) -> bool:
+	return not manual_king[side] and bool(king_entered[side]) and not bool(monster_skill_used[side]) and ally_monster(side) != null
+
+
+## Wild monsters (a side without a King) cast their skill once, for free, when an enemy comes within 3 cells.
+func _auto_wild_skills() -> void:
+	if not bool(GameData.b("wild_monster_skill", true)):
+		return
+	for u in units:
+		if not u.alive or not u.is_monster or u.active_used or u.active_id == "" or king_data[u.side] != "":
+			continue
+		for e in units_of(1 - u.side):
+			if _dist(e.cell, u.cell) <= 3:
+				u.active_used = true
+				_log("Wild monster skill: %s - %s." % [u.display_name, String(GameData.get_monster(u.card_id).get("active_name", u.active_id))])
+				_apply_active_skill(u, u.side, u.active_id, u.active_value)
+				break
 
 
 func _check_end() -> void:
@@ -1226,8 +1352,8 @@ func _ai_use_supports() -> void:
 	if tick % 30 != 0:
 		return
 	for side in range(2):
-		if not ai_supports[side] or _king_waiting(side):
-			continue  # a King that is waiting for its skill gets the energy first
+		if not ai_supports[side] or _king_waiting(side) or _monster_waiting(side):
+			continue  # a King (then its Monster) that is waiting for its skill gets the energy first
 		# The AI plays the most expensive card it can afford right now (so it does not waste the bar).
 		var best := ""
 		var chain_cat := String(combo_category[side]) if combo_active(side) > 0 else ""

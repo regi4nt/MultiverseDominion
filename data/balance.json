@@ -1,5 +1,6 @@
 {
 	"start_gold": 1500,
+	"start_gold_by_difficulty": {"easy": 2000, "normal": 1500, "hard": 1000},
 	"start_life": 3,
 	"life_by_difficulty": {"easy": 5, "normal": 3, "hard": 1},
 	"trophy_win": {"easy": 20, "normal": 30, "hard": 40},
@@ -66,6 +67,12 @@
 	"reroll_price": 80,
 	"bailout_gold": 150,
 	"max_rounds": 30,
+	"lease_cost_ratio": 0.3,
+	"lease_rounds": 4,
+	"round_limit_by_mode": {
+		"journey": {"easy": 20, "normal": 30, "hard": 40},
+		"arena": {"easy": 30, "normal": 40, "hard": 50}
+	},
 	"max_bonus_rolls": 2,
 	"refuse_duel_penalty": 150,
 	"unit_copies": 9,
@@ -97,7 +104,7 @@
 	},
 	"battle_reroll_price": 20,
 	"level_up_base": 40,
-	"champion_hp_mult": 3.0,
+	"champion_hp_mult": 1.0,
 	"check_shield_pct": 0.15,
 	"highland_atk_bonus": 0.15,
 	"practice_gold": 500,
@@ -139,6 +146,7 @@
 	"combo_window_ticks": 20,
 	"combo_refund_max": 2,
 	"king_skill_energy": 6,
+	"king_summon_energy": 8,
 	"energy_max": 10,
 	"energy_start": 2,
 	"energy_regen_ticks": 8,
@@ -171,7 +179,8 @@
 		300
 	],
 	"fate_detour": 3,
-	"monster_ally_stat_mult": 0.75,
 	"monster_defeat_gold": 50,
+	"monster_skill_energy": 5,
+	"wild_monster_skill": true,
 	"monster_unique": true
 }

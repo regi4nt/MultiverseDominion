@@ -1,20 +1,56 @@
 class_name BoardBuilder
 extends RefCounted
-## Builds the 100-tile perimeter board (26x26 grid ring) for a continent.
+## Builds the perimeter board for a continent: 100 tiles (26x26 grid ring), or 40 tiles (11x11) in Chaos Mode.
 ## Per side (region): 24 non-corner tiles = 10 Territory, 1 Portal (the only teleport of the side),
 ## 2 Bank (gold investment / stock market), 1 Casino, 2 Shop, 3 Event, 1 Auction, 2 Tax, 2 Special.
 ## Plus 4 corners => 100 tiles.
 ## Totals: 40 Territory, 4 Portal, 8 Bank, 4 Casino, 8 Shop, 12 Event, 4 Auction, 8 Tax, 8 Special, 4 Corner.
 
-const TILES_TOTAL := 100
-const GRID := 26
+##
+## Chaos Mode: 40 tiles = 4 corners + 9 tiles per side, 4 Territories per region (see CHAOS_PATTERN_A / _B).
+## The size lives in static vars so every script that walks the ring (BoardBuilder.tiles_total, .grid) follows the mode;
+## MatchController sets it with configure() before it builds or loads a board.
+const NORMAL_SIDE := 25
+const CHAOS_SIDE := 10
+const NORMAL_REGION_SIZE := 10
+const CHAOS_REGION_SIZE := 4
+static var chaos: bool = false
+static var side_len: int = NORMAL_SIDE  # tiles from one corner to the next (the corner counts, so a side has side_len - 1 inner tiles)
+static var tiles_total: int = NORMAL_SIDE * 4
+static var grid: int = NORMAL_SIDE + 1  # tiles per row / column of the ring
+static var region_size: int = NORMAL_REGION_SIZE  # territories per region (10 = Regional Dominion)
 const SIDE_PATTERN: Array[String] = [
 	"T", "T", "B", "T", "E", "T", "SH", "T", "X", "P", "T", "SP",
 	"T", "E", "L", "T", "SH", "A", "T", "SP", "T", "X", "B", "E",
 ]
+const CHAOS_PATTERN_A: Array[String] = ["T", "E", "T", "B", "T", "P", "T", "X", "SP"]
+const CHAOS_PATTERN_B: Array[String] = ["T", "SH", "T", "L", "T", "P", "T", "A", "E"]
 const CORNERS: Array[String] = ["start", "sanctuary", "rift", "crossroads"]
 const CORNER_NAMES: Array[String] = ["Dominion Gate (START)", "Sanctuary", "The Rift", "Crossroads"]
 const DEFAULT_REGION_NAMES: Array[String] = ["North", "East", "South", "West"]
+
+
+## Switches the board size (Chaos Mode = 40 tiles). Call before build() / grid_pos() whenever a match is set up or loaded.
+static func configure(is_chaos: bool) -> void:
+	chaos = is_chaos
+	side_len = CHAOS_SIDE if is_chaos else NORMAL_SIDE
+	tiles_total = side_len * 4
+	grid = side_len + 1
+	region_size = CHAOS_REGION_SIZE if is_chaos else NORMAL_REGION_SIZE
+
+
+## Territories of one region needed for the region's majority rent bonus (6 of 10; 3 of 4 in Chaos Mode).
+static func majority_needed() -> int:
+	var base := int(GameData.b("majority_threshold"))
+	if region_size == NORMAL_REGION_SIZE:
+		return base
+	return clampi(ceili(float(base) / float(NORMAL_REGION_SIZE) * float(region_size)), 2, region_size)
+
+
+static func side_pattern(side: int) -> Array[String]:
+	if chaos:
+		return CHAOS_PATTERN_A if side % 2 == 0 else CHAOS_PATTERN_B
+	return SIDE_PATTERN
 
 
 static func build(continent: Dictionary) -> Array[BoardTile]:
@@ -24,11 +60,11 @@ static func build(continent: Dictionary) -> Array[BoardTile]:
 	var order_counter: Array[int] = [0, 0, 0, 0]
 	var portal_counter: Array[int] = [0, 0, 0, 0]
 
-	for idx in range(TILES_TOTAL):
+	for idx in range(tiles_total):
 		var t := BoardTile.new()
 		t.index = idx
-		if idx % 25 == 0:
-			var corner_i := int(idx / 25.0)
+		if idx % side_len == 0:
+			var corner_i := int(idx / float(side_len))
 			t.type = BoardTile.Type.CORNER
 			t.corner_kind = CORNERS[corner_i]
 			t.name = CORNER_NAMES[corner_i]
@@ -36,7 +72,7 @@ static func build(continent: Dictionary) -> Array[BoardTile]:
 			continue
 
 		var side := side_of(idx)
-		var pos_in_side := (idx - 1) % 25
+		var pos_in_side := (idx - 1) % side_len
 		var region_name: String = DEFAULT_REGION_NAMES[side]
 		var suffix: String = DEFAULT_REGION_NAMES[side]
 		if side < regions.size():
@@ -44,7 +80,7 @@ static func build(continent: Dictionary) -> Array[BoardTile]:
 			suffix = regions[side].get("suffix", suffix)
 		t.region = side
 
-		match SIDE_PATTERN[pos_in_side]:
+		match side_pattern(side)[pos_in_side]:
 			"T":
 				t.type = BoardTile.Type.TERRITORY
 				var order := order_counter[side]
@@ -86,18 +122,19 @@ static func build(continent: Dictionary) -> Array[BoardTile]:
 
 ## Region index (0..3) of a non-corner tile.
 static func side_of(idx: int) -> int:
-	return int(floor((idx - 1) / 25.0))
+	return int(floor(float(idx - 1) / float(side_len)))
 
 
-## Position of a tile on the 26x26 ring. Index 0 = top-left corner, clockwise.
+## Position of a tile on the ring (grid x grid). Index 0 = top-left corner, clockwise.
 static func grid_pos(idx: int) -> Vector2i:
-	if idx <= 25:
+	var n := side_len
+	if idx <= n:
 		return Vector2i(idx, 0)
-	if idx <= 50:
-		return Vector2i(25, idx - 25)
-	if idx <= 75:
-		return Vector2i(25 - (idx - 50), 25)
-	return Vector2i(0, 25 - (idx - 75))
+	if idx <= n * 2:
+		return Vector2i(n, idx - n)
+	if idx <= n * 3:
+		return Vector2i(n - (idx - n * 2), n)
+	return Vector2i(0, n - (idx - n * 3))
 
 
 static func count_types(tiles: Array[BoardTile]) -> Dictionary:

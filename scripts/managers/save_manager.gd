@@ -32,7 +32,7 @@ func default_data() -> Dictionary:
 		"stats": {"matches_played": 0, "wins": 0, "losses": 0, "total_rounds": 0, "best_gold": 0},
 		"wallet": {"coins": 600, "fragments": 0, "tickets": 0, "crystals": 0, "chips": 0},  # Aether Coins, Card Fragments (Gacha duplicates), Gacha Tickets, Crystals (buy cards), Chips: persistent Shop currencies (see ShopSystem)
 		"shop": {"pity": 0, "pulls": 0, "unit_pity": 0, "unit_pulls": 0},
-		"chests": {"slots": [null, null, null, null], "opened": 0},  # Arena reward chests (see ChestSystem): 4 slots, each null or {grade, start, ready}
+		"chests": {"slots": [null, null, null, null], "opened": 0, "storage": [], "drops": 0, "limit_at": 0},  # Arena reward chests (see ChestSystem): 4 slots, each null or {grade, start, ready}
 		"events": {},  # Missions + Achievements (see EventHub)
 		"trophies": 0,  # Journey trophy road: a win raises it, a defeat lowers it; continents open at their unlock_trophies
 	}
@@ -208,7 +208,7 @@ func unlock_card(card_id: String) -> bool:
 
 
 ## The unit cards a new player owns: the 8 Pawns and the 7 pieces of Solvaris (the default King), i.e. exactly the 15 types of
-## the default deck. Every other unit card comes from the Shop (Unit Gacha / Buy Unit).
+## the default deck. Every other unit card comes from the Shop (Card Gacha / Buy Card).
 func starter_unit_ids() -> Array[String]:
 	var out: Array[String] = []
 	for raw in GameData.cards.get("units", []):
@@ -284,7 +284,7 @@ func unlock_next_card() -> String:
 	return ""
 
 
-## Returns the id of the card unlocked by this result ("" if none).
+## Always returns "" (kept for the caller's signature): a match result no longer unlocks a Support card.
 func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "", reward_bonus: Dictionary = {}, difficulty: String = "normal") -> String:
 	var s: Dictionary = data["stats"]
 	s["matches_played"] += 1
@@ -309,15 +309,15 @@ func record_match(won: bool, rounds: int, final_gold: int, continent_id: String 
 		last_opened_continents = unlock_by_trophies()
 	last_reward = ShopSystem.win_reward(difficulty) if won else ShopSystem.loss_reward(difficulty)
 	last_bonus_text = ""
+	var bonus_xp := 0
 	if won and not reward_bonus.is_empty():  # Arena random map: the drawn continent's own bonus
 		last_reward += int(round(ShopSystem.win_reward(difficulty) * float(reward_bonus.get("coins_pct", 0)) / 100.0)) + int(reward_bonus.get("coins_flat", 0))
-		add_fragments(int(reward_bonus.get("fragments", 0)))
+		bonus_xp = int(reward_bonus.get("xp", 0))
 		last_bonus_text = String(reward_bonus.get("text", ""))
 	add_coins(last_reward)
-	_award_xp(XpSystem.match_xp(won, rounds, difficulty))
-	var card := unlock_next_card() if won else ""
+	_award_xp(XpSystem.match_xp(won, rounds, difficulty) + bonus_xp)  # one award, so the level-up line covers the bonus XP too
 	save_game()
-	return card
+	return ""  # no Support card is unlocked by a match result anymore (only Gold chests / the Shop give cards)
 
 
 ## Pays the stake of a wager (coins are taken at the start of the match). false = not enough coins, nothing paid.
@@ -363,6 +363,8 @@ func record_practice(won: bool, difficulty: String = "normal") -> int:
 ## Profile XP (see XpSystem). `last_xp` / `last_level_up` describe the last award, for the result screens.
 var last_xp: int = 0
 var last_level_up: int = 0  # the new level when the last award levelled the player up, else 0
+var last_level_coins: int = 0  # Aether Coins paid by the level-up(s) of the last award (chests that overflowed into coins included)
+var last_level_chests: Array = []  # grades of the chests the level-up(s) of the last award gave
 
 
 func profile_xp() -> int:
@@ -388,6 +390,16 @@ func _award_xp(amount: int) -> void:
 	data["profile"]["level"] = profile_level()
 	last_xp = maxi(amount, 0)
 	last_level_up = profile_level() if profile_level() > before else 0
+	last_level_coins = 0
+	last_level_chests = []
+	for lvl in range(before + 1, profile_level() + 1):  # every level gained pays coins and a chest (also when several at once)
+		var coins := XpSystem.level_up_coins(lvl)
+		add_coins(coins)
+		last_level_coins += coins
+		var chest := ChestSystem.award_grade(XpSystem.level_up_chest(lvl))
+		last_level_chests.append(String(chest["grade"]))
+		if String(chest["status"]) == "full":  # slots and Storage full: the chest was paid out as coins already
+			last_level_coins += int(chest["coins"])
 
 
 ## "+120 XP" or "+120 XP   LEVEL UP! Lv 4 - Recruit" for the result screens.
@@ -395,7 +407,18 @@ func xp_line() -> String:
 	var t := "+%d XP" % last_xp
 	if last_level_up > 0:
 		t += "   LEVEL UP!  Lv %d - %s" % [last_level_up, XpSystem.title(last_level_up)]
+		t += "\n" + level_reward_line()
 	return t
+
+
+## "Level reward: +120 coins + Bronze Chest" for the last level-up ("" when the last award did not level up).
+func level_reward_line() -> String:
+	if last_level_up <= 0:
+		return ""
+	var names: Array[String] = []
+	for g in last_level_chests:
+		names.append(ChestSystem.grade_name(String(g)))
+	return "Level reward: +%d coins%s" % [last_level_coins, (" + " + " + ".join(names)) if not names.is_empty() else ""]
 
 
 ## Older saves had no XP: start them from their record (win 100, loss 30), once.
@@ -478,11 +501,13 @@ func get_deck(continent_id: String = "") -> Deck:
 	var main: Dictionary = data["decks"].get("main", {})
 	var ubc: Dictionary = main.get("units_by_continent", {})
 	var deck := Deck.from_dict({"champion": main.get("champion", "champion_solvaris"), "supports": main.get("supports", []),
-		"continent": cid, "units": ubc.get(cid, []), "lineup": (main.get("lineups_by_continent", {}) as Dictionary).get(cid, [])})
+		"continent": cid, "units": ubc.get(cid, []), "lineup": (main.get("lineups_by_continent", {}) as Dictionary).get(cid, []),
+		"support_lineup": main.get("support_lineup", [])})
 	deck.owned_filter = data["collection"]
 	deck.sanitize_units()
 	deck.sanitize_owned()
 	deck.lineup = deck.valid_lineup()
+	deck.support_lineup = deck.valid_support_lineup()
 	deck.champion_id = player_champion_id()  # never a King of a locked faction
 	return deck
 
@@ -492,7 +517,8 @@ func set_deck(deck: Deck) -> void:
 	var ubc: Dictionary = main.get("units_by_continent", {})
 	ubc[deck.deck_continent()] = deck.unit_ids.duplicate() if deck.unit_ids.size() == Deck.UNIT_SLOTS else []
 	data["decks"]["main"] = {"champion": deck.champion_id, "supports": deck.support_ids.duplicate(), "units_by_continent": ubc,
-		"lineups_by_continent": main.get("lineups_by_continent", {})}  # the lineup is saved separately (set_lineup)
+		"lineups_by_continent": main.get("lineups_by_continent", {}),
+		"support_lineup": main.get("support_lineup", [])}  # the lineups are saved separately (set_lineup, set_support_lineup)
 	save_game()
 
 
@@ -502,6 +528,17 @@ func set_lineup(continent_id: String, entries: Array) -> void:
 	var lbc: Dictionary = main.get("lineups_by_continent", {})
 	lbc[continent_id] = entries.duplicate(true)
 	main["lineups_by_continent"] = lbc
+	data["decks"]["main"] = main
+	save_game()
+
+
+## Saves the Support lineup (Support card per slot, "" = empty; shared by every continent like the Support cards). All empty = no order.
+func set_support_lineup(slots: Array) -> void:
+	var main: Dictionary = data["decks"].get("main", {})
+	var any := false
+	for id in slots:
+		any = any or String(id) != ""
+	main["support_lineup"] = slots.duplicate() if any else []
 	data["decks"]["main"] = main
 	save_game()
 

@@ -155,7 +155,7 @@ func focus_tile(i: int) -> void:
 	_user_cam = false
 	_kill_camera_tweens()
 	var g := BoardBuilder.grid_pos(i)
-	_focus = (Vector2(g.x, g.y) + Vector2(0.5, 0.5)) / float(BoardBuilder.GRID)
+	_focus = (Vector2(g.x, g.y) + Vector2(0.5, 0.5)) / float(BoardBuilder.grid)
 	queue_redraw()
 
 
@@ -163,7 +163,7 @@ func focus_tile(i: int) -> void:
 func pan_to_tile(i: int) -> void:
 	_user_cam = false  # a new turn re-centres the camera on purpose
 	var g := BoardBuilder.grid_pos(i)
-	var target := (Vector2(g.x, g.y) + Vector2(0.5, 0.5)) / float(BoardBuilder.GRID)
+	var target := (Vector2(g.x, g.y) + Vector2(0.5, 0.5)) / float(BoardBuilder.grid)
 	_kill_camera_tweens()
 	if not is_inside_tree() or _focus.distance_to(target) < 0.002:
 		return
@@ -228,7 +228,7 @@ func is_busy() -> bool:
 
 
 func _on_player_moved(pid: int, from_i: int, to_i: int, warped: bool) -> void:
-	var steps := posmod(to_i - from_i, BoardBuilder.TILES_TOTAL)
+	var steps := posmod(to_i - from_i, BoardBuilder.tiles_total)
 	if warped or steps == 0 or steps > 14 or FxMode.is_lite():  # Lite: the pawn lands directly, no hopping
 		_visual_pos[pid] = float(to_i)
 		focus_tile(to_i)
@@ -247,10 +247,10 @@ func _set_vis(v: float, pid: int) -> void:
 		return
 	# The camera glides with the pawn (centre of the two tiles it is between) instead of snapping per tile.
 	var i0 := floori(v)
-	var a := BoardBuilder.grid_pos(posmod(i0, BoardBuilder.TILES_TOTAL))
-	var b := BoardBuilder.grid_pos(posmod(i0 + 1, BoardBuilder.TILES_TOTAL))
+	var a := BoardBuilder.grid_pos(posmod(i0, BoardBuilder.tiles_total))
+	var b := BoardBuilder.grid_pos(posmod(i0 + 1, BoardBuilder.tiles_total))
 	var gp := Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), v - float(i0))
-	_focus = (gp + Vector2(0.5, 0.5)) / float(BoardBuilder.GRID)
+	_focus = (gp + Vector2(0.5, 0.5)) / float(BoardBuilder.grid)
 	queue_redraw()
 
 
@@ -262,7 +262,7 @@ func _anim_done(pid: int, to_i: int) -> void:
 
 func _layout() -> void:
 	var s := minf(size.x, size.y) * zoom
-	_cell = s / float(BoardBuilder.GRID)
+	_cell = s / float(BoardBuilder.grid)
 	var o := size * 0.5 - _focus * s
 	# Keep the board covering the view; when it is smaller than the view, centre it.
 	o.x = (size.x - s) * 0.5 if s <= size.x else clampf(o.x, size.x - s, 0.0)
@@ -373,7 +373,7 @@ func _glide() -> void:
 
 func _select_at(pos: Vector2) -> void:
 	_layout()
-	for i in range(BoardBuilder.TILES_TOTAL):
+	for i in range(BoardBuilder.tiles_total):
 		if tile_rect(i).grow(1.0).has_point(pos):
 			selected_index = i
 			tile_pressed.emit(i)
@@ -517,7 +517,7 @@ func _terr() -> Dictionary:
 func _draw() -> void:
 	_layout()
 	var sk := _terr()
-	var s := _cell * BoardBuilder.GRID
+	var s := _cell * BoardBuilder.grid
 	_rr(Rect2(_origin, Vector2(s, s)), sk["frame_bg"], _cell * 0.6, sk["frame"], 2.0, _cell * 0.5)
 	if ctrl == null:
 		return
@@ -583,47 +583,55 @@ func _draw_level_marks(t: BoardTile, r: Rect2) -> void:
 		draw_circle(Vector2(x0 + step * i, y), pr, UiTheme.COL_GOLD)
 
 
+## The centre panel of the ring: a 2-tile margin on the 100-tile board, 1.4 on the 40-tile Chaos board.
+func _inner_rect() -> Rect2:
+	var m := 2.0 if BoardBuilder.grid >= 26 else 1.5
+	return Rect2(_origin + Vector2(_cell * m, _cell * m), Vector2(_cell * (BoardBuilder.grid - m * 2.0), _cell * (BoardBuilder.grid - m * 2.0)))
+
+
 func _draw_center(font: Font) -> void:
-	var inner := Rect2(_origin + Vector2(_cell * 2, _cell * 2), Vector2(_cell * 22, _cell * 22))
+	var inner := _inner_rect()
+	var cu := inner.size.x / 22.0  # the centre panel is laid out for 22 units; on the small Chaos board a unit is smaller than a tile
 	var sk := _terr()
 	var plate: Color = Color(sk["center_bg"], 0.96)
-	_rr(inner, plate, _cell * 0.9, sk["center_border"], 2.0)
-	MapSkin.draw_watermark(self, String(ctrl.continent.get("id", "")), Rect2(inner.get_center() - Vector2(_cell * 8.5, _cell * 8.5), Vector2(_cell * 17.0, _cell * 17.0)), sk, plate)
+	_rr(inner, plate, cu * 0.9, sk["center_border"], 2.0)
+	MapSkin.draw_watermark(self, String(ctrl.continent.get("id", "")), Rect2(inner.get_center() - Vector2(cu * 8.5, cu * 8.5), Vector2(cu * 17.0, cu * 17.0)), sk, plate)
 	var title := String(ctrl.continent.get("name", "")).to_upper()
-	var ty := inner.position.y + _cell * 3.2
-	draw_string_outline(font, Vector2(inner.position.x, ty), title, HORIZONTAL_ALIGNMENT_CENTER, inner.size.x, int(_cell * 1.6), 8, Color(0, 0, 0, 0.7))
-	draw_string(font, Vector2(inner.position.x, ty), title, HORIZONTAL_ALIGNMENT_CENTER, inner.size.x, int(_cell * 1.6), sk["title"])
-	draw_rect(Rect2(inner.position.x + inner.size.x * 0.3, ty + _cell * 0.6, inner.size.x * 0.4, 2.0), sk["title_dim"])
+	var ty := inner.position.y + cu * 3.2
+	draw_string_outline(font, Vector2(inner.position.x, ty), title, HORIZONTAL_ALIGNMENT_CENTER, inner.size.x, int(cu * 1.6), 8, Color(0, 0, 0, 0.7))
+	draw_string(font, Vector2(inner.position.x, ty), title, HORIZONTAL_ALIGNMENT_CENTER, inner.size.x, int(cu * 1.6), sk["title"])
+	draw_rect(Rect2(inner.position.x + inner.size.x * 0.3, ty + cu * 0.6, inner.size.x * 0.4, 2.0), sk["title_dim"])
 	var names := BoardBuilder.DEFAULT_REGION_NAMES
-	var fs := int(_cell * 0.66)
+	var fs := int(cu * 0.66)
 	for r in range(4):
-		var y := inner.position.y + _cell * (6.2 + r * 1.7)
-		var row := Rect2(inner.position.x + _cell * 1.2, y - _cell * 0.95, inner.size.x - _cell * 2.4, _cell * 1.4)
-		_rr(row, Color(1, 1, 1, 0.045), _cell * 0.3)
-		_rr(Rect2(row.position + Vector2(_cell * 0.25, _cell * 0.25), Vector2(_cell * 0.9, _cell * 0.9)), BoardBuilder.region_color(ctrl.continent, r), _cell * 0.2)
+		var y := inner.position.y + cu * (6.2 + r * 1.7)
+		var row := Rect2(inner.position.x + cu * 1.2, y - cu * 0.95, inner.size.x - cu * 2.4, cu * 1.4)
+		_rr(row, Color(1, 1, 1, 0.045), cu * 0.3)
+		_rr(Rect2(row.position + Vector2(cu * 0.25, cu * 0.25), Vector2(cu * 0.9, cu * 0.9)), BoardBuilder.region_color(ctrl.continent, r), cu * 0.2)
 		var rname: String = ctrl.continent["regions"][r]["name"] if ctrl.continent.has("regions") else names[r]
-		draw_string(font, Vector2(row.position.x + _cell * 1.6, y), "%s - %s" % [names[r], rname], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiTheme.COL_TEXT)
+		draw_string(font, Vector2(row.position.x + cu * 1.6, y), "%s - %s" % [names[r], rname], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiTheme.COL_TEXT)
 		# one coloured count per player, right aligned
-		var x := row.end.x - _cell * 0.4
+		var x := row.end.x - cu * 0.4
 		for pi in range(ctrl.players.size() - 1, -1, -1):
 			var p = ctrl.players[pi]
 			var txt := str(EconomySystem.region_count(ctrl.tiles, r, p.id))
 			var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 			draw_string(font, Vector2(x - w, y), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, p.color.lightened(0.25))
-			x -= w + _cell * 0.9
+			x -= w + cu * 0.9
 	_draw_info(font, inner)
 
 
 ## The explanation (inspected tile / world modifier) sits in the centre of the map, right under the four region rows.
 ## The dice plate (drawn in view space, bottom-centre of the map) stays below it.
 func _draw_info(font: Font, inner: Rect2) -> void:
+	var cu := inner.size.x / 22.0
 	if info_text == "":
 		return
-	var box := Rect2(inner.position.x + _cell * 1.2, inner.position.y + _cell * 12.4, inner.size.x - _cell * 2.4, _cell * 5.3)
-	_rr(box, Color(1, 1, 1, 0.045), _cell * 0.3)
-	var fs := int(_cell * 0.6)
+	var box := Rect2(inner.position.x + cu * 1.2, inner.position.y + cu * 12.4, inner.size.x - cu * 2.4, cu * 5.3)
+	_rr(box, Color(1, 1, 1, 0.045), cu * 0.3)
+	var fs := int(cu * 0.6)
 	var line_h := font.get_height(fs)
-	var pad := _cell * 0.5
+	var pad := cu * 0.5
 	var lines := maxi(1, int(floor((box.size.y - pad * 1.2) / line_h)))
 	draw_multiline_string(font, Vector2(box.position.x + pad, box.position.y + pad + font.get_ascent(fs)), info_text,
 		HORIZONTAL_ALIGNMENT_LEFT, box.size.x - pad * 2.0, fs, lines, UiTheme.COL_TEXT)
@@ -634,11 +642,11 @@ func _draw_info(font: Font, inner: Rect2) -> void:
 func _draw_dice() -> void:
 	if ctrl.last_dice.x <= 0:
 		return
-	var d := clampf(minf(size.x, size.y) * 0.09, 44.0, 96.0)
+	var d := clampf(minf(size.x, size.y) * (0.09 if BoardBuilder.grid >= 26 else 0.07), 44.0, 96.0)
 	var gap := d * 0.28
 	# bottom of the plate: 2.4 fitted cells above the board's bottom edge = inside the centre panel when the board is fitted
-	var fit_cell := minf(size.x, size.y) / float(BoardBuilder.GRID)
-	var plate_bottom := minf(size.y * 0.5 + minf(size.x, size.y) * 0.5 - fit_cell * 2.4, size.y - 8.0)
+	var fit_cell := minf(size.x, size.y) / float(BoardBuilder.grid)
+	var plate_bottom := minf(size.y * 0.5 + minf(size.x, size.y) * 0.5 - fit_cell * (2.4 if BoardBuilder.grid >= 26 else 1.9), size.y - 8.0)
 	var top := Vector2(size.x * 0.5 - d - gap * 0.5, plate_bottom - d * 1.3)
 	var rolling := _roll_t < 1.0
 	var decay := 1.0 - _roll_t
@@ -689,8 +697,8 @@ func _draw_tokens() -> void:
 		var v := float(_visual_pos.get(p.id, p.position))
 		var i0 := floori(v)
 		var f := v - float(i0)
-		var c0 := tile_rect(posmod(i0, BoardBuilder.TILES_TOTAL)).get_center()
-		var c1 := tile_rect(posmod(i0 + 1, BoardBuilder.TILES_TOTAL)).get_center()
+		var c0 := tile_rect(posmod(i0, BoardBuilder.tiles_total)).get_center()
+		var c1 := tile_rect(posmod(i0 + 1, BoardBuilder.tiles_total)).get_center()
 		var lift := sin(PI * f) * _cell * HOP_HEIGHT if f > 0.0001 else 0.0
 		var c := c0.lerp(c1, f) + offs[p.id % 4] * _cell * 0.2
 		if p.id == ctrl.current:

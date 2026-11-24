@@ -149,11 +149,26 @@ static func open_in_browser(info: Dictionary) -> void:
 		OS.shell_open(String(info.get("page_url", PAGE % REPO)))
 
 
+## The download that is running (null = none). It lives on the SceneTree root, not on the screen that started it,
+## so Hide really hides: changing screens (Back, New Match, ...) no longer frees the downloader and kills the download.
+static var _running: UpdateInstaller = null
+static var _progress_dlg: UiDialog = null
+static var _pill: CanvasLayer = null
+static var _pill_btn: Button = null
+
+
 ## In-game update: a progress dialog while the APK downloads, then Android's installer opens. Any failure
 ## (offline, refused install) offers the browser download instead, so the player is never stuck.
+## "Hide" keeps the download going behind a small "Downloading update" pill (tap it to see the progress again);
+## only "Cancel download" stops it. Android Back counts as Hide.
 static func start_in_app_update(parent: Node, info: Dictionary) -> void:
+	if _running != null and is_instance_valid(_running):  # already downloading: just show the progress again
+		_show_progress()
+		return
+	var host: Node = parent.get_tree().root
 	var inst := UpdateInstaller.new()
-	parent.add_child(inst)
+	_running = inst
+	host.add_child(inst)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	var lbl := UiTheme.make_label("Starting download...", 18)
@@ -165,32 +180,44 @@ static func start_in_app_update(parent: Node, info: Dictionary) -> void:
 	bar.show_percentage = false
 	box.add_child(bar)
 	var dlg := UiDialog.new()
+	_progress_dlg = dlg
 	dlg.title = "Updating to %s" % String(info.get("version", ""))
 	dlg.body_node = box
 	dlg.ok_button_text = "Hide"  # the download keeps going in the background
-	dlg.cancel_button_text = "Cancel"
+	dlg.show_cancel = false
+	dlg.add_button("Cancel download", false, "cancel")
 	dlg.dismiss_on_backdrop = false
-	dlg.show_cancel = true
-	parent.add_child(dlg)
-	dlg.popup_centered(Vector2i(600, 0))
+	host.add_child(dlg)
+	_show_progress()
+	var pct := func() -> String: return "%d%%" % int(bar.value)
 	inst.progress.connect(func(done: int, total: int):
 		if total > 0:
 			bar.value = 100.0 * float(done) / float(total)
 			lbl.text = "Downloading... %.1f / %.1f MB" % [done / 1048576.0, total / 1048576.0]
 		else:
-			lbl.text = "Downloading... %.1f MB" % (done / 1048576.0))
-	dlg.canceled.connect(func():
+			lbl.text = "Downloading... %.1f MB" % (done / 1048576.0)
+		if _pill_btn != null and is_instance_valid(_pill_btn):
+			_pill_btn.text = "Downloading update  %s   (tap to open)" % (pct.call() if total > 0 else "..."))
+	dlg.confirmed.connect(func(): _show_pill())  # Hide
+	dlg.canceled.connect(func(): _show_pill())  # Android Back: hide too, never lose the download by accident
+	dlg.custom_action.connect(func(_a: StringName):
 		inst.cancel()
-		inst.queue_free()
+		_cleanup(inst)
 		dlg.queue_free())
 	inst.finished.connect(func(ok: bool, error: String):
 		if is_instance_valid(dlg):
 			dlg.hide()
 			dlg.queue_free()
-		if ok and inst.install():
-			inst.queue_free()
+		_free_pill()
+		if ok:
+			# Downloaded. The installer starts when the game is in the foreground and installs are allowed; the pill lets the
+			# player start it again by hand if Android showed nothing (it keeps the file until the game restarts).
+			inst.install_failed.connect(func(reason: String): _install_failed(host, inst, reason))
+			_show_pill("Update downloaded  -  tap to install", func():
+				inst.install_when_possible())
+			inst.install_when_possible()
 			return
-		inst.queue_free()
+		_cleanup(inst)
 		var fb := UiDialog.new()
 		fb.title = "Could not update in the game"
 		fb.tone = "warn"
@@ -200,9 +227,71 @@ static func start_in_app_update(parent: Node, info: Dictionary) -> void:
 		fb.confirmed.connect(func(): open_in_browser(info))
 		fb.confirmed.connect(fb.queue_free)
 		fb.canceled.connect(fb.queue_free)
-		parent.add_child(fb)
+		host.add_child(fb)
 		fb.popup_centered(Vector2i(600, 0)))
 	inst.start(String(info.get("apk_url", "")))
+
+
+static func _install_failed(host: Node, inst: UpdateInstaller, reason: String) -> void:
+	var d := UiDialog.new()
+	d.tone = "warn"
+	if reason == "permission":
+		d.title = "Allow installing"
+		d.dialog_text = "Android blocks the install until \"Install unknown apps\" is allowed for this game.\n\nOpen the Android settings of this app, switch it on, come back and tap Try again."
+	else:
+		d.title = "Installer did not open"
+		d.dialog_text = "Android did not open the installer. Tap Try again, or use the tap-to-install strip at the bottom of the screen."
+	d.ok_button_text = "Try again"
+	d.cancel_button_text = "Later"
+	d.confirmed.connect(func():
+		if is_instance_valid(inst):
+			inst.install_when_possible())
+	d.confirmed.connect(d.queue_free)
+	d.canceled.connect(d.queue_free)
+	host.add_child(d)
+	d.popup_centered(Vector2i(600, 0))
+
+
+static func _cleanup(inst: UpdateInstaller) -> void:
+	_free_pill()
+	if _running == inst:
+		_running = null
+	_progress_dlg = null
+	if is_instance_valid(inst):
+		inst.queue_free()
+
+
+static func _show_progress() -> void:
+	_free_pill()
+	if _progress_dlg != null and is_instance_valid(_progress_dlg):
+		_progress_dlg.popup_centered(Vector2i(600, 0))
+
+
+## A small tappable strip at the bottom of the screen while the dialog is hidden (it follows the player across screens).
+static func _show_pill(text: String = "Downloading update  ...   (tap to open)", on_tap: Callable = Callable()) -> void:
+	_free_pill()
+	if _running == null or not is_instance_valid(_running):
+		return
+	_pill = CanvasLayer.new()
+	_pill.layer = 55
+	var b := UiTheme.make_primary(text, 48)
+	b.theme = UiTheme.get_theme()
+	b.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	b.offset_top = -64.0
+	b.offset_bottom = -16.0
+	b.offset_left = -240.0
+	b.offset_right = 240.0
+	b.pressed.connect(on_tap if on_tap.is_valid() else _show_progress)
+	_pill_btn = b
+	_pill.add_child(b)
+	_running.get_tree().root.add_child(_pill)
+
+
+static func _free_pill() -> void:
+	if _pill != null and is_instance_valid(_pill):
+		_pill.queue_free()
+	_pill = null
+	_pill_btn = null
 
 
 func check() -> void:

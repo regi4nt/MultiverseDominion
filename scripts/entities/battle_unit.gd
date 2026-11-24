@@ -19,6 +19,9 @@ var atk_range: int = 1
 var move: int = 1
 var skill_id: String = ""
 var skill_value: float = 0.0  # champion active skill strength (data: active_value)
+var active_id: String = ""  # monster active skill (data/monsters.json skill_id): same effects as a King skill, cast once
+var active_value: float = 0.0  # its strength (data: active_value)
+var active_used: bool = false
 var params: Dictionary = {}  # per-continent skill numbers (data: skill.params); empty = base values
 var extra: String = ""  # the card's continent buff: effect type (data/card_buffs.json), see CardDatabase.BUFF_TYPES
 var extra_value: float = 0.0  # strength of the buff (a count for evade / stun_proc / chill)

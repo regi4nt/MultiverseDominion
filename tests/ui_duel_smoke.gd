@@ -1,16 +1,23 @@
 extends Node
 ## Territory Board with a human visitor: Encounter -> Duel -> Battle overlay -> result -> Conquest/Reward.
 
-func play_overlay(scene: Control) -> void:
+func play_overlay(scene: Control) -> bool:  # false = the Monster skill button is missing
 	var b: Control = scene._duel_node
 	b._on_auto()
 	b._on_start_battle()
 	b.timer.stop()
+	var has_btn: bool = b.monster_btn != null
+	if has_btn:  # Monster card owner: the Monster skill button exists and can be pressed at any time without errors
+		b.engine.energy[0] = b.engine.energy_max()
+		b._on_monster_skill()
+		b._refresh_monster_btn()
+		print("monster skill button: ", b.monster_btn.text.replace("\n", " | "))
 	var n := 0
 	while not b.engine.finished and n < 1000:
 		b._on_tick()
 		n += 1
 	b._finish_duel()
+	return has_btn
 
 
 func _ready() -> void:
@@ -43,6 +50,7 @@ func _ready() -> void:
 	print("human sees: ", labels)
 	if labels.size() != 2:
 		fails += 1
+	c.players[0].monster_id = "crownstone_golem"  # the human owns a Monster card: the Battle panel gets a Monster skill button
 	c.decide("accept")
 	await get_tree().process_frame
 	print("overlay open: ", scene._duel_node != null, " state=", c.state)
@@ -50,7 +58,9 @@ func _ready() -> void:
 		fails += 1
 	else:
 		var gold_before: int = c.players[0].gold
-		play_overlay(scene)
+		if not play_overlay(scene):
+			print("FAIL: no Monster skill button for a Monster card owner")
+			fails += 1
 		await get_tree().process_frame
 		print("overlay closed: ", scene._duel_node == null, " pending=", c.pending.get("type", "none"), " state=", c.state, " gold ", gold_before, "->", c.players[0].gold)
 		if scene._duel_node != null or c.state == MatchController.State.AWAIT_DUEL:

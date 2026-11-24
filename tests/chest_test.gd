@@ -65,8 +65,38 @@ func _ready() -> void:
 	ChestSystem.award_grade("bronze")
 	ChestSystem.award_grade("gold")
 	ChestSystem.award_grade("bronze")
+	var stored := ChestSystem.award_grade("gold")
+	check(stored["status"] == "stored" and stored["storage"] == 0 and ChestSystem.storage_count() == 1 and SaveManager.coins() == 0, "all slots full: the chest goes to the Storage")
+	check(ChestSystem.move_to_slot(0) != "" and ChestSystem.storage_count() == 1, "no free slot: moving out of the Storage is refused")
+	for i in range(ChestSystem.STORAGE_CAPACITY - 1):
+		ChestSystem.award_grade("bronze")
+	check(ChestSystem.storage_count() == ChestSystem.STORAGE_CAPACITY, "the Storage fills up to its capacity")
 	var full := ChestSystem.award_grade("gold")
-	check(full["status"] == "full" and SaveManager.coins() == int(full["coins"]) and int(full["coins"]) > 0, "all slots full: the chest becomes coins")
+	check(full["status"] == "full" and SaveManager.coins() == int(full["coins"]) and int(full["coins"]) > 0, "slots and Storage full: the chest becomes coins")
+	SaveManager.data["wallet"]["coins"] = 0
+	var freed := ChestSystem.slots()[3]
+	ChestSystem.slots()[3] = null
+	check(ChestSystem.move_to_slot(0) == "" and ChestSystem.grade_at(3) == "gold" and ChestSystem.state(3) == "locked" and ChestSystem.storage_count() == ChestSystem.STORAGE_CAPACITY - 1, "a stored chest moves into a free slot, waiting")
+	check(ChestSystem.move_to_slot(99) != "", "bad Storage index is refused")
+	ChestSystem.slots()[3] = freed
+	ChestSystem.storage().clear()
+
+	# --- drop limit: DROP_LIMIT chests, then 1 hour of waiting, then the allowance refreshes
+	var rng_l := RandomNumberGenerator.new()
+	rng_l.seed = 7
+	SaveManager.data["chests"] = {"slots": [null, null, null, null], "opened": 0}
+	ChestSystem.time_offset = 0
+	for i in range(ChestSystem.DROP_LIMIT):
+		check(ChestSystem.award("normal", rng_l)["status"] != "limit", "drop %d of the allowance is given" % (i + 1))
+	check(ChestSystem.drops_used() == ChestSystem.DROP_LIMIT and ChestSystem.limit_seconds_left() > 3500, "limit reached: about an hour to wait")
+	var blocked := ChestSystem.award("normal", rng_l)
+	check(blocked["status"] == "limit" and int(blocked["wait"]) > 0, "over the limit: no chest drops")
+	ChestSystem.time_offset = ChestSystem.DROP_REFRESH_SECONDS - 60
+	check(ChestSystem.award("normal", rng_l)["status"] == "limit", "still limited just before the hour is over")
+	ChestSystem.time_offset = ChestSystem.DROP_REFRESH_SECONDS + 5
+	check(ChestSystem.limit_seconds_left() == 0 and ChestSystem.award("normal", rng_l)["status"] != "limit" and ChestSystem.drops_used() == 1, "after the hour the allowance is refreshed")
+	ChestSystem.time_offset = 0
+	SaveManager.data["chests"] = {"slots": [null, null, null, null], "opened": 0, "storage": []}
 	SaveManager.data["wallet"]["coins"] = 0
 
 	# --- timer
@@ -103,35 +133,42 @@ func _ready() -> void:
 	check(ChestSystem.opened_total() == 1, "opened counter")
 	check(ChestSystem.open(0)["ok"] == false, "an empty slot cannot be opened twice")
 
-	# --- gold may unlock a card
+	# --- no chest unlocks a card anymore
 	var got_card := false
 	for i in range(80):
 		ChestSystem.slots()[3] = {"grade": "gold", "start": 1, "ready": 1}
 		if String(ChestSystem.open(3, rng)["card"]) != "":
 			got_card = true
 			break
-	check(got_card or SaveManager.unlock_next_card() == "", "a gold chest can unlock a Support card")
+	check(not got_card, "a gold chest no longer unlocks a Support card")
 
 	# --- Chests screen
 	ChestSystem.time_offset = 0
-	SaveManager.data["chests"] = {"slots": [null, null, null, null], "opened": 0}
+	SaveManager.data["chests"] = {"slots": [null, null, null, null], "opened": 0, "storage": ["silver", "bronze"]}
 	ChestSystem.award_grade("gold")
 	ChestSystem.award_grade("bronze")
 	ChestSystem.slots()[1] = {"grade": "bronze", "start": 1, "ready": 1}
 	SaveManager.data["wallet"]["crystals"] = 10
-	var screen: Control = load("res://scenes/chests/chests.tscn").instantiate()
-	add_child(screen)
+	var events_screen: Control = load("res://scenes/events/events.tscn").instantiate()
+	add_child(events_screen)
+	events_screen._show_tab("chest")
 	await get_tree().process_frame
+	check(events_screen._chest_panel.visible, "Events has a visible Chests tab")
+	var screen: ChestsPanel = events_screen._chest_panel
 	check(screen._cards.size() == 4, "screen shows 4 slots")
 	check((screen._cards[0].unlock_btn as Button).visible and not (screen._cards[0].open_btn as Button).visible, "waiting chest shows Unlock")
 	check((screen._cards[1].open_btn as Button).visible, "ready chest shows OPEN")
 	check(not (screen._cards[2].unlock_btn as Button).visible and not (screen._cards[2].open_btn as Button).visible, "empty slot has no buttons")
 	screen._on_unlock(0)
 	check(ChestSystem.state(0) == "unlocking" and (screen._cards[0].skip_btn as Button).visible, "Unlock starts the timer on screen")
+	check(screen._storage_list.get_child_count() == 2, "Storage beside the slots lists its 2 chests")
 	screen._on_open(1)
 	await get_tree().process_frame
 	check(ChestSystem.state(1) == "empty" and ChestSystem.opened_total() >= 1, "OPEN on screen empties the slot")
-	screen.queue_free()
+	screen._on_move(0)
+	await get_tree().process_frame
+	check(ChestSystem.grade_at(1) == "silver" and screen._storage_list.get_child_count() == 1, "To slot moves a stored chest into the free slot")
+	events_screen.queue_free()
 	await get_tree().process_frame
 
 	# --- Arena victory drops a chest, a Journey win / an Arena defeat does not

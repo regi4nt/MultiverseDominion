@@ -179,6 +179,11 @@ static func claimable_count() -> int:
 	return n
 
 
+## Menu badge: unclaimed missions / achievements plus chests that are ready to open.
+static func badge_count() -> int:
+	return claimable_count() + ChestSystem.ready_count()
+
+
 static func claimable_count_in(daily: bool) -> int:
 	var n := 0
 	for d in (daily_missions() if daily else ACHIEVEMENTS):

@@ -155,8 +155,8 @@
 				"Eldritch"
 			],
 			"random_bonus": {
-				"fragments": 20,
-				"text": "+20 fragments",
+				"xp": 20,
+				"text": "+20 XP",
 				"ingame": {
 					"start_tokens": 2
 				},
@@ -320,9 +320,9 @@
 				"Amber"
 			],
 			"random_bonus": {
-				"fragments": 15,
+				"xp": 15,
 				"coins_flat": 15,
-				"text": "+15 fragments, +15 coins",
+				"text": "+15 XP, +15 coins",
 				"ingame": {
 					"harvest_extra": 2
 				},
@@ -570,8 +570,8 @@
 				"Infinite"
 			],
 			"random_bonus": {
-				"fragments": 25,
-				"text": "+25 fragments",
+				"xp": 25,
+				"text": "+25 XP",
 				"ingame": {
 					"pass_token": 1
 				},

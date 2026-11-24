@@ -10,7 +10,7 @@ const HINTS := {
 	"welcome": "Welcome, ruler! Win by being the last ruler standing, or by having the highest net worth after 10 rounds. Each rule is explained the first time it appears. Tap ROLL DICE: two dice move your Champion clockwise around the 100-tile board.",
 	"roll": "Your turn: tap ROLL DICE.",
 	"rolled": "Dice rolled. Tap MOVE. (A Reroll Token lets you roll again first; doubles give a bonus roll.)",
-	"buy": "Free territory! Buy it with Dominion Gold: rivals landing on it pay you rent. Owning 6 of the 10 lands of a region raises rent; all 10 give Regional Dominion.",
+	"buy": "Free territory! Buy it with Dominion Gold, or Lease it for a share of the price for a few rounds: rivals landing on it pay you rent either way. Owning 6 of the 10 lands of a region raises rent; all 10 give Regional Dominion.",
 	"upgrade": "Your own land! Pay gold to upgrade it (Level 1-3, the last level is a Landmark): every level raises the rent rivals pay you.",
 	"auction": "Auction House: a free territory is sold to the highest bidder. Bid, or pass. Every ruler can join.",
 	"portal": "An active portal (purple)! Warp to another portal. Each side has only one portal.",

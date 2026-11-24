@@ -67,10 +67,10 @@ func _ready() -> void:
 	rng.seed = 3
 	ChestSystem.open(0, rng)
 	check(EventHub.metric_value("chests", true) == 1 and EventHub.metric_value("gold_chests", false) >= 1, "opening a chest is tracked")
-	SaveManager.data["wallet"]["coins"] = 5000
+	SaveManager.data["wallet"]["tickets"] = 50
 	SaveManager.data["shop"] = {"pity": 0, "pulls": 0, "unit_pity": 0, "unit_pulls": 0}
 	var col0: Dictionary = SaveManager.data["collection"].duplicate(true)
-	ShopSystem.pull_batch(3, rng, "support", "coins")
+	ShopSystem.pull_batch(3, rng)
 	check(EventHub.metric_value("pulls", true) == 3, "gacha pulls are tracked")
 	SaveManager.data["collection"] = col0
 
@@ -100,7 +100,7 @@ func _ready() -> void:
 	var screen: Control = load("res://scenes/events/events.tscn").instantiate()
 	add_child(screen)
 	await get_tree().process_frame
-	check(screen._tab_buttons.keys() == ["mission", "achievement"], "two tabs: Mission, Achievement")
+	check(screen._tab_buttons.keys() == ["mission", "achievement", "chest"], "three tabs: Mission, Achievement, Chests")
 	check(screen._lists["mission"].get_child_count() == 4, "Mission tab lists 4 missions")
 	screen._show_tab("achievement")
 	await get_tree().process_frame

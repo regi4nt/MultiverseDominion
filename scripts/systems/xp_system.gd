@@ -50,3 +50,17 @@ static func match_xp(won: bool, rounds: int, difficulty: String) -> int:
 ## One Battle Chess battle (every round of a 10-round / survival run counts).
 static func practice_xp(won: bool, difficulty: String) -> int:
 	return int(round(float(40 if won else 10) * float(DIFFICULTY_MULT.get(difficulty, 1.0))))
+
+
+## Level-up reward: every new level pays Aether Coins and one reward chest (it skips the Arena drop limit).
+## Coins: 50 + 10 per level. Chest: Gold on every 10th level, Silver on every 5th, otherwise Bronze.
+static func level_up_coins(level: int) -> int:
+	return 50 + 10 * level
+
+
+static func level_up_chest(level: int) -> String:
+	if level % 10 == 0:
+		return "gold"
+	if level % 5 == 0:
+		return "silver"
+	return "bronze"

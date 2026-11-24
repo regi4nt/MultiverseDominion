@@ -1,10 +1,10 @@
-# MULTIVERSE DOMINION — Godot 4.2+ (GDScript)
+# MULTIVERSE DOMINION — Godot 4.7 (GDScript)
 
 Status: **PHASE 1 (Foundation) + PHASE 2 (Territory Board) + PHASE 3 (Card System) + PHASE 4 (Battle System) + PHASE 5 (Game Loop) + PHASE 6 (Content) + PHASE 7 (Android) — selesai di sisi kode; **APK belum dibangun/diuji di perangkat** (lihat BUILD_ANDROID.md).**
-Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smoke test lolos.
+Proyek berjalan di Godot 4.7 (renderer GL Compatibility). Menu utama: New Match (Journey / Arena / Battle Chess / Tutorial), Card Hub (Collection / Deck / Info), Shop, Events (Mission / Achievement / Chests), Profile, Settings. Sebelum perubahan batas ronde per mode, diuji dengan Godot headless: import bersih, game AI penuh selesai, UI smoke test lolos; setelah perubahan itu tes belum dijalankan ulang.
 
 ## Menjalankan
-1. Buka Godot 4.2+ -> Import -> pilih `project.godot` (biarkan import pertama selesai).
+1. Buka Godot 4.7 -> Import -> pilih `project.godot` (biarkan import pertama selesai).
 2. Tekan F5. Alur: Main Menu -> NEW MATCH -> pilih OFFLINE (Journey / Arena / Battle Chess / Tutorial) -> untuk Journey dan Arena: pemain / difficulty / continent -> START MATCH (faksi diambil dari Deck) (lihat bagian "New Match").
 3. Tes otomatis (tanpa UI):
    `godot --headless --path . res://tests/sim_test.tscn` -> harus mencetak `TEST RESULT: PASS`.
@@ -20,30 +20,31 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
    `godot --headless --path . res://tests/monster_test.tscn` -> `MONSTER TEST RESULT: PASS` (monster tersembunyi).
    `godot --headless --path . res://tests/deposit_test.tscn` -> `DEPOSIT TEST RESULT: PASS` (tambang & harta karun tersembunyi).
    `godot --headless --path . res://tests/skin_test.tscn` -> `SKIN TEST RESULT: PASS` (skin map per benua).
-   Juga: `tutorial_test`, `audio_test`, `rules_test` (Auction, Special Dice, unlock), `team_test` (mode 2vs2), `save_test`, `perf_test`, `ui_resume_smoke`; dan
-   `ui_tutorial_smoke` + `layout_test` (butuh render nyata, lihat BUILD_ANDROID.md bagian 4).
+   Juga: `tutorial_test` (juga memeriksa batas ronde per mode / difficulty), `audio_test`, `fx_test`, `rules_test` (Auction, Special Dice, unlock), `team_test` (mode 2vs2), `newmatch_test` (hub, setup, aturan unlock),
+   `series_test` (Battle Chess 10 Rounds / Survival), `shop_test`, `chest_test`, `event_test`, `xp_test`, `save_test`, `update_test`, `perf_test`;
+   UI: `ui_resume_smoke`, `ui_shop_smoke`, `ui_dialog_smoke`, `ui_ux_smoke`, `ui_tutorial_smoke`, `layout_test` (dua terakhir butuh render nyata, lihat BUILD_ANDROID.md bagian 4).
+   `tools/run_tests.sh [logic|ui|all]` menjalankan tes logika dan UI headless berurutan (dipakai juga oleh `.github/workflows/tests.yml`); `perf_test`, `ui_smoke`, `ui_tutorial_smoke`, dan `layout_test` tidak termasuk. Scene `*_shots` / `art_gallery` hanya membuat screenshot.
 
-## Peti hadiah / Chests (Main Menu -> Chests)
-- **Menang Arena = dapat 1 peti** (Journey, Tutorial, Battle Chess, dan kekalahan tidak). Grade ditentukan acak menurut difficulty (`ChestSystem.DROP_WEIGHTS`): Easy 70/25/5, Normal 55/33/12, Hard 35/45/20 (% Bronze/Silver/Gold). Layar hasil menampilkan peti yang didapat.
-- **4 slot**. Peti masuk ke slot kosong pertama dalam keadaan menunggu; tekan *Start unlocking* untuk menjalankan **timer** (jam nyata, tetap berjalan saat game ditutup). Hanya **satu peti** yang boleh membuka kunci pada satu waktu. Semua slot penuh = peti langsung jadi coin (Bronze 50 / Silver 150 / Gold 400).
+## Peti hadiah / Chests (Main Menu -> Events -> tab Chests)
+- **Menang Arena = dapat 1 peti** (Journey, Tutorial, Battle Chess, dan kekalahan tidak). Grade ditentukan acak menurut difficulty (`ChestSystem.DROP_WEIGHTS`): Easy 70/25/5, Normal 55/33/12, Hard 35/45/20 (% Bronze/Silver/Gold). Layar hasil menampilkan peti yang didapat. Kemenangan tidak lagi membuka kartu Support baru (kartu hanya dari Shop).
+- **Batas perolehan: 6 peti** (`ChestSystem.DROP_LIMIT`). Setelah peti ke-6 didapat, kemenangan Arena berikutnya tidak memberi peti sampai **1 jam** (`DROP_REFRESH_SECONDS`) berlalu sejak batas tercapai; lalu jatah di-refresh ke 0 dan peti bisa didapat lagi. Tab Chests menampilkan "Chest drops: n/6" dan hitung mundur refresh; layar hasil menulis "Chest limit reached".
+- **4 slot**. Peti masuk ke slot kosong pertama dalam keadaan menunggu; tekan *Start unlocking* untuk menjalankan **timer** (jam nyata, tetap berjalan saat game ditutup). Hanya **satu peti** yang boleh membuka kunci pada satu waktu. Semua slot penuh = peti masuk **Storage** (di samping slot, kapasitas 12, `ChestSystem.STORAGE_CAPACITY`); tombol *To slot* memindahkannya ke slot kosong pertama (menunggu, belum jalan timernya). Hanya bila Storage juga penuh, peti langsung jadi coin (Bronze 50 / Silver 150 / Gold 400).
 - **Timer**: Bronze 15 menit, Silver 1 jam, Gold 4 jam. **Open now** melewati sisa timer dengan Crystal (1 Crystal per 30 menit tersisa, dibulatkan ke atas, ada konfirmasi).
-- **Isi** (rentang, peluang): Bronze = Coins 60-120, Fragments 5-15 (70%), Chips 50-150 (40%), Tiket 1 (10%), XP 20-40. Silver = Coins 150-300, Fragments 20-45, Chips 150-400 (70%), Tiket 1-2 (40%), Crystal 1 (20%), XP 60-110. Gold = Coins 400-800, Fragments 60-140, Chips 500-1200 (90%), Tiket 2-4 (80%), Crystal 1-3 (60%), XP 150-260, plus 25% membuka Support card berikutnya. Semua angka ada di `ChestSystem.GRADE_DATA`.
-- Tersimpan di save (`chests`: slots + opened); save lama otomatis mendapat 4 slot kosong. Menu utama menampilkan "Chests (N ready!)" bila ada peti siap.
-- Kode: `scripts/systems/chest_system.gd`, `scripts/ui/chests.gd`, `scenes/chests/chests.tscn`. Tes: `godot --headless --path . res://tests/chest_test.tscn` -> `CHEST TEST RESULT: PASS`.
+- **Isi** (rentang, peluang): Bronze = Coins 60-120, Fragments 5-15 (70%), Chips 50-150 (40%), Tiket 1 (10%), XP 20-40. Silver = Coins 150-300, Fragments 20-45, Chips 150-400 (70%), Tiket 1-2 (40%), Crystal 1 (20%), XP 60-110. Gold = Coins 400-800, Fragments 60-140, Chips 500-1200 (90%), Tiket 2-4 (80%), Crystal 1-3 (60%), XP 150-260. Semua angka ada di `ChestSystem.GRADE_DATA`.
+- Tersimpan di save (`chests`: slots + opened + storage + drops + limit_at); save lama otomatis mendapat 4 slot kosong. Tombol Events di menu utama menampilkan "Events (N to claim!)" bila ada peti siap (dihitung bersama misi/achievement yang belum diklaim); tab Chests juga menampilkan jumlah peti siap.
+- Kode: `scripts/systems/chest_system.gd`, `scripts/ui/chests_panel.gd` (dipakai tab Chests di `scenes/events/events.tscn`). Tes: `godot --headless --path . res://tests/chest_test.tscn` -> `CHEST TEST RESULT: PASS`.
 
 ## Events (Main Menu -> Events, tepat di atas Settings)
-- Dua tab: **Mission** dan **Achievement**. Entri yang selesai tampil di atas dengan tombol **Claim**; angka di tab = jumlah hadiah yang belum diambil, menu utama menampilkan "Events (N to claim!)".
+- Tiga tab: **Mission**, **Achievement**, dan **Chests** (4 slot peti, lihat bagian Peti hadiah). Entri yang selesai tampil di atas dengan tombol **Claim**; angka di tab = jumlah hadiah yang belum diambil, menu utama menampilkan "Events (N to claim!)".
 - **Mission**: 4 misi harian, diundi dari 8 misi (`EventHub.MISSION_POOL`) dengan seed tanggal (daftar sama seharian, berganti tiap tengah malam waktu lokal; ada hitung mundur reset). Progres dan klaim ikut di-reset.
 - **Achievement**: 16 target permanen (menang, main, Arena, Battle Chess, peti, gacha, level, trofi, jumlah coin) di `EventHub.ACHIEVEMENTS`.
 - Hadiah: coin, fragment, tiket, Crystal, chip, XP. Progres dihitung lewat `EventHub.track(metric, n)` dari `SaveManager.record_match` / `record_practice`, `ChestSystem.open`, dan `ShopSystem.pull_batch`. Disimpan di save (`events`).
 - Kode: `scripts/systems/event_hub.gd`, `scripts/ui/events.gd`, `scenes/events/events.tscn`. Tes: `godot --headless --path . res://tests/event_test.tscn` -> `EVENT TEST RESULT: PASS`.
 
 ## Shop (Main Menu -> Shop, di atas Profile)
-- Mata uang: **Aether Coins** (disimpan di save, mulai 600). Hadiah match tergantung difficulty (lihat bagian "Nyawa & hadiah per difficulty"). **Battle Chess** juga memberi coin: menang +75, kalah/seri +15 (`ShopSystem.PRACTICE_WIN_REWARD` / `PRACTICE_LOSS_REWARD`, `SaveManager.record_practice`); tidak mengubah statistik, progres Journey, atau membuka kartu.
-- Tab **Gacha**: Pull x1 = 100, Pull x10 = 900 (10 kartu, minimal 1 Rare). Rate: Common 60 / Rare 28 / Epic 10 / Legendary 2 (%).
-  Pity: Epic atau lebih dijamin paling lambat pull ke-30. Kartu duplikat diubah jadi **Card Fragment** (Common 10, Rare 25, Epic 60, Legendary 150), disimpan di save (`wallet.fragments`) dan ditampilkan di header Shop.
-- Tab **Buy Cards**: beli langsung Support yang masih terkunci (filter per kategori). Harga: Common 200, Rare 500, Epic 1200, Legendary 3000.
-  Atau **tukar dengan fragment** lewat tombol *Exchange* di panel yang sama: makin langka kartunya makin banyak fragment (Common 50, Rare 150, Epic 400, Legendary 1000; `ShopSystem.exchange`).
+- Rincian lengkap ada di bagian "Shop, unit terkunci & jalur trofi" di bawah (4 tab: Card Gacha, Buy Card, Gamble, Exchange). Gacha dibayar **Tiket** (bukan coin), kartu terkunci dibeli dengan **Crystal** atau **Fragment**, dan coin diubah ke tiket / fragment / chip lewat Exchange.
+- Mata uang: **Aether Coins** (mulai 600), Fragments, Gacha Tickets, Crystals, Chips (disimpan di `wallet` pada save). Hadiah match tergantung difficulty (lihat "Nyawa & hadiah per difficulty"). **Battle Chess** juga memberi coin menurut difficulty (Easy +50 / +10, Normal +75 / +15, Hard +150 / +25 untuk menang / kalah-seri; `ShopSystem.PRACTICE_WIN_BY_DIFF` / `PRACTICE_LOSS_BY_DIFF`); tidak mengubah statistik, progres Journey, atau membuka kartu.
+- Rate gacha: Common 60 / Rare 28 / Epic 10 / Legendary 2 (%), pity Epic+ di pull ke-30 (`ShopSystem.RATES`, `PITY_LIMIT`). Duplikat jadi Fragment.
 - Tes: `godot --headless --path . res://tests/shop_test.tscn` -> `SHOP TEST RESULT: PASS`; `ui_shop_smoke.tscn` -> `UI SHOP SMOKE: PASS`.
 
 ## UX geser (scroll)
@@ -51,22 +52,23 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - Geseran yang dimulai di atas tombol membatalkan tekan tombol itu setelah melewati dead zone, jadi melepas jari tidak ikut menekan tombol. Slider, scrollbar, LineEdit/TextEdit tetap `STOP`.
 
 ## Shop, unit terkunci & jalur trofi
-- **Shop** punya 6 tab: **Support Gacha**, **Unit Gacha**, **Buy Support**, **Buy Unit**, **Exchange**, **Gamble** (`scripts/ui/shop.gd`, logika di `ShopSystem`). Mata uang di dompet: Aether Coins, Fragments, **Gacha Tickets**, **Crystals**, **Chips**.
-- **Gacha** bisa dibayar Coins atau Tiket (1 pull = 1 tiket, 10-pull = 9 tiket). Unit Gacha hanya mengeluarkan kartu unit Rare (85%) / Epic (15%) dari benua yang sudah terbuka, pity Epic di pull ke-20, duplikat jadi fragment.
-- **Buy Support / Buy Unit**: beli kartu terkunci dengan Coins, **Crystals** (kristal = beli kartu), atau tukar Fragments. Harga unit: Rare 400 coin / 2 kristal / 120 fragment, Epic 1000 / 4 / 300.
-- **Exchange** (`ShopSystem.EXCHANGES`): 100 coins = 1 tiket; 3 tiket = 1 kristal; 100 coins = 100 chip; 100 chip = 80 coins; 10 fragment = 20 coins; 50 coins = 10 fragment. Bolak-balik selalu rugi, tidak bisa untung. Chip dipakai di tab **Gamble**.
+- **Shop** punya 4 tab: **Card Gacha** (3 pool: Unit + Support, Unit, Support), **Buy Card** (Support + Unit jadi satu), **Gamble**, **Exchange** (`scripts/ui/shop.gd`, logika di `ShopSystem`). Mata uang di dompet: Aether Coins, Fragments, **Gacha Tickets**, **Crystals**, **Chips**.
+- **Gacha** hanya bisa dibayar **Tiket** (1 pull = 1 tiket, 10-pull = 9 tiket); Coins tidak bisa lagi dipakai langsung. **Card Gacha** punya 3 pool yang dipilih lewat tombol di panel kiri: **Unit + Support** (default), **Unit**, dan **Support**. *Unit + Support*: rarity diundi dulu (Common 60 / Rare 28 / Epic 10 / Legendary 2 %), lalu kartu diambil dari pool berisi semua kartu Support rarity itu ditambah kartu unit Rare/Epic dari benua yang sudah terbuka. *Support*: sama tapi tanpa unit. *Unit*: hanya kartu unit Rare (85%) / Epic (15%) dari benua yang sudah terbuka. Pity: Epic+ dijamin di pull ke-30 (dipakai bersama oleh pool Unit + Support dan Support), pool Unit punya pity sendiri (Epic di pull ke-20). 10-pull Unit + Support / Support minimal 1 Rare, duplikat jadi fragment.
+- **Animasi grafis Gacha** (`scripts/ui/gacha_stage.gd`, digambar dengan kode seperti `gamble_stage.gd`): saat Pull, lingkaran sihir berputar, partikel tersedot ke orb yang makin terang, lalu ledakan cahaya + cincin + sinar berwarna rarity terbaik di batch itu (Common 1,1 dtk, Rare 1,45, Epic 1,85, Legendary 2,4). Kartu baru muncul saat ledakan. Hasil undian sudah ditentukan `ShopSystem.pull_batch`; animasi hanya memutarnya. Mode **Lite** melewati animasi.
+- **Buy Card** (kartu Support dan unit dalam satu tab; filter All / Unit / Support): beli kartu terkunci dengan **Crystals** atau tukar Fragments (tidak bisa dengan Coins). Harga unit: Rare 2 kristal / 120 fragment, Epic 4 / 300.
+- **Exchange** (`ShopSystem.EXCHANGES`): jumlah pack dipilih dengan **slider** (tombol - dan + di sampingnya, maksimum = sebanyak yang mampu dibayar), lalu tekan *Exchange*; urutan di tab: 100 coins = 1 tiket (tiket tidak bisa ditukar ke kristal; kristal hanya dari peti, misi, dan achievement); 50 coins = 10 fragment; 100 coins = 100 chip; 10 fragment = 20 coins; 100 chip = 80 coins. Bolak-balik selalu rugi, tidak bisa untung. Chip dipakai di tab **Gamble**.
 - **Gamble (judi)**: mini game uang cepat, taruhan dan hadiah hanya dalam **Chip** (bet 100/500/1000/5000; ubah kemenangan jadi coins lewat Exchange). Coin Flip (menang 48%, bayar x2), Dice 2 dadu (Low/High x2.3, Seven x5.5), Slots 3 reel (tiga 7 x30, tiga sama x8, dua sama x1.5). Semua punya house edge kecil (~95% return, diuji simulasi). Logika: `ShopSystem.gamble`.
 - **Kartu unit terkunci** (mekanik Clash Royale): pemain baru hanya punya 15 tipe unit starter (8 Pawn + 7 bidak Solvaris = deck default). Sisanya hanya bisa dipakai di deck setelah didapat dari Shop. Deck tidak pernah memakai unit yang belum dimiliki (`Deck.owned_filter`). Save lama (semua unit dimiliki) tetap utuh (`unit_cards_v`).
 - **Journey = jalur trofi**: menang +trofi, kalah -trofi (Easy +20/-30, Normal +30/-20, Hard +40/-10; `trophy_win`/`trophy_loss` di balance.json). Trofi tidak turun di bawah ambang benua tertinggi yang terbuka. Benua terbuka otomatis di `unlock_trophies` (Aetherion 0, Arcanum 150, Machina 400, Sylvaris 700, Drakmor 1100, Thalassia 1600, Eclipsia 2200), dan kartu unitnya masuk Shop (tidak langsung bisa dipakai).
 
 ## Nyawa & hadiah per difficulty
 - **Nyawa (Life)** awal semua penguasa dalam match mengikuti difficulty: **Easy 5, Normal 3, Hard 1** (`data/balance.json` -> `life_by_difficulty`, `GameData.life_for`). Angka ini juga batas maksimal heal (Territory Shop, Royal Pardon, dadu Healing, dst.): `PlayerState.max_life`. Pada Hard, kekalahan duel atau bangkrut pertama langsung menyingkirkan penguasa. Tutorial memakai AI Normal dan 3 Life. Tersimpan di save/resume (`max_life`, `difficulty`); save lama dianggap 3.
-- **Hadiah Aether Coins setelah match** (Journey / Arena, `ShopSystem.WIN_REWARD_BY_DIFF` / `LOSS_REWARD_BY_DIFF`): Easy menang +100 / kalah +25, Normal +150 / +50, Hard +300 / +75. Bonus random-map Arena dihitung dari hadiah menang difficulty yang dipilih.
+- **Hadiah Aether Coins setelah match** (Journey / Arena, `ShopSystem.WIN_REWARD_BY_DIFF` / `LOSS_REWARD_BY_DIFF`): Easy menang +100 / kalah +25, Normal +150 / +50, Hard +300 / +75. Bonus random-map Arena (hanya saat menang) dihitung dari hadiah menang difficulty yang dipilih; bonus benua berupa persen/tambahan coin dan **XP** (bukan lagi fragment: Arcanum +20 XP, Sylvaris +15 XP +15 coins, Eclipsia +25 XP; data di `data/continents.json` -> `random_bonus.xp`). Bonus XP digabung dengan XP match sehingga ikut memicu hadiah naik level.
 - **Battle Chess** (`PRACTICE_WIN_BY_DIFF` / `PRACTICE_LOSS_BY_DIFF`): Easy +50 / +10, Normal +75 / +15, Hard +150 / +25. Battle Chess tidak memakai Life.
 - Layar New Match menampilkan Life dan hadiah difficulty yang sedang dipilih; layar hasil menampilkan difficulty di baris coin. Taruhan (wager) tetap memakai pengali odds sendiri di atas hadiah ini.
 
 ## Taruhan / Wager (Arena dan Battle Chess)
-- Sebelum bertanding pemain bisa mempertaruhkan **Aether Coins**: None / 50 / 100 / 250 / 500 / 1000 (chip yang melebihi saldo nonaktif). Journey dan Tutorial tidak punya taruhan.
+- Sebelum bertanding pemain bisa mempertaruhkan **Aether Coins** lewat **slider kelipatan 10** (0 = None, maksimal 1000, tombol - / + menggeser 10; batas atas mengikuti saldo, `ShopSystem.WAGER_STEP` / `WAGER_MAX`). Journey dan Tutorial tidak punya taruhan.
 - **Arena**: panel *Wager* ada di kolom Match (di bawah Difficulty). **Battle Chess**: menekan kartunya membuka dialog kesulitan + taruhan, lalu tombol FIGHT.
 - Stake dibayar **saat match dimulai** (`SaveManager.place_wager`). Menang: dibayar **stake x odds** (stake sudah termasuk), kalah: stake hangus. Battle Chess seri: stake dikembalikan.
   Keluar di tengah Battle Chess = stake hangus. Arena: stake ikut tersimpan di match yang bisa dilanjutkan (`MatchController.wager`), diselesaikan satu kali (`wager_settled`).
@@ -76,12 +78,18 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - **4 monster per benua** (7 benua = 28 monster, semuanya berbeda: nama, stat, dan buff; data di `data/monsters.json`). Satu monster untuk tiap region (Utara/Timur/Selatan/Barat), masing-masing bersembunyi di **petak Territory acak** region itu.
   Lokasinya diacak tiap match (seed yang sama = lokasi yang sama) dan **tidak pernah ditampilkan di peta**: `describe_tile`, papan, dan info petak tidak menyebutnya. Pemain baru tahu setelah **mendarat** di petak itu. Match Tutorial tidak punya monster.
 - **Bertemu monster**: mendarat di petak berisi monster -> pilih **Fight** atau **Flee** (`pending.type = "monster"`, tombol keputusan biasa). Setelah itu petak diproses seperti biasa (beli / sewa / duel).
-  Fight = auto battle (`MonsterSystem.fight`): pasukan permanen pemain yang dipasang otomatis + King (Last Stand) melawan monster. Tidak membeli unit dan kartu Support tidak terpakai.
+  **Fight (pemain manusia di game)** = pertarungan di layar Battle seperti Duel (`MatchController.monster_battles_interactive`, state `AWAIT_DUEL` dengan `pending.type = \"monster_battle\"`): fase persiapan (beli unit dengan Dominion Gold, deploy, Level Up, kunci formasi), kartu Support dan skill King bisa dipakai, lalu auto battle melawan monster liar. Gold yang dibelanjakan permanen, sama seperti Duel. Menang = Kartu Monster; kalah atau seri/timeout = bayar `monster_defeat_gold` dan monster tetap di sarang. Hasil dilaporkan lewat `MatchController.finish_monster_battle`.
+  AI dan simulasi tanpa UI tetap memakai auto battle instan (`MonsterSystem.fight`: pasukan permanen dipasang otomatis + King Last Stand, tanpa beli unit dan tanpa kartu Support).
   Kalah = kehilangan `monster_defeat_gold` (50 G) dan monster tetap di sarangnya; kabur = gratis.
 - **Menang = dapat Kartu Monster**, **maksimal 1 per pemain**. Pemain yang sudah punya kartu berjalan melewati monster lain tanpa terjadi apa-apa (monster tetap tersembunyi). Monster yang sudah dikalahkan hilang untuk semua pemain (`monster_unique`: true di `balance.json`; set `false` agar tiap pemain bisa mengalahkan monster yang sama).
-- **Membantu King di Duel**: saat King masuk lewat Last Stand, monster ikut turun di samping King dan bertarung di pihak yang sama, dengan stat **75%** dari monster liar (`monster_ally_stat_mult`). Buff monster (armor, burn, regen, aura ATK, dst.) memakai efek buff kartu yang sudah ada. Berlaku untuk duel pemain maupun AI (`BattleEngine` side config key `"monster"`, `BattlePrep.to_side_cfg(..., monster_id)`).
+- **Membantu King di Duel**: saat King masuk lewat Last Stand, monster ikut turun di samping King dan bertarung di pihak yang sama, dengan stat setara **King di level yang sama dengan King pemain saat kartunya didapat**: stat monster liar x pengali level itu (Lv 1 = x1,0 / x1,0, Lv 2 = HP x1,35 / ATK x1,25, Lv 3 = HP x1,8 / ATK x1,5, `CommanderSystem`). Level disimpan di `PlayerState.monster_star` (= `commander_star` saat menang) dan **tetap** walau King naik level setelahnya; ikut tersimpan di save/resume (`mstar`, save lama memakai level King saat ini). Dikirim ke engine lewat side config `monster_star` (`BattlePrep.to_side_cfg`). Buff monster (armor, burn, regen, aura ATK, dst.) memakai efek buff kartu yang sudah ada. Berlaku untuk duel pemain maupun AI (`BattleEngine` side config key `"monster"`, `BattlePrep.to_side_cfg(..., monster_id)`).
+- **Skill aktif Monster** (dipakai seperti skill King): tiap dari 28 monster punya skill aktif sendiri di `data/monsters.json` (`skill_id`, `active_name`, `active_value`, `active_desc`; memakai mekanik skill King yang sama: Sun Judgment, Inferno Burst, Banner of Iron, Rift Strike, Chrono Stasis, dst., jadi efeknya sudah ada di `BattleEngine._apply_active_skill`). Kekuatannya mengikuti ATK/HP monster, jadi kekuatan skill sekutu mengikuti level monster (Lv 1-3).
+  - **Sekutu (Kartu Monster)**: skill dipakai **manual, sekali per battle** lewat tombol baru di panel King (di bawah tombol skill King), setelah monster ikut turun bersama King. Biaya **energi** `monster_skill_energy` = 5 (sumber energi yang sama dengan Support dan skill King; King punya biaya `king_skill_energy` = 6). Skill King dan skill Monster masing-masing sekali pakai dan tidak saling mengunci. Tombol menampilkan biaya, sisa energi, "(used)" atau "(the Monster has fallen)" bila monster sudah tumbang. Sisi AI / auto memakainya otomatis: skill King dulu, lalu skill Monster begitu energi cukup, dan AI tidak memainkan Support selagi menunggu keduanya.
+  - **Monster liar**: memakai skill-nya **sekali, otomatis, gratis** saat ada musuh dalam jarak 3 petak. Matikan lewat `wild_monster_skill: false` di `balance.json`.
+  - API engine: `can_use_monster_skill(side)`, `use_monster_skill(side)`, `monster_energy_cost()`, `ally_monster(side)`, `monster_skill_used`, `monster_unit`. Ringkasan monster (`MonsterSystem.summary`, tooltip di Territory Board) kini menampilkan baris "Skill - nama: deskripsi". Tes: `monster_test` (`_test_skill_data`, `_test_manual_monster_skill`, `_test_auto_monster_skill`, `_test_all_monster_skills`, `_test_wild_monster_skill`).
 - UI: kartu pemain menampilkan "Monster: nama" (tooltip = stat + buff); popup hasil untuk pemain manusia; panel King di layar Battle menampilkan kartu monster. Tersimpan di save/resume (`monsters`, `PlayerState.monster_id`); save lama tanpa monster tetap bisa dimuat.
-- Keseimbangan (diukur dengan 14 game AI per benua): kekuatan tiap monster dikalibrasi agar kira-kira **60% menang di pertengahan game (ronde ~14)**, sulit di awal (pasukan 3 pion hampir pasti kalah), dan makin mudah seiring pasukan tumbuh. Kartu monster menaikkan peluang menang duel rata-rata sekitar 15 poin persen pada pasangan pasukan yang seimbang.
+- **Level monster liar = level King yang menantangnya**: stat di `data/monsters.json` adalah stat dasar (Lv 1); monster liar bertarung dengan pengali level King penantang (Lv 1 = x1,0 / x1,0, Lv 2 = HP x1,35 / ATK x1,25, Lv 3 = HP x1,8 / ATK x1,5, `CommanderSystem`), jadi HP liar 325-490 di Lv 1 dan 585-882 di Lv 3 (ATK 26-35 di Lv 1, 39-53 di Lv 3). Level dikirim ke engine lewat side config `foe_star` (= `commander_star` pemain, juga di `MonsterSystem.fight` untuk AI dan di layar Battle untuk pemain manusia). Skill dan buff liar ikut menyesuaikan karena dihitung dari stat itu. Ringkasan monster (`MonsterSystem.summary`) dan pesan Fight / Flee menampilkan "Lv n"; kekuatan yang dipakai AI untuk memutuskan Fight / Flee (`MonsterSystem.power(id, star)`) memakai level King AI itu sendiri. Naik level King berarti monster liar berikutnya juga lebih kuat, sedangkan Kartu Monster yang sudah didapat tetap di level saat didapat.
+- **Stat setara King, bukan setara unit**: HP dasar monster **325-490** dan ATK dasar **26-35**, sejajar dengan King di `data/champions.json` (HP 310-490, ATK 26-35); unit biasa hanya HP 50-290 dan ATK 6-28. Urutan antar-monster dipertahankan (Gearwork Behemoth 490 HP paling tebal, Cinder Phoenix 325 HP paling tipis; Voltage Arc Hound dan Chrono Foundry Drone ATK 35 paling kuat). Sebagai sekutu stat-nya mengikuti level King saat didapat (Lv 1 = stat liar, Lv 3 = HP 585-882 dan ATK 39-53); nama monster di panel King dan tooltip Territory Board menampilkan "Lv n". Rentang lama (HP 600-1510, ATK 22-53) sudah tidak dipakai; kalibrasi lama (~60% menang di ronde ~14) tidak berlaku lagi dan belum diukur ulang, jadi pasukan penuh sekarang kemungkinan jauh lebih mudah mengalahkan monster. Penyesuaian lewat `data/monsters.json` (hp / atk) dan pengali level di `commander_star_hp_mult` / `commander_star_atk_mult`.
 - Kode: `scripts/systems/monster_system.gd`, `MatchController._meet_monster` / `_answer_monster`, `AIController._monster_choice`. Tes: `godot --headless --path . res://tests/monster_test.tscn` -> `MONSTER TEST RESULT: PASS`.
 
 ## Tambang & harta karun tersembunyi di Territory
@@ -117,7 +125,7 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - Roll Dice (2xD6). Double / event "Time Surge" = lempar lagi (maks 2 bonus).
 - **Kartu Event** (12, `data/events.json`): Hidden Treasure, Royal Levy, Tailwind, Sudden Storm, Blessing of Fortune, Grand Festival, Bandit Ambush, Time Surge, Special Die, plus **Bull Market** (semua saham +20%), **Market Crash** (semua saham -20%), **Lucky Chip** (taruhan Casino gratis).
 - Reroll Token: ulang lemparan sebelum bergerak (beli di Shop / event / passive Elarion).
-- Wilayah kosong: beli. Wilayah lawan: bayar Tax (rent). Mayoritas region (6/10) x1.5, Regional Dominion (10/10) x2.5.
+- Wilayah kosong: **Beli** atau **Sewa**. Sewa (`balance.json` -> `lease_cost_ratio` 0,3 dan `lease_rounds` 4): bayar 30% harga, wilayah jadi milikmu selama 4 ronde dan menarik rent seperti biasa, lalu kembali kosong. Selama disewa: tidak bisa di-upgrade, tidak dihitung net worth, tidak dihitung bonus region (6/10 dan Dominion), tidak ikut dijual paksa saat bangkrut. Mendarat di wilayah sewaanmu sendiri menawarkan **Buy out** seharga sisa harga (harga - biaya sewa), yang membuatnya permanen. Menaklukkan wilayah sewaan lewat duel membuatnya permanen bagi penakluk; pemain yang tereliminasi melepas sewanya. AI Normal / Hard menyewa setengah waktu saat membeli akan menipiskan dompet dan masih ada sisa gold; AI Easy tidak menyewa. Tersimpan di save (`tiles` memuat sisa ronde dan biaya sewa; save lama tanpa sewa tetap bisa dimuat). Kode: `MatchController._do_lease` / `_do_redeem` / `_tick_leases`, `EconomySystem.lease_cost` / `redeem_cost`. Tes: `tests/rules_test.gd` (`_test_lease`). Wilayah lawan: bayar Tax (rent). Mayoritas region (6/10) x1.5, Regional Dominion (10/10) x2.5.
 - **Portal**: tiap sisi hanya punya **1 portal** (4 di papan, selalu aktif); mendarat di sana bisa warp ke portal sisi lain.
 - **Bank & Saham** (ikon grafik hijau, 2 per sisi = 8): investasi gold 100 / 250 / 500. Pasar bergerak tiap ronde (acak -20% s/d +30%, `stock_change_min/max`), berlaku untuk semua portofolio.
   Jual semua di Bank mana pun. Saham dihitung di net worth dan otomatis dicairkan lebih dulu saat harus bayar utang (sebelum tanah dijual). State: `PlayerState.stock_value/stock_basis`, `MatchController.market_change`, tersimpan di save.
@@ -133,7 +141,7 @@ Diuji dengan Godot 4.3 headless: import bersih, 60 game AI penuh selesai, UI smo
 - **Destiny Die** (Special Die ke-5, `data/special_dice.json`): dadu nasib baik/buruk, dibeli di Shop / dari Event, dipakai sebelum lempar dadu. 1 = bencana (-200 G), 2 = sial (-100 G), 3 = mundur 3 petak (petak itu diproses), 4 = +100 G, 5 = +200 G, 6 = +300 G + Reroll Token. Nilai di `fate_values` / `fate_detour` (`data/balance.json`); rugi dibayar lewat `_pay` (saham dicairkan dulu, lalu tanah dijual). Tidak ada petak Fate di papan.
 - **Casino** (tempat judi, ikon dadu merah, 1 per sisi = 4): taruhan 50 G (`casino_bet`). Hadiah: x2 (20%), x4 (10%), atau seluruh pot (2%, pot naik tiap taruhan, awal 200 G). Parameter di `data/balance.json` (`casino_*`).
 - Bangkrut = jual wilayah otomatis; jika tetap kurang -> -1 Life + bailout. Life 0 = tereliminasi.
-- Menang: lawan habis, atau ronde 40 -> net worth tertinggi.
+- Menang: lawan habis, atau saat batas ronde tercapai -> net worth tertinggi. Batas ronde berbeda per mode dan difficulty (Journey 20 / 30 / 40, Arena 30 / 40 / 50 untuk Easy / Normal / Hard; Tutorial 10).
 - Ketuk petak mana pun di papan untuk info detail.
 
 ## New Match (menu utama -> NEW MATCH)
@@ -145,7 +153,7 @@ Satu scene (`scripts/ui/match_setup.gd`) dengan dua tampilan. Tombol Back / Esc 
   (bebas benua mana saja, bukan berurutan): setup Journey menampilkan "Tap to unlock" di benua terkunci, lalu konfirmasi. Satu hak = satu benua; benua baru itu harus di-master untuk hak berikutnya.
   Faksi dari benua lain tidak dihitung untuk mastery benua ini (hint di setup menjelaskannya). Baris benua menampilkan "Factions won 2 / 4" atau "Mastered"; layar hasil menulis kemajuannya.
   Logika di `SaveManager`: `journey_won_factions`, `is_journey_cleared` (= mastered), `journey_picks_available`, `choose_continent`, `journey_frontier`; key save `journey_wins` (continent -> faksi yang menang).
-- **Arena**: match bebas melawan AI di benua yang sudah terbuka. Players: **1 vs 1**, **2 vs 2**, **4 Player**. **Tidak membuka benua** (kemenangan tetap memberi koin, statistik, dan kartu Support).
+- **Arena**: match bebas melawan AI di **semua benua playable (semuanya terbuka di Arena)**, termasuk yang belum dibuka lewat Journey. Players: **1 vs 1**, **2 vs 2**, **4 Player**. **Tidak membuka apa pun**: benua yang masih terkunci di Journey tetap terkunci, dan **King (faksi) serta Pawn benua itu tetap terkunci** di Card Hub (baris benua di setup menulis "Open  -  King & Pawn stay locked"). Kemenangan tetap memberi koin, statistik, dan peti (bukan kartu Support). Random map mengundi dari semua benua playable (`MatchSetup._open_continents`, `_is_continent_open`). **Musuh AI Arena** diundi dari faksi **seluruh benua playable** (bukan hanya 4 faksi benua map; faksi pemain dikecualikan, tiap faksi paling banyak satu kursi): config `any_continent_enemies` (`GameSession.to_match_config`, hanya kategori Arena) dibaca `MatchController.setup`. Journey dan Tutorial tetap melawan faksi benua yang sama. Buff King / kartu / Faction Synergy faksi asing tetap hanya aktif di benua asalnya.
   Flag `journey` ikut di config match (`GameSession.category`) dan di save/resume (`MatchController.journey`); `SaveManager.record_match(..., journey)` hanya membuka benua jika `journey` true.
 - **Faksi tidak dipilih di New Match.** Kolom kanan setup hanya menampilkan faksi + King dari Deck (read-only) dan tombol **Change faction in Deck**
   (membuka Card Hub -> Deck -> tab Faction; Back kembali ke New Match lewat `GameSession.collection_return`, `open_deck_tab`).
@@ -183,7 +191,7 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
   Asumsi: King/Champion tidak dihitung ke kapasitas deploy (hanya masuk saat Last Stand) — konfirmasi di Phase 4.
 - `BattleDeck`: tumpukan 135 kartu untuk Battle Shop (5 kartu per refresh, sisa kembali ke tumpukan).
 - Main Menu -> Card Hub (dulu "Card Hub"; nama di `GameSession.CARD_HUB_NAME`): satu layar dengan tiga tab. Tab Collection (filter, detail, stat 1/2/3 bintang), tab Deck (pilih Champion + tepat 15 Support, simpan ke save), dan tab **Info** (panduan: aturan dek, **Territory** (dadu, jenis petak, rent/region, Tax-Duel-Conquest, cara menang), 7 role + skill, sinergi faksi/role, dasar battle; semua angka dibaca dari data game). Card Hub juga bisa dibuka dari **Territory Board** (tombol Card Hub di kolom pemain): tampil sebagai overlay, match berhenti sementara (tidak disimpan/dimuat ulang), benua match dipulihkan saat ditutup, dan dek yang disimpan berlaku untuk match berikutnya.
-- Koleksi awal: semua unit x9 dan 15 dari 105 Support; 90 Support terkunci (cara membuka: tiap kemenangan membuka satu Support terkunci, lihat "Aturan tambahan").
+- Koleksi awal: semua unit x9 dan 15 dari 105 Support; 90 Support terkunci (cara membuka: Shop (Crystal); kemenangan match dan peti tidak lagi membuka kartu).
 
 ## Deck (Main Menu -> Card Hub -> tab Deck)
 - Editor bergaya Clash Royale: **deck sebagai kartu visual di kiri** (grid 3 x 5, lencana biaya capacity di tiap kartu, "avg cost" di judul) dan **koleksi di kanan** (5 kolom).
@@ -204,8 +212,9 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
 - Engine (`BattleEngine`, deterministik per seed): 1 tick = 0.25 detik; prioritas target per role (Assassin = HP terendah,
   Marksman/Mage = musuh terlemah dalam jangkauan, lainnya = terdekat), range Chebyshev, gerak BFS 8 arah,
   15 skill unit, Faction Synergy (2 unit sefaksi +5%, 4 = +15%, 6 = +30% HP/ATK) dan Role Synergy (2 unit semisi role +8%, 4 = +20%, 6 = +35%; Tank/Support = HP, Assassin/Mage/Marksman = ATK, Fighter/Controller = HP+ATK 60%).
-- **Champion Last Stand**: Champion hanya masuk arena saat semua unit biasa pihaknya kalah (dan langsung masuk jika tanpa unit),
-  lalu memakai skill aktifnya. Champion kalah = pihak itu kalah. HP Champion di battle = HP x3 (`champion_hp_mult`).
+- **Summon King**: pemain bisa memanggil King lebih awal tanpa menunggu unit habis dengan membayar energy (`king_summon_energy` = 8, tombol di panel King; `BattleEngine.summon_king`). AI tetap hanya lewat Last Stand.
+- **Champion Last Stand**: Champion otomatis masuk arena saat semua unit biasa pihaknya kalah (dan langsung masuk jika tanpa unit),
+  lalu memakai skill aktifnya. Champion kalah = pihak itu kalah. Stat King (HP 310-490, ATK 26-35) sengaja lebih besar daripada unit mana pun (maks HP 290 / ATK 25); tidak ada lagi pengali x3 (`champion_hp_mult` = 1.0).
 - **King di battle punya tiga hal terpisah**: **Pasif** (`data/king_passives.json`, aktif sejak battle mulai di benua mana pun: +HP/+ATK/-damage/shield untuk semua unit, atau +HP/+ATK King saat masuk); **Buff** (`data/king_buffs.json`, hanya di benua asal, melekat pada King saat masuk); **Aktif** = skill King
   (Sun Judgment, Starfall Decree, dst.) yang dipakai **manual, sekali** lewat tombol di panel King (kiri) setelah King masuk lewat Last Stand. Sisi AI / auto memakainya otomatis saat masuk.
   Engine: `manual_king` di cfg, `can_use_king_skill`, `use_king_skill`, `king_skill_used`; tes di `battle_test` (`_test_manual_king`).
@@ -229,12 +238,14 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
 - Duel = auto battle 8x8 antar **pasukan permanen** pemain: unit yang dibeli dengan Dominion Gold tetap dimiliki antar duel.
   Persiapan duel memakai batas belanja `battle_budget_ratio` (50% gold) untuk manusia; AI memakai rasio per tingkat kesulitan.
   Duel yang melibatkan pemain manusia tampil sebagai overlay Battle; duel AI vs AI diselesaikan instan (hasil masuk log).
-- Penyerang menang -> **Conquest** (ambil wilayah) atau **Victory Reward** (gold = 75% harga wilayah, wilayah tetap).
+- Penyerang menang -> **Conquest** (ambil wilayah) atau **Victory Reward** (gold = 75% dari harga wilayah + total biaya upgrade, wilayah tetap dan levelnya tetap). Saat Conquest, level upgrade wilayah direset ke 0.
+- Saat pemain manusia tidak bisa membayar (Tax, Refuse Duel, event kehilangan gold), muncul pilihan **utang**: jual lahan satu per satu (harga + upgrade x sell_ratio, level kembali 0), cairkan saham, **beli nyawa** (harga Restore Life), lalu **Pay**. Pilihan *Sell everything and settle* menjual semua lahan secara otomatis; bila masih kurang, kehilangan 1 Life dan bailout.
+- **Chaos Mode**: kartu sendiri di New Match > Offline, di sebelah kanan Arena. Pertandingan Arena (benua, taruhan, hadiah sama) di papan 40 petak: 4 sudut + 9 petak per sisi, 4 Territory per wilayah (majority 3, Regional Dominion 4), tetap 4 Portal. Dipilih lewat `GameSession.chaos_mode`; disimpan di save (`chaos`). Journey dan Tutorial selalu 100 petak.
 - Pemain yang kalah duel kehilangan 1 Life (spesifikasi bagian 6). Jika penyerang kalah: wilayah tetap. Jika pemilik kalah: penyerang
   memilih Conquest/Reward. `defender_loses_life=false` mengembalikan aturan "hanya penyerang yang kehilangan Life" (bagian 12).
   Life 0 = tereliminasi. Heal Life lewat Territory Shop (`heal_price`).
 - AI memutuskan Tax/Duel/Accept/Refuse dari estimasi kekuatan pasukan (`BattleAI.army_power`), jumlah Life, dan tingkat kesulitan.
-- Pemenang game: pemain terakhir yang hidup, atau net worth tertinggi di ronde 30 (`max_rounds`).
+- Pemenang game: pemain terakhir yang hidup, atau net worth tertinggi saat batas ronde tercapai. **Batas ronde berbeda per mode dan difficulty** (`balance.json` -> `round_limit_by_mode`, `GameData.round_limit_for`, dikirim lewat `GameSession.to_match_config` -> `round_limit`): Journey Easy 20 / Normal 30 / Hard 40; Arena Easy 30 / Normal 40 / Hard 50. Tutorial tetap 10; `max_rounds` (30) hanya cadangan jika config tidak membawa `round_limit`. Match yang disimpan membawa `round_limit`-nya sendiri.
 
 ## Tuning keseimbangan (`tools/balance_report`)
 Alat ukur: `godot --headless --path . res://tools/balance_report.tscn -- games=600 mode=mixed seed_base=300 rent_rate=0.4`
@@ -262,12 +273,13 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 - Performa (desktop; ponsel kelas bawah ~5-10x lebih lambat): tick battle terburuk 1.3 ms (timer 250 ms), satu game AI penuh 76 ms,
   satu duel AI instan <= 13 ms, memori logika ~18 MB, 0 kebocoran setelah 40 game dan 75 siklus buat/hapus scene.
   `low_processor_mode` aktif (hemat baterai), max FPS 60, renderer GL Compatibility.
+- **Cek update** (`UpdateCheck`, `UpdateInstaller`): di Android, saat aplikasi dibuka (bisa dimatikan lewat Settings -> Auto-check updates, dan versi tertentu bisa dilewati) game membaca GitHub Release terbaru (aset `MultiverseDominion.apk`); bila versinya lebih baru, menu utama menawarkan unduh di dalam game lalu membuka installer Android (pemain tetap menekan konfirmasi sekali; perlu izin "Install unknown apps"). Jika offline atau gagal, ada jalan keluar ke halaman Release di browser. Tes: `update_test`.
 - Ekspor: `export_presets.cfg` (arm64-v8a + armeabi-v7a, permission INTERNET saja (cek update), tests/tools dikecualikan); paket data 218 KB (95 file)
   berjalan dari luar folder proyek tanpa error.
 
 ## Konten (Phase 6)
 - **7 benua dapat dimainkan**, masing-masing 4 regional bernama, 10 awalan nama wilayah, 4 faction, dan 1 world modifier.
-  Benua selain Aetherion dibuka lewat Journey: master sebuah benua (menang dengan ke-4 faksinya) lalu pilih satu benua terkunci untuk dibuka (Arena tidak membuka apa pun; tidak ada fitur "Unlock all").
+  Benua selain Aetherion dibuka lewat Journey: master sebuah benua (menang dengan ke-4 faksinya) lalu pilih satu benua terkunci untuk dibuka (Arena bisa dimainkan di semua benua tetapi tidak membuka apa pun; tidak ada fitur "Unlock all").
 - **28 Champion berbeda** (`data/champions.json`): 10 passive papan x 11 skill aktif Last Stand, nilai tiap Champion beda dan dibaca dari data
   (`passive_value`, `active_value`). Passive: Royal Treasury, Shadow Ledger, Landlord, Fortune Weave, Toll Keeper, Treasure Hunter,
   Spoils of War, Quartermaster, Mender, Vanguard. Aktif: Sun Judgment, Starfall Decree, Eclipse Veil, Banner of Iron, Inferno Burst,
@@ -292,16 +304,18 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
   lifesteal, chill, opener, rage, last_rites, death_burst, mend_self, swift, guard, opening_shield, regen, second_life.
 - **Semua 21 efek Support berfungsi.** Efek yang butuh target (Crown of Valor, Aegis Shield, Windboots) memilih target otomatis
   (unit terkuat / tertangguh) - TODO: pilih target manual. Mercenary Pact dan Merchant Contract bekerja otomatis di fase persiapan.
-- Penyetelan konten: win rate tiap faction di 7 benua berada di kisaran 22-27% (ideal 25%) pada 400-700 game AI per benua.
+- Penyetelan konten: pengukuran lama menunjukkan win rate tiap faction 22-27% (ideal 25%). **Pengukuran ulang (Godot 4.7, 300 game AI per benua, dua set seed, galat sekitar +/-2,5 poin) tidak lagi memenuhi itu**: Inferna 11-13%, Solvaris 16-18% (faksi bawaan dan faksi Tutorial), Verdantia 18%, Voltrix 19-20% di bawah ideal; Warborn / Bloodfang 32-33%, Terragorn 30-32%, Nocthyr 29-31% di atas. Arcanum, Thalassia dan Eclipsia relatif rata (20-30%). Urutan giliran adil (kursi pertama 22-31% tergantung seed).
+- Difficulty (simulasi AI vs AI di Aetherion, 200 game per sel): selisih Normal vs Hard kecil dibanding selisih hadiahnya. Pemain ber-skill Normal menang 1v1 sebesar 51,5% di Normal dan 47,5% di Hard, tetapi Hard membayar 300 / 75 coin (Normal 150 / 50) dan trofi +40 / -10 (Normal +30 / -20), sehingga Hard unggul sebagai pilihan di semua tingkat skill. Pemain skill Easy di Arena Normal tersingkir sebelum game selesai 55% (Hard 87%). Belum diuji dengan pemain manusia.
 
 ## Struktur
-- `data/` balance.json (semua angka ekonomi), continents.json (7 benua / 28 faction), champions.json, events.json
-- `scripts/managers/` GameData, SaveManager (user://save.json), GameSession (autoload)
-- `scripts/entities/` BoardTile, PlayerState
-- `scripts/systems/` BoardBuilder (100 petak), DiceSystem, PortalSystem, EconomySystem, EventSystem, MatchController (aturan permainan)
-- `scripts/ai/ai_controller.gd` AI Easy/Normal/Hard
-- `scripts/ui/` tema, menu, setup, BoardView (digambar dengan _draw), layar Territory Board
-- `tests/` sim_test, ui_smoke
+- `data/` balance.json (semua angka ekonomi, termasuk `life_by_difficulty`, `start_gold_by_difficulty`, `round_limit_by_mode`), continents.json (7 benua / 28 faksi), champions.json, cards.json, card_buffs.json, king_buffs.json, king_passives.json, monsters.json, deposits.json, events.json, continent_flavor.json, special_dice.json, map_skins.json
+- `scenes/` main_menu, match_setup, territory_board, battle_board, deck_builder, card_collection (Card Hub), shop, events, settings
+- `scripts/managers/` GameData, SaveManager (user://save.json), GameSession (autoload, config match), AppNav (tombol Back), Sfx
+- `scripts/entities/` BoardTile, PlayerState, BattleUnit, UnitInstance
+- `scripts/systems/` aturan Territory (BoardBuilder, DiceSystem, PortalSystem, EconomySystem, EventSystem, MatchController, WorldMods, Terrain, DepositSystem, MonsterSystem), kartu dan battle (CardDatabase, Deck, BattleDeck, UnitRoster, CapacitySystem, CommanderSystem, BattleEngine, BattlePrep, ChessMove), meta (ShopSystem, ChestSystem, EventHub, XpSystem, TutorialGuide, FxMode, UpdateCheck, UpdateInstaller)
+- `scripts/ai/` ai_controller.gd (AI Territory Easy/Normal/Hard), battle_ai.gd (AI battle)
+- `scripts/ui/` tema, menu, setup, BoardView (digambar dengan _draw), layar Territory / Battle, Card Hub, Shop, Events, panel Chests / Wager, seni prosedural
+- `tests/` sim_test, ui_smoke dan tes per fitur (lihat bagian Menjalankan); `tools/` balance_report, run_tests.sh, install_android_template.sh
 
 ## Export Android (Phase 7, belum diuji di perangkat)
 Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor landscape (landscape dua arah: layar ikut terbalik saat ponsel diputar 180°, tidak pernah portrait). Butuh Android SDK + JDK + keystore.
@@ -318,7 +332,7 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
   Order (lempar ekstra / lawan berikutnya lewat giliran / token / gold), Destiny (dadu nasib baik/buruk), **Thief** (curi 20-60 G dari lawan terkaya; sisi terakhir tertangkap, denda 30 G),
   **Broker** (portofolio saham -10% s/d +50%; tanpa saham dapat modal gratis 100 G). Sumber: kartu Event dan Territory Shop (120 G); maks 3 dibawa; dipakai
   sebelum melempar. AI memakainya. Tersimpan di save. (Sumber dari Champion dan Rule Card belum ada.)
-- **Kartu baru**: tiap kemenangan membuka satu dari 90 Support yang terkunci (urutan tetap: 6 kartu awal, lalu common -> rare -> epic -> legendary). Pool unit baru belum ada.
+- **Kartu baru**: kemenangan match tidak lagi membuka Support terkunci (dihapus); kartu didapat dari Shop (gacha, Buy Card) dan peti. Kartu unit Rare / Epic benua yang terbuka masuk pool gacha Unit; varian kartu unit pengganti belum ada.
 - **Seni prosedural** (`Art`, `PortraitView`; tanpa file gambar): siluet 6 bidak catur, 7 lambang benua, 7 ikon kategori Support, potret perisai
   Champion. Dipakai di kartu, token battle, dan pemilihan Champion. Galeri: `docs/screenshots/art_gallery.png`.
 - **Audio** (`Sfx`): 11 efek suara disintesis dari kode (klik, dadu, koin, pukulan, gugur, sihir, portal, menang/kalah, dll), bisa dimatikan di Settings.
@@ -329,29 +343,37 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
   - *10 Rounds*: 10 battle berturut-turut dengan pasukan yang sama. Menang jika jumlah round menang > kalah, seri jika sama.
   - *Survival*: lanjut terus sampai kalah pertama. Seri tidak mengakhiri run.
   - Antar round: pasukan, gold, level dan kartu Support tetap; dapat income gold (150 + 25 per round yang sudah dimainkan), shop dibagi ulang, medan diacak lagi.
-    Musuh makin kuat (budget +12% per round, maks x3.5; +1 level shop tiap 3 round). Kecepatan battle yang dipilih tetap.
+    Musuh makin kuat lewat budget (+12% per round, maks x3.5). **Level musuh (level shop / kapasitas) selalu sama dengan level pemain** (bukan level King), tanpa bonus Hard dan tanpa +1 tiap 3 round; naik level pemain berarti musuh ikut naik. Kecepatan battle yang dipilih tetap.
   - Koin Aether dibayar tiap round (hadiah practice + bonus 25 x nomor round untuk round menang dari round 2). Wager dibayar sekali di akhir run:
     10 Rounds = menang/seri/kalah menurut skor; Survival = menang jika menang minimal 5 round. *End Run* di 10 Rounds menghanguskan wager; keluar lewat Menu di tengah run juga menghanguskannya.
+  - **Gold awal per difficulty** (match wilayah Journey / Arena, semua kursi seperti Life): **Easy 2000 / Normal 1500 / Hard 1000** (`balance.json` -> `start_gold_by_difficulty`, `GameData.gold_for`). Tutorial tetap 1500. Teks Card Hub > Info ikut menampilkan angkanya.
+  - **AI naik level di duel wilayah (Arena / Journey)**: semua difficulty, termasuk Easy, naik level (maks Lv 7) saat pasukannya mengisi kapasitas dan budget duelnya cukup (`BattleAI.prepare_ai_army`); Easy lebih jarang karena budget duelnya hanya 10% gold (Normal 20%, Hard 30%).
+  - **Level King di seri**: di 10 Rounds dan Survival, King kedua sisi naik level seperti bintang Commander: **Lv 1** ronde 1-3, **Lv 2** ronde 4-6, **Lv 3** ronde 7+ (HP x1,0 / x1,35 / x1,8 dan ATK x1,0 / x1,25 / x1,5, `CommanderSystem`). Battle tunggal (1 Round) tetap Lv 1. Layar hasil memberi tahu saat King naik di ronde berikutnya (`ShopSystem.series_king_star`).
   - Aturan ada di `ShopSystem` (`series_*`), tes: `tests/series_test.gd`.
 - **Profil di beranda** (`ProfileView.build_card`, `XpSystem`): kartu profil (avatar, nama, title, Lv, bar EXP, rekor) langsung tampil di Main Menu, tanpa tombol Profile; tap kartu untuk detail lengkap.
   EXP total disimpan di `profile.xp`, level dihitung darinya (butuh `100 + 40 x (level-1)` EXP per level, maks Lv 60).
   Title: Recruit (Lv 1), Squire (5), Knight (10), Captain (15), Warden (20), Warlord (30), Archon (40), Overlord (50), Dominion Lord (60).
   EXP: match Territory menang 100 / kalah 30 (+2 per round, maks 30 round), Battle Chess menang 40 / kalah 10 per battle; dikali easy 0.75, normal 1, hard 1.5.
-  Save lama dapat EXP awal dari rekornya (menang x100, kalah x30), sekali saja. Tes: `tests/xp_test.gd`.
+  **Hadiah naik level**: tiap level baru memberi **Aether Coins** (50 + 10 x level) dan **1 peti** (Gold di level kelipatan 10, Silver di kelipatan 5, selain itu Bronze). Naik beberapa level sekaligus membayar semuanya. Peti ini tidak menghitung batas drop Arena (`ChestSystem.award_grade`); kalau slot dan Storage penuh, peti jadi coin. Ditampilkan di layar hasil (`SaveManager.level_reward_line`) dan dialog buka peti. Angka ada di `XpSystem.level_up_coins` / `level_up_chest`.
+  Save lama dapat EXP awal dari rekornya (menang x100, kalah x30), sekali saja (tidak ada hadiah level untuk level hasil migrasi). Tes: `tests/xp_test.gd`.
 - **Mode Effects Lite / Pro** (Settings -> Effects, `FxMode`, tersimpan di `settings.effects`, default Pro):
-  Pro = semua animasi (dadu berguling, pion melompat, kamera meluncur, lunge, cincin gugur, kartu Shop muncul bertahap, fade dialog).
+  Pro = semua animasi (dadu berguling, pion melompat, kamera meluncur, lunge, cincin gugur, kartu Shop muncul bertahap, animasi summon Gacha, fade dialog).
   Lite = hasil langsung tampil tanpa tween: dadu langsung hasil, pion langsung mendarat, kamera lompat, unit battle berpindah instan tanpa lunge/cincin, kartu Shop dan dialog tanpa fade.
   Angka damage dan banner (CHECK, CHECKMATE, dll) tetap tampil di Lite karena membawa informasi.
 
 ## TODO (tidak berpura-pura selesai)
-- Pool kartu unit baru (varian pengganti) dan Champion/Rule Card sebagai sumber Special Dice.
+- Varian kartu unit pengganti dan Champion/Rule Card sebagai sumber Special Dice.
 - Nama dan ilustrasi unik per benua/Champion (seni sekarang prosedural dan generik); sprite dan animasi unit sungguhan.
 - Musik latar; suara masih sintetis sederhana.
 - Multiplayer online (Classic dan Ranked 1v1 / 2v2 / 4 player, Battle Chess online, Lobi, Turnamen): belum ada, tab ONLINE di New Match hanya menampilkan kartunya sebagai "Coming soon". Journey sekarang hanya jalur unlock benua 1v1; alur cerita/campaign dengan misi khusus belum ada. (2vs2 melawan AI sudah ada, lihat bagian Mode 2vs2.)
 - Pemilihan target manual untuk kartu Artifact (Crown of Valor, Aegis Shield, Windboots).
 - Uji di perangkat Android nyata (lihat BUILD_ANDROID.md).
-- Keseimbangan: eliminasi total jarang (3-4%); game biasanya diputuskan net worth di ronde 30. Diukur per benua dengan `tools/balance_report`.
+- Keseimbangan: eliminasi total jarang (3-4%); game biasanya diputuskan net worth saat batas ronde tercapai. Angka keseimbangan di atas diukur dengan batas 30 ronde. Batas per mode / difficulty yang baru (Journey 20 / 30 / 40, Arena 30 / 40 / 50) diukur sekali dengan simulasi AI vs AI di Aetherion (60 game per sel, galat sekitar +/-6 poin, tanpa pemain manusia):
+  - Easy (5 Life) tidak pernah berakhir karena eliminasi (0%): hasilnya selalu net worth di batas ronde, jadi ronde tambahan hanya memperpanjang waktu.
+  - Hard (1 Life): eliminasi 1v1 naik dari 10% (20 ronde) ke 25% (30) dan 37% (40); keuntungan Hard melawan Easy naik 55% -> 65% -> 68% lalu datar di 40-50 ronde. Arena 4 Player: Normal baru ada 7% eliminasi di 40 ronde dan 13% di 50, jadi ronde ekstra kebanyakan hanya menambah durasi.
+  - Pemain di giliran pertama menang lebih sering di Arena 4 Player (23-38% vs 25% adil), terbesar di Easy dan di batas pendek.
+  Kesimpulan sementara: batas Normal sudah wajar; Hard Journey 40 dan Arena 50 kemungkinan terlalu panjang untuk manfaatnya. Belum diuji dengan pemain manusia, benua selain Aetherion, atau sampel lebih besar.
 
 ## Peta Territory: zoom dan kamera
-Layar Territory dan Battle tiga kolom ala Monopoly (Battle: tombol + kartu Support di kiri, papan 8x8 di tengah, shop + bench di kanan, log di kanan saat bertarung). Territory: papan di tengah, log di kiri (aksi di bawah log; tombol dadu di dalam papan), pemain di kanan. Papan tampil utuh (zoom 1x) dan kamera mengikuti pion saat di-zoom. Geser dengan drag, cubit atau roda mouse untuk zoom,
+Layar Territory dan Battle tiga kolom ala Monopoly (Battle: tombol + kartu Support di kiri, papan 8x8 di tengah, shop + bench di kanan, log di kanan saat bertarung). Territory: papan di tengah, Card Hub + kartu pemain di kiri atas, Round + Menu dengan history (log) di bawahnya di kanan (aksi di bawah log; tombol dadu di dalam papan). Papan tampil utuh (zoom 1x) dan kamera mengikuti pion saat di-zoom. Geser dengan drag, cubit atau roda mouse untuk zoom,
 tombol + / - / Fit dan Speed di pojok kiri bawah layar; semua tombol aksi (Roll Dice, Reroll, Move, End Turn, Buy, special dice) di pojok kanan bawah layar untuk zoom manual atau melihat seluruh papan. Ketuk petak untuk info. Kode: `scripts/ui/board_view.gd`.

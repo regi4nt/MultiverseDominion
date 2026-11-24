@@ -96,6 +96,30 @@ func _test_config() -> void:
 	check(cfg["journey"] == true and cfg["ai_count"] == 1 and cfg["team_mode"] == false, "Journey config: 1vs1, journey flag set")
 	GameSession.category = "arena"
 	check(GameSession.to_match_config()["journey"] == false, "Arena config: no journey flag")
+	check(GameSession.to_match_config()["any_continent_enemies"] == true and cfg["any_continent_enemies"] == false, "Arena draws enemies from every continent, Journey does not")
+	var foreign := false
+	var own_only := true
+	for sd in range(1, 13):  # Arena opponents: factions of every continent (more than just the map's own four), never the player's faction
+		var mc := MatchController.new()
+		mc.setup({"continent_id": "aetherion", "faction_id": "solvaris", "ai_count": 3, "seed": sd, "any_continent_enemies": true})
+		for pl in mc.players:
+			if pl.is_ai and GameData.get_faction("aetherion", pl.faction_id).is_empty():
+				foreign = true
+			if pl.is_ai and pl.faction_id == "solvaris":
+				own_only = false
+		var mj := MatchController.new()
+		mj.setup({"continent_id": "aetherion", "faction_id": "solvaris", "ai_count": 3, "seed": sd})
+		for pl in mj.players:
+			if GameData.get_faction("aetherion", pl.faction_id).is_empty():
+				own_only = false
+	var gold_ok := true
+	for dd in [["easy", 2000], ["normal", 1500], ["hard", 1000]]:
+		var mg := MatchController.new()
+		mg.setup({"continent_id": "aetherion", "faction_id": "solvaris", "ai_count": 1, "seed": 5, "difficulty": dd[0]})
+		for pl in mg.players:
+			gold_ok = gold_ok and pl.gold == int(dd[1])
+	check(gold_ok, "starting gold follows the difficulty: Easy 2000 / Normal 1500 / Hard 1000 (every seat)")
+	check(foreign and own_only, "Arena AI rulers can come from other continents; without the flag they stay on the map's continent")
 	GameSession.start_tutorial()
 	check(not GameSession.to_match_config().has("journey") or GameSession.to_match_config()["journey"] == false, "the tutorial is never a Journey match")
 	GameSession.mode = "ffa_ai"
@@ -202,10 +226,25 @@ func _test_ui() -> void:
 	var offline: Array[String] = []
 	for ch in n._cards_row.get_children():
 		offline.append(String(ch.name))
-	check(offline == ["Card_journey", "Card_arena", "Card_battle_chess", "Card_tutorial"], "Offline shows Journey, Arena, Battle Chess, Tutorial (%s)" % str(offline))
+	check(offline == ["Card_journey", "Card_arena", "Card_chaos", "Card_battle_chess", "Card_tutorial"], "Offline shows Journey, Arena, Chaos (right of Arena), Battle Chess, Tutorial (%s)" % str(offline))
 	for ch in n._cards_row.get_children():
 		check(not (ch.get_node("Tap") as Button).disabled, "offline card %s is playable" % ch.name)
+	await get_tree().process_frame
+	var sc: ScrollContainer = n._cards_scroll
+	var first: Control = n._cards_row.get_child(0)
+	check(sc.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO and sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "the mode cards row scrolls sideways")
+	check(n._cards_row.get_child_count() == 5, "offline has 5 mode cards, one more than the 4 shown at once")
+	check(absf(first.custom_minimum_size.x * 4.0 + 14.0 * 3.0 - sc.size.x) < 2.0, "4 mode cards fill the row width; the rest is a swipe away")
+	var th := UiTheme.get_theme()
+	var themed := true
+	for kind in ["VScrollBar", "HScrollBar"]:
+		for part in ["scroll", "grabber", "grabber_highlight", "grabber_pressed"]:
+			themed = themed and th.has_stylebox(part, kind) and th.get_stylebox(part, kind) is StyleBoxFlat
+	check(themed, "every scroll bar is styled by the app theme (navy track, gold handle)")
+	check(UiTheme.scrollbar_thickness() in [8, 12] and (th.get_stylebox("scroll", "VScrollBar") as StyleBoxFlat).get_minimum_size().x >= float(UiTheme.scrollbar_thickness()) - 1.0, "scroll bar thickness adapts to touch / pointer devices")
 	n._set_tab("online")
+	await get_tree().process_frame
+	check(n._cards_row.get_child(0).custom_minimum_size.x == 0.0, "3 online cards just share the row (no sideways scrolling)")
 	var online: Array[String] = []
 	for ch in n._cards_row.get_children():
 		online.append(String(ch.name))
@@ -248,11 +287,21 @@ func _test_ui() -> void:
 	check(GameSession.mode == "custom_ai" and GameSession.ai_count == 1, "Arena 1 vs 1 sets a duel")
 	_find_button(n, "4 Player").pressed.emit()
 	check(GameSession.mode == "ffa_ai" and GameSession.ai_count == 3, "Arena 4 Player sets the free-for-all")
-	check(_find_button(n, "3.  MACHINA").disabled, "Arena: locked continents cannot be picked")
+	var mach := _find_button(n, "3.  MACHINA")
+	check(mach != null and not mach.disabled and mach.text.find("King & Pawn stay locked") >= 0, "Arena: every playable continent can be picked, its King and Pawn stay locked")
+	check(not SaveManager.is_continent_unlocked("machina") and not SaveManager.is_faction_unlocked("ferrum"), "Arena never unlocks the continent or its factions")
 	check(n._champion_text.text.find("Nocthyr") >= 0 or n._champion_text.text.find("Solvaris") >= 0, "Arena shows the faction of the Deck")
 	check(GameSession.faction_id == SaveManager.player_faction_id(), "the match faction is the Deck faction")
 	check(_find_button(n, "Valdoria") == null and _find_button(n, "Elarion") == null, "New Match has no faction buttons")
 	check(_find_button(n, "Change faction") != null, "New Match links to the Deck to change the faction")
 	n.on_back_requested()
+	check(not GameSession.chaos_mode and not GameSession.to_match_config().get("chaos", false), "Arena is a normal 100-tile match")
+	# Chaos: its own card, an Arena setup on the 40-tile board
+	(n._cards_row.get_node("Card_chaos/Tap") as Button).pressed.emit()
+	check(n._view == "setup" and n._kind == "arena" and GameSession.category == "arena" and GameSession.chaos_mode, "tapping Chaos opens the Arena setup in Chaos Mode")
+	check(bool(GameSession.to_match_config().get("chaos", false)), "a Chaos match is configured with the 40-tile board")
+	n.on_back_requested()
+	(n._cards_row.get_node("Card_arena/Tap") as Button).pressed.emit()
+	check(not GameSession.chaos_mode, "choosing Arena again switches Chaos off")
 	n.queue_free()
 	await get_tree().process_frame
