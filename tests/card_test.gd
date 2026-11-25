@@ -229,11 +229,11 @@ func _ready() -> void:
 		CardDatabase.set_continent(cid)
 		pawn_buffs[String(CardDatabase.get_buff("pawn_royal_guard")["name"])] = true
 	check(pawn_buffs.size() == 7, "the same Pawn has a different buff on each continent")
-	CardDatabase.set_continent("aetherion")
+	CardDatabase.set_continent("arcanum")  # the Queen of Arcanum guards her neighbours
 	var eg := BattleEngine.new()
 	eg.setup({"seed": 1, "ai_supports": [false, false], "sides": [
-		{"units": [{"card_id": _piece_with_buff("guard", "queen"), "stars": 1, "cell": Vector2i(3, 5)}, {"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(4, 5)}, {"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(7, 7)}], "champion": "champion_solvaris", "supports": []},
-		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 2)}], "champion": "champion_nocthyr", "supports": []}]})
+		{"units": [{"card_id": _piece_with_buff("guard", "queen"), "stars": 1, "cell": Vector2i(3, 5)}, {"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(4, 5)}, {"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(7, 7)}], "champion": "champion_astralis", "supports": []},
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 2)}], "champion": "champion_ignivar", "supports": []}]})
 	var near: BattleUnit = eg.units_of(0)[1]
 	var far: BattleUnit = eg.units_of(0)[2]
 	var near_hp := near.hp
@@ -305,12 +305,12 @@ func _ready() -> void:
 	check(qu.alive and qu.hp == maxi(1, int(qu.max_hp * qu.extra_value)), "a Queen with Second Life returns once with her HP share (hp %d)" % qu.hp)
 	eq._damage(qu, 99999)
 	check(not qu.alive, "Second Life is used only once")
-	CardDatabase.set_continent("machina")
+	CardDatabase.set_continent("sylvaris")  # the Queen of Sylvaris (Floralis) opens with a shield
 	var q_mac: String = _piece_with_buff("opening_shield", "queen")
 	var em2 := BattleEngine.new()
 	em2.setup({"seed": 1, "ai_supports": [false, false], "sides": [
-		{"units": [{"card_id": q_mac, "stars": 1, "cell": Vector2i(3, 5)}, {"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(4, 5)}], "champion": "champion_ferrum", "supports": []},
-		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 2)}], "champion": "champion_voltrix", "supports": []}]})
+		{"units": [{"card_id": q_mac, "stars": 1, "cell": Vector2i(3, 5)}, {"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(4, 5)}], "champion": "champion_verdantia", "supports": []},
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 2)}], "champion": "champion_besthara", "supports": []}]})
 	var ally: BattleUnit = em2.units_of(0)[1]
 	check(ally.shield == int(round(ally.max_hp * em2.units_of(0)[0].extra_value)) and ally.shield > 0, "a Queen with Opening Shield gives the side an opening shield (%d)" % ally.shield)
 	CardDatabase.set_continent("sylvaris")
@@ -367,7 +367,7 @@ func _piece_of_role(faction_id: String, role: String) -> Dictionary:
 ## A piece (Rook / Bishop / Queen ...) of any continent whose buff has the given effect type.
 func _piece_with_buff(btype: String, chess: String) -> String:
 	for u in GameData.cards["units"]:
-		if u["chess"] == chess and u.has("continent") and String(CardDatabase.get_buff(u["id"]).get("type", "")) == btype:
+		if u["chess"] == chess and String(u.get("continent", "")) == CardDatabase.active_continent and String(CardDatabase.get_buff(u["id"]).get("type", "")) == btype:  # a piece of another continent fights without its buff
 			return String(u["id"])
 	push_error("no %s with buff %s" % [chess, btype])
 	return ""

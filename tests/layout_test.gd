@@ -32,6 +32,15 @@ func _ready() -> void:
 				await get_tree().process_frame
 			_audit(node, Rect2(Vector2.ZERO, Vector2(sz)), "%s @ %s" % [sc.get_file(), label], sc.get_file())
 			if "shots" in OS.get_cmdline_user_args() and label in ["16:9 1920x1080", "20:9 2400x1080", "4:3 tablet 2048x1536"]:
+				if sc.get_file() == "territory_board":  # the start camera is zoomed in on the pawn: show the whole board in the screenshot
+					for i in range(30):  # the zoom buttons are locked while the start dice animation runs
+						await get_tree().process_frame
+					var bv = node.board_view
+					bv._on_zoom_button(0.0)
+					bv._user_cam = true  # an AI turn would otherwise pull the camera back onto its pawn
+					bv.zoom = bv.ZOOM_MIN
+					bv._focus = Vector2(0.5, 0.5)
+					bv.queue_redraw()
 				vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 				await RenderingServer.frame_post_draw
 				await RenderingServer.frame_post_draw

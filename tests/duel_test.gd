@@ -277,6 +277,7 @@ func _test_chaos_mode() -> void:
 	var p: PlayerState = c.players[0]
 	p.position = 38
 	var gold := p.gold
+	var chaos_world_extra := WorldMods.start_bonus_extra  # static: the matches created below replace it
 	c._move_player(p, 5)
 	check(p.position == 3 and p.gold > gold, "Chaos Mode: walking past tile 39 wraps to the start and pays the Gate")
 	check(c.first_seat == 0, "default matches still open with seat 0")
@@ -298,7 +299,10 @@ func _test_chaos_mode() -> void:
 			t_ok = t_ok and tm.players[i].team == i % 2
 		check(t_ok, "2v2 random first seat (seed %d): teams still alternate A, B, A, B" % sd)
 	check(seen_first.size() > 1, "2v2: the opening seat varies between matches")
-	check(p.gold - gold == int(GameData.b("chaos_start_bonus")) + WorldMods.start_bonus_extra, "Chaos Mode: the Gate pays the reduced Chaos bonus")
+	var gate_pay: int = int(GameData.b("chaos_start_bonus")) + chaos_world_extra
+	if p.has_passive("royal_treasury"):  # Solvaris: Royal Treasury raises what the Gate pays
+		gate_pay = int(gate_pay * (1.0 + p.passive_value))
+	check(p.gold - gold == gate_pay, "Chaos Mode: the Gate pays the reduced Chaos bonus (%d)" % (p.gold - gold))
 	var first_lot: BoardTile = c.tiles[1]
 	check(first_lot.type == BoardTile.Type.TERRITORY and first_lot.price == int(round(float(int(GameData.b("territory_base_price"))) * float(GameData.b("chaos_price_mult")))), "Chaos Mode: Territory prices are scaled up")
 	check(GameData.round_limit_for("chaos", "normal") < GameData.round_limit_for("arena", "normal"), "Chaos Mode: the round limit is shorter than Arena's")

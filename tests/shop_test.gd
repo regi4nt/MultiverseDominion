@@ -59,7 +59,8 @@ func _ready() -> void:
 	var mc3 := MatchController.from_dict(mc.to_dict())
 	check(mc3.random_map and mc3.players[0].reroll_tokens == mc.players[0].reroll_tokens, "random map survives save and load without paying the gift twice")
 
-	check(SaveManager.coins() == 600, "a new profile starts with 600 coins")
+	check(int(SaveManager.default_data()["wallet"]["coins"]) == 600 and ShopSystem.START_COINS == 600, "a new profile starts with 600 coins")
+	SaveManager.data["wallet"]["coins"] = ShopSystem.START_COINS  # the matches above paid rewards: back to a new wallet
 	check(SaveManager.spend_coins(100) and SaveManager.coins() == 500 and not SaveManager.spend_coins(501) and SaveManager.coins() == 500, "spending needs enough coins and never goes negative")
 	SaveManager.add_coins(100)
 
