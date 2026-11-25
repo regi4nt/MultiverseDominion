@@ -56,7 +56,19 @@ func _process(_delta: float) -> void:
 		progress.emit(_http.get_downloaded_bytes(), _http.get_body_size())
 
 
-func _on_done(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+## Content-Length of the response, or -1 when it is unknown or the body was sent compressed (the length would not match the file).
+static func _expected_size(headers: PackedStringArray) -> int:
+	var length := -1
+	for h in headers:
+		var low := h.to_lower()
+		if low.begins_with("content-encoding:") and not low.contains("identity"):
+			return -1
+		if low.begins_with("content-length:"):
+			length = int(low.substr(15).strip_edges())
+	return length
+
+
+func _on_done(result: int, code: int, headers: PackedStringArray, _body: PackedByteArray) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS:
 		_finish(false, "Download interrupted (check your connection).")
 	elif code != 200:
@@ -67,7 +79,8 @@ func _on_done(result: int, code: int, _headers: PackedStringArray, _body: Packed
 			var f := FileAccess.open(path, FileAccess.READ)
 			if f != null:
 				size = f.get_length()
-		if size < MIN_APK_BYTES:
+		var expected := _expected_size(headers)
+		if size < MIN_APK_BYTES or (expected > 0 and size != expected):  # a truncated download is never handed to the installer
 			_finish(false, "The downloaded file is incomplete.")
 		else:
 			_finish(true, "")

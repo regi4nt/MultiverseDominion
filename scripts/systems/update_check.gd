@@ -212,7 +212,7 @@ static func start_in_app_update(parent: Node, info: Dictionary) -> void:
 		if ok:
 			# Downloaded. The installer starts when the game is in the foreground and installs are allowed; the pill lets the
 			# player start it again by hand if Android showed nothing (it keeps the file until the game restarts).
-			inst.install_failed.connect(func(reason: String): _install_failed(host, inst, reason))
+			inst.install_failed.connect(func(reason: String): _install_failed(host, inst, reason, info))
 			_show_pill("Update downloaded  -  tap to install", func():
 				inst.install_when_possible())
 			inst.install_when_possible()
@@ -232,17 +232,21 @@ static func start_in_app_update(parent: Node, info: Dictionary) -> void:
 	inst.start(String(info.get("apk_url", "")))
 
 
-static func _install_failed(host: Node, inst: UpdateInstaller, reason: String) -> void:
+static func _install_failed(host: Node, inst: UpdateInstaller, reason: String, info: Dictionary = {}) -> void:
 	var d := UiDialog.new()
 	d.tone = "warn"
 	if reason == "permission":
 		d.title = "Allow installing"
-		d.dialog_text = "Android blocks the install until \"Install unknown apps\" is allowed for this game.\n\nOpen the Android settings of this app, switch it on, come back and tap Try again."
+		d.dialog_text = "Android blocks the install until \"Install unknown apps\" is allowed for this game.\n\nOpen the Android settings of this app, switch it on, come back and tap Try again.\n\nIf this game is not in that list, the installed version is older than this permission: tap Open browser and install the downloaded APK once. After that, in-game updates work."
 	else:
 		d.title = "Installer did not open"
 		d.dialog_text = "Android did not open the installer. Tap Try again, or use the tap-to-install strip at the bottom of the screen."
 	d.ok_button_text = "Try again"
 	d.cancel_button_text = "Later"
+	d.add_button("Open browser", false, "browser")  # fallback: the browser / Files app installs the APK with its own permission
+	d.custom_action.connect(func(_a: StringName):
+		open_in_browser(info)
+		d.queue_free())
 	d.confirmed.connect(func():
 		if is_instance_valid(inst):
 			inst.install_when_possible())

@@ -33,6 +33,7 @@ var king_star: Array = [1, 1]  # Commander stars of each side (multiply the King
 var king_entered: Array = [false, false]
 var side_passive: Array = [{}, {}]  # battle passive of each side's King (data/king_passives.json), active from the start on any continent
 var king_skill_used: Array = [false, false]
+var king_skill_locked: Array = [false, false]  # true = that side's King active skill is still locked (the human's King below B2)
 var manual_king: Array = [false, false]  # true = that side's King skill is cast by hand (human); false = on entry (AI / tests)
 var king_entry_tick: Array = [-1, -1]
 var monster_unit: Array = [null, null]  # the allied Monster unit on the field (set when it joins the King)
@@ -42,6 +43,7 @@ var monster_card: Array = ["", ""]  # Monster card of each side: that monster jo
 var regulars_alive_at_entry: Array = [-1, -1]  # test hook: must always be 0
 var hands: Array = [[], []]
 var used_supports: Array = [[], []]
+var kills: Array = [0, 0]  # regular units destroyed BY each side (Battle Chess Continent Mission)
 ## Support energy: fills by 1 every `energy_regen_ticks` ticks up to `energy_max` (overflow is wasted), each Support card costs energy by rarity.
 var energy: Array = [0, 0]
 var energy_timer: Array = [0, 0]
@@ -83,6 +85,7 @@ func setup(cfg: Dictionary) -> void:
 	rng.seed = int(cfg.get("seed", 1))
 	ai_supports = cfg.get("ai_supports", [false, true])
 	manual_king = cfg.get("manual_king", [false, false])
+	king_skill_locked = (cfg.get("king_skill_locked", [false, false]) as Array).duplicate()
 	free_supports = bool(cfg.get("free_supports", false))
 	terrain = cfg.get("terrain", {})
 	energy = [mini(int(GameData.b("energy_start", 2)), energy_max()), mini(int(GameData.b("energy_start", 2)), energy_max())]
@@ -714,6 +717,8 @@ func _kill(t: BattleUnit) -> void:
 		return
 	t.hp = 0
 	t.alive = false
+	if not t.is_king:
+		kills[1 - t.side] = int(kills[1 - t.side]) + 1
 	grid.erase(t.cell)
 	events.append({"type": "death", "cell": t.cell})
 	_log("%s (side %d) falls." % [t.display_name, t.side])
@@ -890,6 +895,9 @@ func _enter_king(side: int) -> void:
 	u.move = 2
 	u.skill_id = String(ch.get("skill_id", ""))
 	u.skill_value = float(ch.get("active_value", 0.0))
+	if bool(king_skill_locked[side]):  # B1 King: the active skill is locked until the second copy (B2)
+		u.skill_id = ""
+		u.skill_value = 0.0
 	u.cell = _free_cell_near(Vector2i(3, 7) if side == 0 else Vector2i(4, 0))
 	var kb := CardDatabase.king_buff(king_data[side])  # home-continent King buff (data/king_buffs.json)
 	u.extra = String(kb.get("type", ""))
@@ -914,7 +922,9 @@ func _enter_king(side: int) -> void:
 	_log("LAST STAND! %s enters the arena (side %d)." % [u.display_name, side])
 	events.append({"type": "last_stand", "side": side})
 	events.append({"type": "fx", "cells": [u.cell]})
-	if manual_king[side]:
+	if bool(king_skill_locked[side]):
+		_log("%s has no active skill yet (unlocks at B2: a second copy of the King card)." % u.display_name)
+	elif manual_king[side]:
 		_log("%s waits for the King skill (%s)." % [u.display_name, String(ch.get("active_name", "skill"))])
 	else:
 		_auto_king_skill(side)  # AI / auto sides cast it on entry, or as soon as they can pay for it
@@ -1023,7 +1033,7 @@ func _apply_active_skill(u: BattleUnit, side: int, skill_id: String, v: float) -
 
 ## True while the side's King is in the arena and its active skill is still unused.
 func can_use_king_skill(side: int) -> bool:
-	return not finished and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive \
+	return not bool(king_skill_locked[side]) and not finished and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive \
 			and int(energy[side]) >= king_energy_cost()
 
 
@@ -1031,6 +1041,8 @@ func can_use_king_skill(side: int) -> bool:
 func use_king_skill(side: int) -> String:
 	if finished:
 		return "The battle is over."
+	if bool(king_skill_locked[side]):
+		return "King skill locked: get a second copy of this King card (B2)."
 	if not king_entered[side]:
 		return "The King enters only in Last Stand."
 	if king_skill_used[side]:
@@ -1199,7 +1211,7 @@ func king_energy_cost() -> int:
 
 ## An auto (AI) King that has entered but is still saving energy for its skill.
 func _king_waiting(side: int) -> bool:
-	return not manual_king[side] and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive
+	return not bool(king_skill_locked[side]) and not manual_king[side] and bool(king_entered[side]) and not bool(king_skill_used[side]) and (kings[side] as BattleUnit).alive
 
 
 func _regen_energy() -> void:

@@ -149,7 +149,9 @@ func _test_faction_rules() -> void:
 	check(SaveManager.player_champion_id() == "champion_solvaris", "a King of a locked faction falls back to an open one")
 	check(SaveManager.get_deck("aetherion").champion_id == "champion_solvaris", "the saved deck never leads with a locked King")
 	SaveManager.unlock_continent("arcanum")
-	check(SaveManager.player_faction_id() == "astralis", "once its continent is open the faction can be used")
+	check(SaveManager.player_faction_id() == "solvaris", "an open faction's King still has to be owned (a King card)")
+	SaveManager.data["collection"]["champion_astralis"] = 1
+	check(SaveManager.player_faction_id() == "astralis", "once its continent is open and its King is owned the faction can be used")
 	check(SaveManager.get_deck("aetherion").champion_id == "champion_astralis", "the Deck King is the same on every continent")
 	# a match on another continent with the Deck's faction
 	var m := MatchController.new()
@@ -216,6 +218,7 @@ func _test_faction_rules() -> void:
 
 func _test_deck_ui() -> void:
 	_fresh_save()
+	SaveManager.data["collection"]["champion_nocthyr"] = 1  # Kings are cards: only owned Kings can lead the deck
 	GameSession.open_deck_tab = true
 	var coll: Control = load("res://scenes/card_collection/card_collection.tscn").instantiate()
 	add_child(coll)
@@ -228,6 +231,8 @@ func _test_deck_ui() -> void:
 	check((coll._pool_buttons["champion_nocthyr"] as CardView).owned > 0, "a faction of an open continent can be picked")
 	coll._set_king("champion_drakhan")
 	check(coll.deck.champion_id == "champion_solvaris", "picking a locked faction does nothing")
+	coll._set_king("champion_valdoria")
+	check(coll.deck.champion_id == "champion_solvaris", "picking a King card that is not owned does nothing")
 	coll._set_king("champion_nocthyr")
 	check(coll.deck.champion_id == "champion_nocthyr", "picking an open faction sets the King")
 	coll._on_save()

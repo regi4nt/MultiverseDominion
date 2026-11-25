@@ -68,7 +68,7 @@ func _ready() -> void:
 	ChestSystem.open(0, rng)
 	check(EventHub.metric_value("chests", true) == 1 and EventHub.metric_value("gold_chests", false) >= 1, "opening a chest is tracked")
 	SaveManager.data["wallet"]["tickets"] = 50
-	SaveManager.data["shop"] = {"pity": 0, "pulls": 0, "unit_pity": 0, "unit_pulls": 0}
+	SaveManager.data["shop"] = {"pity": 0, "pity_rare": 0, "pity_legendary": 0, "pulls": 0}
 	var col0: Dictionary = SaveManager.data["collection"].duplicate(true)
 	ShopSystem.pull_batch(3, rng)
 	check(EventHub.metric_value("pulls", true) == 3, "gacha pulls are tracked")

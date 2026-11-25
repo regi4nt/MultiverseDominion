@@ -39,6 +39,29 @@ func _init(d: Deck, r: RandomNumberGenerator, start_gold: int, budget: int, star
 	refresh_offers(false)
 
 
+## Starter units: gives `count` random Pawns of the deck for free. Each one is deducted from the copies in the draw pile, so a type
+## never exceeds its 9 copies and the Battle Shop cannot offer those copies again. If the deck has no Pawn, any unit type is used. Returns the ids that were given.
+func give_starter_pawns(count: int) -> Array[String]:
+	var given: Array[String] = []
+	var ids := deck.effective_unit_ids()
+	var pawns: Array[String] = []
+	for id in ids:
+		if String(CardDatabase.get_unit(id).get("chess", "")) == "pawn":
+			pawns.append(id)
+	if pawns.is_empty():
+		pawns = ids
+	if pawns.is_empty():
+		return given
+	finish()  # the 5 offers go back to the pile first, so every copy of a Pawn can be deducted
+	for i in range(count):
+		var id := pawns[rng.randi() % pawns.size()]
+		if battle_deck.take_card(id):  # each given Pawn is one copy less in the pile (and so in the Battle Shop)
+			roster.add_copy(id)
+			given.append(id)
+	refresh_offers(false)  # deal the shop again from what is left
+	return given
+
+
 ## Series (Battle Chess 10 rounds / survival): between two rounds the army, gold, level and hand stay; the player earns
 ## income, the shop is dealt again and the free rerolls come back.
 func start_next_round(income: int) -> void:

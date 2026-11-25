@@ -40,20 +40,7 @@ func _ready() -> void:
 				GameSession.difficulty = d
 				refresh())
 			drow.add_child(b)
-	if with_difficulty:  # Battle Chess: how long the run is (1 round / 10 rounds / until the first defeat)
-		add_child(UiTheme.make_label("Length", 20, UiTheme.COL_TEXT))
-		var lrow := HBoxContainer.new()
-		lrow.add_theme_constant_override("separation", 8)
-		add_child(lrow)
-		var lgroup := ButtonGroup.new()
-		for sid in ShopSystem.SERIES_IDS:
-			var lb := UiTheme.make_toggle(ShopSystem.series_title(sid), lgroup, 48)
-			lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			lb.button_pressed = (GameSession.battle_series == sid)
-			lb.pressed.connect(func():
-				GameSession.battle_series = sid
-				refresh())
-			lrow.add_child(lb)
+	if with_difficulty:  # Battle Chess: always a Survival run; the difficulty above sets the lives (5 / 3 / 1)
 		_series_info = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
 		_series_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		add_child(_series_info)
@@ -125,7 +112,7 @@ func refresh() -> void:
 	_value.text = "None" if GameSession.wager == 0 else str(GameSession.wager)
 	_balance.text = "You have %d coins" % coins
 	if _series_info != null:
-		_series_info.text = ShopSystem.series_desc(GameSession.battle_series)
+		_series_info.text = ShopSystem.series_desc("survival", GameSession.difficulty)  # the lives follow the difficulty above
 	var stake := GameSession.wager
 	if stake <= 0:
 		_info.text = "No wager. Pick a stake to bet Aether Coins: win it back with a bonus, lose it if you lose."
@@ -133,13 +120,7 @@ func refresh() -> void:
 		var o := odds()
 		var tail := ""
 		if kind == "battle_chess":
-			match GameSession.battle_series:
-				"ten":
-					tail = "  Win = more rounds won than lost. Draw (equal): stake returned. Quitting early forfeits it."
-				"survival":
-					tail = "  Win = clear %d rounds before your first defeat." % ShopSystem.SERIES_SURVIVAL_TARGET
-				_:
-					tail = "  Draw: stake returned."
+			tail = "  Win = win %d rounds before you run out of lives." % ShopSystem.SERIES_SURVIVAL_TARGET
 		_info.text = "Stake %d paid at the start.  Win: +%d coins back (x%s).  Lose: the stake is gone.%s" % [
 			stake, ShopSystem.wager_payout(stake, o), _fmt(o), tail]
 

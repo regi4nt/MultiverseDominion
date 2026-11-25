@@ -17,13 +17,14 @@ var _cell: float = 10.0
 var _origin: Vector2 = Vector2.ZERO
 
 # Camera: the 26x26 ring is only ~27 px per tile when it fits a 720 px screen, so the view is zoomed and
-# follows the moving pawn. Drag pans, pinch / +/- buttons zoom, "Fit" shows the whole board.
+# follows the moving pawn. Drag pans, pinch / +/- buttons zoom, "Fit" zooms in on the player.
 const SPEEDS: Array[float] = [1.0, 2.0, 4.0]
 static var speed_mult: float = 1.0  # kept between scenes; restored from the saved settings on first use
 const HOP_TIME := 0.17  # seconds per tile while a pawn walks (one hop per tile)
 const HOP_HEIGHT := 0.6  # hop apex, in tile sizes
 const ZOOM_MIN := 1.0
 const ZOOM_MAX := 4.0
+const FIT_PLAYER_ZOOM := 2.5  # zoom used by the Fit button (focus on the player's pawn)
 static var zoom: float = 1.0  # kept between scenes (static) so a duel does not reset it
 static var _zoom_for_grid: int = 0  # board size the current zoom was last defaulted for (see bind())
 var _focus: Vector2 = Vector2(0.5, 0.5)  # board-space point (0..1) shown at the view centre
@@ -143,13 +144,9 @@ func _on_zoom_button(factor: float) -> void:
 	_kill_camera_tweens()
 	if factor == 0.0:
 		_user_cam = false
-		if _fit_shows_default():  # at Fit on a big board: the same button goes back to the normal tile size, on the pawn
-			zoom = default_zoom()
-			var cur := ctrl.current_player() if ctrl != null else null
-			_focus = Vector2(0.5, 0.5) if cur == null else (Vector2(BoardBuilder.grid_pos(cur.position)) + Vector2(0.5, 0.5)) / float(BoardBuilder.grid)
-		else:
-			zoom = ZOOM_MIN
-			_focus = Vector2(0.5, 0.5)
+		# Fit = focus on the player only: zoom in on the human player's pawn (the current player if there is no human).
+		zoom = maxf(default_zoom(), FIT_PLAYER_ZOOM)
+		_focus = _player_focus()
 		queue_redraw()
 	else:
 		_user_cam = true
@@ -277,17 +274,27 @@ func _anim_done(pid: int, to_i: int) -> void:
 	queue_redraw()
 
 
-## True when the Fit button would now return to the normal tile size ("1:1"): the whole board is shown and a larger
-## default exists (the 100-tile board; on the 40-tile board Fit already is the normal size).
-func _fit_shows_default() -> bool:
-	return zoom <= ZOOM_MIN + 0.01 and default_zoom() > ZOOM_MIN + 0.01
+## Board-space point (0..1) of the human player's pawn; falls back to the current player, then to the board centre.
+func _player_focus() -> Vector2:
+	var who: PlayerState = null
+	if ctrl != null:
+		for p in ctrl.players:
+			if not p.is_ai:
+				who = p
+				break
+		if who == null:
+			who = ctrl.current_player()
+	if who == null:
+		return Vector2(0.5, 0.5)
+	var v: float = float(_visual_pos.get(who.id, who.position))
+	var i0 := floori(v)
+	var a := BoardBuilder.grid_pos(posmod(i0, BoardBuilder.tiles_total))
+	var b := BoardBuilder.grid_pos(posmod(i0 + 1, BoardBuilder.tiles_total))
+	var gp := Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), v - float(i0))
+	return (gp + Vector2(0.5, 0.5)) / float(BoardBuilder.grid)
 
 
 func _layout() -> void:
-	if _zoom_btns.size() > 2:
-		var want := "1:1" if _fit_shows_default() else "Fit"
-		if _zoom_btns[2].text != want:
-			_zoom_btns[2].text = want
 	var s := minf(size.x, size.y) * zoom
 	_cell = s / float(BoardBuilder.grid)
 	var o := size * 0.5 - _focus * s

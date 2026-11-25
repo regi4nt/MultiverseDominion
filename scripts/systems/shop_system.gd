@@ -30,11 +30,23 @@ static func practice_reward(won: bool, difficulty: String) -> int:
 	return int(PRACTICE_LOSS_BY_DIFF.get(difficulty, PRACTICE_LOSS_REWARD))
 ## Battle Chess series (1 round / 10 rounds / until you lose): rules shared by the screen and the tests.
 const SERIES_IDS: Array[String] = ["single", "ten", "survival"]
-const SERIES_TEN_ROUNDS := 10
+const SERIES_TEN_ROUNDS := 10  # default length of the multi-round run when no difficulty is given (tests); in the game see SERIES_ROUNDS_BY_DIFF
+const SERIES_ROUNDS_BY_DIFF := {"easy": 5, "normal": 3, "hard": 1}  # rounds of the multi-round run (series id "ten") per difficulty
 const SERIES_SURVIVAL_TARGET := 5  # survival wager is won by winning at least this many rounds in a row
 const SERIES_INCOME := 150  # gold the player earns between two rounds ...
 const SERIES_INCOME_STEP := 25  # ... plus this much per round already played
 const SERIES_ROUND_BONUS := 25  # extra Aether Coins for a round won, from round 2 on (x round number), on top of practice_reward
+
+
+## Lives of a Battle Chess Survival run: Easy 5 / Normal 3 / Hard 1 (the match Life table, balance.json "life_by_difficulty").
+## Every defeat costs one life and the run ends at 0. "" (no difficulty given: tests) = 1 life, the first defeat ends it.
+static func series_lives(difficulty: String = "") -> int:
+	return 1 if difficulty == "" else maxi(GameData.life_for(difficulty), 1)
+
+
+## Rounds of the multi-round run for a difficulty: Easy 5 / Normal 3 / Hard 1 ("" or unknown = SERIES_TEN_ROUNDS).
+static func series_rounds(difficulty: String = "") -> int:
+	return int(SERIES_ROUNDS_BY_DIFF.get(difficulty, SERIES_TEN_ROUNDS))
 
 
 ## Gold earned after round `played` (1-based) to prepare the next one.
@@ -47,31 +59,36 @@ static func series_coin_bonus(id: String, round_no: int) -> int:
 	return 0 if id == "single" or round_no < 2 else SERIES_ROUND_BONUS * round_no
 
 
-static func series_title(id: String) -> String:
+static func series_title(id: String, difficulty: String = "") -> String:
 	match id:
 		"ten":
-			return "10 Rounds"
+			var n := series_rounds(difficulty)
+			return "%d Round%s" % [n, "" if n == 1 else "s"]
 		"survival":
 			return "Survival"
 	return "1 Round"
 
 
-static func series_desc(id: String) -> String:
+static func series_desc(id: String, difficulty: String = "") -> String:
 	match id:
 		"ten":
-			return "10 battles in a row with the same army. More wins than losses wins the series."
+			var n := series_rounds(difficulty)
+			return "%d battle%s in a row with the same army. More wins than losses wins the series." % [n, "" if n == 1 else "s"]
 		"survival":
-			return "Battle after battle, the enemy grows stronger. The run ends at your first defeat."
+			if difficulty == "":
+				return "Battle after battle, the enemy grows stronger. The run ends at your first defeat."
+			var lv := series_lives(difficulty)
+			return "Battle after battle, the enemy grows stronger. You have %d li%s (Easy 5 / Normal 3 / Hard 1): each defeat costs one and the run ends at 0." % [lv, "fe" if lv == 1 else "ves"]
 	return "A single battle."
 
 
 ## Does the series go on after this round? `round_no` is the round just played (1-based), `won`/`lost` count rounds incl. this one.
-static func series_continues(id: String, round_no: int, lost: int) -> bool:
+static func series_continues(id: String, round_no: int, lost: int, difficulty: String = "") -> bool:
 	match id:
 		"ten":
-			return round_no < SERIES_TEN_ROUNDS
+			return round_no < series_rounds(difficulty)
 		"survival":
-			return lost == 0
+			return lost < series_lives(difficulty)
 	return false
 
 
@@ -138,10 +155,12 @@ static func random_bonus_lines(continent_id: String) -> String:
 
 static func wager_payout(stake: int, odds: float) -> int:
 	return int(round(float(stake) * odds))
-## Card Gacha with three pools (mode): "mix" = Support + unit cards together, "unit" = unit cards only, "support" = Support cards only.
-## "mix" and "support" roll the rarity with RATES (one shared pity); the card then comes from the pool of that rarity: every Support card, plus
-## (mix only, Rare / Epic) the unit cards of the continents opened on the trophy road (see shop_units). "unit" has its own rates and pity (UNIT_RATES).
-const PITY_LIMIT := 30  # the 30th pull without an Epic or better is guaranteed to be one
+## Card Gacha: ONE pool. The rarity is rolled with RATES (one pity); the card then comes from the pool of that rarity: every Support card, plus
+## (Rare / Epic) the unit cards and (Legendary) the King cards of the continents opened on the trophy road (see shop_units / shop_kings).
+## Pity per rarity: the Nth pull without that rarity (or better) is guaranteed to be it. Each rarity has its own counter, saved in the shop data
+## (Rare "pity_rare", Epic "pity", Legendary "pity_legendary"). A counter resets when its rarity or a better one drops.
+const PITY_LIMITS := {"rare": 10, "epic": 30, "legendary": 90}
+const PITY_KEYS := {"rare": "pity_rare", "epic": "pity", "legendary": "pity_legendary"}
 const RARITY_ORDER: Array[String] = ["common", "rare", "epic", "legendary"]
 const RATES := {"common": 60, "rare": 28, "epic": 10, "legendary": 2}  # percent
 ## Direct purchase of a locked card: with Crystals, or Card Fragments (no coins).
@@ -155,10 +174,6 @@ const CRYSTAL_PRICE := {"common": 1, "rare": 2, "epic": 4, "legendary": 10}
 ## Unit cards (the Shop sells every unit card except the starter ones): coins / fragments by rarity. Pawns are starter cards.
 const UNIT_FRAGMENT_PRICE := {"rare": 120, "epic": 300}
 const UNIT_CRYSTAL_PRICE := {"rare": 2, "epic": 4}
-## Unit pool of the Card Gacha: only Rare and Epic unit cards of the continents opened on the trophy road; its pity is separate.
-const UNIT_RATES := {"rare": 85, "epic": 15}  # percent
-const UNIT_PITY_LIMIT := 20  # the 20th pull without an Epic is guaranteed to be one
-const GACHA_MODES: Array[String] = ["mix", "unit", "support"]  # Unit + Support (one pool) | Unit only | Support only
 ## What a pull costs: 1 Gacha Ticket per pull (the 10-pull costs 9 tickets).
 const TICKET_PULL := 1
 const TICKET_PULL10 := 9
@@ -169,16 +184,21 @@ static func is_unit_card(card: Dictionary) -> bool:
 	return card.has("chess")
 
 
+## A King card (CardDatabase.king_card): collected like a card, its copies are its B level (B1 / B2 / B3, SaveManager.king_b).
+static func is_king_card(card: Dictionary) -> bool:
+	return bool(card.get("is_king", false))
+
+
 static func fragment_price(card: Dictionary) -> int:
 	var r := String(card.get("rarity", "common"))
-	if is_unit_card(card):
+	if is_unit_card(card) and not is_king_card(card):
 		return int(UNIT_FRAGMENT_PRICE.get(r, 120))
 	return int(FRAGMENT_PRICE.get(r, 50))
 
 
 static func crystal_price(card: Dictionary) -> int:
 	var r := String(card.get("rarity", "common"))
-	if is_unit_card(card):
+	if is_unit_card(card) and not is_king_card(card):
 		return int(UNIT_CRYSTAL_PRICE.get(r, 2))
 	return int(CRYSTAL_PRICE.get(r, 1))
 
@@ -188,7 +208,53 @@ static func card_by_id(card_id: String) -> Dictionary:
 	var s := CardDatabase.get_support(card_id)
 	if not s.is_empty():
 		return s
+	if CardDatabase.is_king(card_id):
+		return CardDatabase.king_card(card_id)
 	return CardDatabase.get_unit(card_id)
+
+
+## King cards the Shop sells: the Kings of the continents opened on the trophy road. `only_incomplete`: only those below B3.
+static func shop_kings(only_incomplete: bool = true) -> Array:
+	var out: Array = []
+	for c in GameData.continents:
+		var cid := String(c["id"])
+		if not c.get("playable", false) or not SaveManager.is_continent_unlocked(cid):
+			continue
+		for f in c.get("factions", []):
+			var k := CardDatabase.king_card(String(f.get("champion", "")))
+			if k.is_empty():
+				continue
+			if only_incomplete and SaveManager.king_b(String(k["id"])) >= SaveManager.KING_MAX_COPIES:
+				continue
+			out.append(k)
+	return out
+
+
+static func king_for_sale(card_id: String) -> bool:
+	for k in shop_kings(false):
+		if String(k["id"]) == card_id:
+			return true
+	return false
+
+
+## What reaching a B level of a King gives (shown in the Gacha / Buy Card).
+static func king_b_text(b: int) -> String:
+	match b:
+		1:
+			return "B1: King card"
+		2:
+			return "B2: Battle Chess skill unlocked"
+		3:
+			return "B3: Territory skill unlocked"
+	return ""
+
+
+## Gives the player one copy of a King (first copy = B1). Returns the new B level, or 0 at B3 already.
+static func _give_king_copy(card_id: String) -> int:
+	if SaveManager.owned_count(card_id) == 0:
+		SaveManager.unlock_card(card_id)
+		return 1
+	return SaveManager.add_king_copy(card_id)
 
 
 ## Unit cards the Shop can sell right now: not a starter card (Pawns, Solvaris), from a continent opened on the trophy road.
@@ -225,6 +291,16 @@ static func buy(card_id: String) -> String:
 	var s := card_by_id(card_id)
 	if s.is_empty():
 		return "Unknown card."
+	if is_king_card(s):
+		if not king_for_sale(card_id):
+			return "This King is not in the Shop yet."
+		if SaveManager.king_b(card_id) >= SaveManager.KING_MAX_COPIES:
+			return "This King is already at B3."
+		if not SaveManager.spend_currency("crystals", crystal_price(s)):
+			return "Not enough Crystals."
+		_give_king_copy(card_id)
+		SaveManager.save_game()
+		return ""
 	if SaveManager.owned_count(card_id) > 0:
 		return "You already own this card."
 	if is_unit_card(s) and not unit_for_sale(card_id):
@@ -241,6 +317,16 @@ static func exchange(card_id: String) -> String:
 	var s := card_by_id(card_id)
 	if s.is_empty():
 		return "Unknown card."
+	if is_king_card(s):
+		if not king_for_sale(card_id):
+			return "This King is not in the Shop yet."
+		if SaveManager.king_b(card_id) >= SaveManager.KING_MAX_COPIES:
+			return "This King is already at B3."
+		if not SaveManager.spend_fragments(fragment_price(s)):
+			return "Not enough Card Fragments."
+		_give_king_copy(card_id)
+		SaveManager.save_game()
+		return ""
 	if SaveManager.owned_count(card_id) > 0:
 		return "You already own this card."
 	if is_unit_card(s) and not unit_for_sale(card_id):
@@ -260,19 +346,26 @@ static func unit_for_sale(card_id: String) -> bool:
 	return false
 
 
-static func pity() -> int:
-	return int(SaveManager.data["shop"].get("pity", 0))
+## Pulls since the last `rarity` or better (rarity: "rare" | "epic" | "legendary").
+static func pity(rarity: String = "epic") -> int:
+	return int(SaveManager.data["shop"].get(String(PITY_KEYS[rarity]), 0))
 
 
-## Pulls left until the guaranteed Epic or better.
-static func pulls_to_pity() -> int:
-	return maxi(PITY_LIMIT - pity(), 1)
+## Pulls left until the guaranteed `rarity` or better.
+static func pulls_to_pity(rarity: String = "epic") -> int:
+	return maxi(int(PITY_LIMITS[rarity]) - pity(rarity), 1)
 
 
-static func roll_rarity(rng: RandomNumberGenerator, pity_count: int, min_index: int = 0) -> String:
+## `counters`: {"rare": n, "epic": n, "legendary": n} = pulls since the last Rare+ / Epic+ / Legendary.
+## A reached Legendary pity wins over Epic, which wins over Rare.
+static func roll_rarity(rng: RandomNumberGenerator, counters: Dictionary, min_index: int = 0) -> String:
+	if int(counters.get("legendary", 0)) + 1 >= int(PITY_LIMITS["legendary"]):
+		return "legendary"
 	var lo := min_index
-	if pity_count + 1 >= PITY_LIMIT:
+	if int(counters.get("epic", 0)) + 1 >= int(PITY_LIMITS["epic"]):
 		lo = maxi(lo, 2)
+	elif int(counters.get("rare", 0)) + 1 >= int(PITY_LIMITS["rare"]):
+		lo = maxi(lo, 1)
 	var total := 0
 	for i in range(lo, RARITY_ORDER.size()):
 		total += int(RATES[RARITY_ORDER[i]])
@@ -285,23 +378,36 @@ static func roll_rarity(rng: RandomNumberGenerator, pity_count: int, min_index: 
 
 
 ## One pull WITHOUT charging (use pull_batch). Returns {id, rarity, new, fragments} (fragments > 0 for a duplicate). The card may be a Support or a unit card.
-static func _pull_one(rng: RandomNumberGenerator, min_index: int, mode: String = "mix") -> Dictionary:
+static func _pull_one(rng: RandomNumberGenerator, min_index: int) -> Dictionary:
 	var shop: Dictionary = SaveManager.data["shop"]
-	var rarity := roll_rarity(rng, int(shop.get("pity", 0)), min_index)
+	var rarity := roll_rarity(rng, {"rare": pity("rare"), "epic": pity("epic"), "legendary": pity("legendary")}, min_index)
 	var pool: Array = []
 	for s in CardDatabase.all_supports():
 		if String(s["rarity"]) == rarity:
 			pool.append(s)
-	if mode == "mix":
-		for u in shop_units("", false):  # unit cards (Rare / Epic of the open continents) share the pool
-			if String(u["rarity"]) == rarity:
-				pool.append(u)
+	for u in shop_units("", false):  # unit cards (Rare / Epic of the open continents) share the pool
+		if String(u["rarity"]) == rarity:
+			pool.append(u)
+	for k in shop_kings(true):  # King cards (Legendary, Kings of the open continents below B3) share the pool too
+		if String(k["rarity"]) == rarity:
+			pool.append(k)
 	if pool.is_empty():
 		pool = CardDatabase.all_supports()
 	var card: Dictionary = pool[rng.randi() % pool.size()]
-	shop["pity"] = 0 if RARITY_ORDER.find(rarity) >= 2 else int(shop.get("pity", 0)) + 1
+	var rank := RARITY_ORDER.find(rarity)
+	for pr in ["rare", "epic", "legendary"]:  # every counter resets when its rarity or better drops
+		var key := String(PITY_KEYS[pr])
+		shop[key] = 0 if rank >= RARITY_ORDER.find(pr) else int(shop.get(key, 0)) + 1
 	shop["pulls"] = int(shop.get("pulls", 0)) + 1
 	var id := String(card["id"])
+	if is_king_card(card):  # a duplicate King raises its B level (B2 / B3); only past B3 does it turn into fragments
+		var was_new := SaveManager.owned_count(id) == 0
+		var b := _give_king_copy(id)
+		if b > 0:
+			return {"id": id, "rarity": String(card["rarity"]), "new": was_new, "fragments": 0, "king_b": b}
+		var kf := int(DUPLICATE_FRAGMENTS[String(card["rarity"])])
+		SaveManager.add_fragments(kf)
+		return {"id": id, "rarity": String(card["rarity"]), "new": false, "fragments": kf, "king_b": 0}
 	var is_new := SaveManager.owned_count(id) == 0
 	var fragments := 0
 	if is_new:
@@ -316,67 +422,17 @@ static func ticket_price(count: int) -> int:
 	return TICKET_PULL10 if count >= 10 else TICKET_PULL * count
 
 
-# ------------------------------------------------------------------ Unit pool
-
-static func unit_pity() -> int:
-	return int(SaveManager.data["shop"].get("unit_pity", 0))
-
-
-static func unit_pulls_to_pity() -> int:
-	return maxi(UNIT_PITY_LIMIT - unit_pity(), 1)
-
-
-## Rare or Epic (UNIT_RATES); the pity pull is always Epic.
-static func roll_unit_rarity(rng: RandomNumberGenerator, pity_count: int) -> String:
-	if pity_count + 1 >= UNIT_PITY_LIMIT:
-		return "epic"
-	var r := rng.randi() % (int(UNIT_RATES["rare"]) + int(UNIT_RATES["epic"]))
-	return "rare" if r < int(UNIT_RATES["rare"]) else "epic"
-
-
-## The unit pool can only pull cards of continents the trophy road has opened.
-static func unit_gacha_ready() -> bool:
-	return not shop_units("", false).is_empty()
-
-
-## One unit-only pull WITHOUT charging. Same result shape as _pull_one (a duplicate turns into fragments).
-static func _pull_unit(rng: RandomNumberGenerator) -> Dictionary:
-	var shop: Dictionary = SaveManager.data["shop"]
-	var rarity := roll_unit_rarity(rng, int(shop.get("unit_pity", 0)))
-	var all_units := shop_units("", false)
-	var pool: Array = all_units.filter(func(u): return String(u["rarity"]) == rarity)
-	if pool.is_empty():
-		pool = all_units
-	var card: Dictionary = pool[rng.randi() % pool.size()]
-	rarity = String(card["rarity"])
-	shop["unit_pity"] = 0 if rarity == "epic" else int(shop.get("unit_pity", 0)) + 1
-	shop["unit_pulls"] = int(shop.get("unit_pulls", 0)) + 1
-	var id := String(card["id"])
-	var is_new := SaveManager.owned_count(id) == 0
-	var fragments := 0
-	if is_new:
-		SaveManager.unlock_card(id)
-	else:
-		fragments = int(DUPLICATE_FRAGMENTS[rarity])
-		SaveManager.add_fragments(fragments)
-	return {"id": id, "rarity": rarity, "new": is_new, "fragments": fragments}
-
-
-## Pays and pulls `count` cards from the pool `mode` ("mix" | "unit" | "support"). [] when the player cannot pay (or, for "unit", no unit card
-## is in the Shop yet). Paid with Gacha Tickets only. A mix / support batch of 10 always holds a Rare or better.
-static func pull_batch(count: int, rng: RandomNumberGenerator, mode: String = "mix") -> Array:
-	if count < 1 or not GACHA_MODES.has(mode) or (mode == "unit" and not unit_gacha_ready()):
+## Pays and pulls `count` cards from the Gacha. [] when the player cannot pay. Paid with Gacha Tickets only. A batch of 10 always holds a Rare or better.
+static func pull_batch(count: int, rng: RandomNumberGenerator) -> Array:
+	if count < 1:
 		return []
 	if not SaveManager.spend_currency("tickets", ticket_price(count)):  # the Gacha only takes Gacha Tickets
 		return []
 	var out: Array = []
 	var got_rare := false
 	for i in range(count):
-		if mode == "unit":
-			out.append(_pull_unit(rng))
-			continue
 		var min_index := 1 if (count >= 10 and i == count - 1 and not got_rare) else 0
-		var r := _pull_one(rng, min_index, mode)
+		var r := _pull_one(rng, min_index)
 		if RARITY_ORDER.find(String(r["rarity"])) >= 1:
 			got_rare = true
 		out.append(r)
@@ -424,6 +480,71 @@ static func convert_currency(exchange_id: String, packs: int) -> String:
 	return ""
 
 
+# ------------------------------------------------------------------ Auction (lelang): bid for locked cards with Aether Coins
+
+const AUCTION_LOTS := 4  # cards on offer at the same time
+const AUCTION_VALUE_MULT := 4  # market value in coins = fragment price x this
+const AUCTION_OPEN := 0.4  # the first bid is 40% of the value (same as the Auction on the board)
+const AUCTION_STEP := 0.10  # every raise is 10% of the value
+const AUCTION_RIVAL_MIN := 0.6  # a rival's hidden limit is between 60% ...
+const AUCTION_RIVAL_MAX := 1.3  # ... and 130% of the value
+
+
+## What a card is worth at the Auction, in Aether Coins.
+static func auction_value(card: Dictionary) -> int:
+	return fragment_price(card) * AUCTION_VALUE_MULT
+
+
+static func auction_open(card: Dictionary) -> int:
+	return maxi(1, roundi(float(auction_value(card)) * AUCTION_OPEN))
+
+
+static func auction_step(card: Dictionary) -> int:
+	return maxi(1, roundi(float(auction_value(card)) * AUCTION_STEP))
+
+
+## The lots of a day (ids): locked Support cards and unit cards the Shop sells, never Common. Same lots all day (`day` = unix day).
+static func auction_lots(day: int) -> Array:
+	var pool: Array = []
+	for s in locked_supports():
+		if String(s.get("rarity", "common")) != "common":
+			pool.append(String(s["id"]))
+	for u in shop_units():
+		pool.append(String(u["id"]))
+	pool.sort()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("auction_%d" % day)
+	var out: Array = []
+	while out.size() < AUCTION_LOTS and not pool.is_empty():
+		out.append(pool.pop_at(rng.randi_range(0, pool.size() - 1)))
+	return out
+
+
+## The hidden most a rival bidder will pay for this card.
+static func auction_rival_limit(card: Dictionary, rng: RandomNumberGenerator) -> int:
+	return roundi(float(auction_value(card)) * rng.randf_range(AUCTION_RIVAL_MIN, AUCTION_RIVAL_MAX))
+
+
+## The rival's answer to the player's bid: the new bid, or 0 when the rival gives up (the player wins at `bid`).
+static func auction_rival_reply(card: Dictionary, bid: int, limit: int) -> int:
+	var next := bid + auction_step(card)
+	return next if next <= limit else 0
+
+
+## The player wins the lot at `price`. Returns "" on success or the reason it failed.
+static func auction_win(card_id: String, price: int) -> String:
+	var s := card_by_id(card_id)
+	if s.is_empty():
+		return "Unknown card."
+	if SaveManager.owned_count(card_id) > 0:
+		return "You already own this card."
+	if not SaveManager.spend_coins(price):
+		return "Not enough Aether Coins."
+	SaveManager.unlock_card(card_id)
+	SaveManager.save_game()
+	return ""
+
+
 # ------------------------------------------------------------------ Gamble (judi): quick mini games, Chips only
 
 ## Bets are paid and won in Chips only (turn winnings into coins with the Exchange tab). Every game has a small house edge
@@ -439,24 +560,25 @@ const SLOT_PAIR := 1.5  # exactly two alike
 const SLOT_EXPECTED_RETURN := (SLOT_JACKPOT + 5.0 * SLOT_TRIPLE) / 216.0 + 90.0 / 216.0 * SLOT_PAIR  # about 95%
 
 
-## Plays one round. Returns {"ok": bool, "error": String, "win": bool, "payout": int (chips back, stake included), "net": int,
-## "bet": int, "game": String, "detail": Dictionary}. Nothing is paid when ok is false.
-static func gamble(game: String, choice: String, bet: int, rng: RandomNumberGenerator) -> Dictionary:
-	var res := {"ok": false, "error": "", "win": false, "payout": 0, "net": 0, "bet": bet, "game": game, "detail": {}}
+## "" when `game` and `choice` are valid, otherwise what is wrong with them.
+static func gamble_pick_error(game: String, choice: String) -> String:
 	if not GAMBLE_GAMES.has(game):
-		res["error"] = "Unknown game."
-		return res
-	if not GAMBLE_BETS.has(bet):
-		res["error"] = "Pick a bet."
-		return res
+		return "Unknown game."
 	if game == "coin" and choice not in ["heads", "tails"]:
-		res["error"] = "Pick heads or tails."
-		return res
+		return "Pick heads or tails."
 	if game == "dice" and not DICE_PAYOUT.has(choice):
-		res["error"] = "Pick Low, Seven or High."
-		return res
-	if not SaveManager.spend_currency("chips", bet):
-		res["error"] = "Not enough Chips."
+		return "Pick Low, Seven or High."
+	return ""
+
+
+## One round of a Gamble game with `bet` of any currency, nothing is paid here. Shared by the Shop > Gamble tab (Chips) and the
+## Territory Casino (Dominion Gold). Returns {"ok", "error", "win", "payout" (stake included), "net", "bet", "game", "detail"}.
+static func gamble_round(game: String, choice: String, bet: int, rng: RandomNumberGenerator) -> Dictionary:
+	var res := {"ok": false, "error": "", "win": false, "payout": 0, "net": 0, "bet": bet, "game": game, "detail": {}}
+	res["error"] = gamble_pick_error(game, choice)
+	if res["error"] == "" and bet < 1:
+		res["error"] = "Pick a bet."
+	if res["error"] != "":
 		return res
 	var payout := 0
 	match game:
@@ -484,11 +606,24 @@ static func gamble(game: String, choice: String, bet: int, rng: RandomNumberGene
 				kind = "pair"
 				payout = int(floor(float(bet) * SLOT_PAIR))
 			res["detail"] = {"reels": reels, "symbols": reels.map(func(i): return SLOT_SYMBOLS[i]), "kind": kind}
-	if payout > 0:
-		SaveManager.add_currency("chips", payout)
-	SaveManager.save_game()
 	res["ok"] = true
 	res["payout"] = payout
 	res["net"] = payout - bet
 	res["win"] = payout > bet
+	return res
+
+
+## Plays one round of the Shop > Gamble tab. Bets are paid and won in Chips; nothing is paid when ok is false.
+static func gamble(game: String, choice: String, bet: int, rng: RandomNumberGenerator) -> Dictionary:
+	var res := {"ok": false, "error": gamble_pick_error(game, choice), "win": false, "payout": 0, "net": 0, "bet": bet, "game": game, "detail": {}}
+	if res["error"] == "" and not GAMBLE_BETS.has(bet):
+		res["error"] = "Pick a bet."
+	if res["error"] == "" and not SaveManager.spend_currency("chips", bet):
+		res["error"] = "Not enough Chips."
+	if res["error"] != "":
+		return res
+	res = gamble_round(game, choice, bet, rng)
+	if int(res["payout"]) > 0:
+		SaveManager.add_currency("chips", int(res["payout"]))
+	SaveManager.save_game()
 	return res

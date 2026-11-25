@@ -137,6 +137,24 @@ static func make_primary(text: String, min_h: float = 60.0) -> Button:
 	return b
 
 
+## Crystal purchase button (Buy with Crystals): deep blue fill, bright cyan border, near-white text so the label stays readable
+## in every state (the gold primary look with cyan text was unreadable). Disabled keeps a dim but legible label.
+static func make_crystal(text: String, min_h: float = 60.0) -> Button:
+	var b := make_button(text, min_h)
+	b.add_theme_stylebox_override("normal", make_box(Color("14407a"), Color("7fd8ff"), 3, 14, 8))
+	b.add_theme_stylebox_override("hover", make_box(Color("1c569e"), Color("c4efff"), 3, 14, 10))
+	var pr := make_box(Color("0e2f5c"), Color("c4efff"), 3, 14, 0)
+	pr.content_margin_top = 10
+	b.add_theme_stylebox_override("pressed", pr)
+	b.add_theme_stylebox_override("disabled", make_box(Color("1a2338"), Color("3d5670"), 2, 14, 0))
+	b.add_theme_color_override("font_color", Color("effaff"))
+	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.add_theme_color_override("font_pressed_color", Color("c4efff"))
+	b.add_theme_color_override("font_disabled_color", Color("8fa3b8"))
+	b.add_theme_font_size_override("font_size", 24)
+	return b
+
+
 ## Destructive confirm button (Leave a battle, ...): red fill, light text.
 static func make_danger(text: String, min_h: float = 60.0) -> Button:
 	var b := make_button(text, min_h)

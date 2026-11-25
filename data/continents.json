@@ -80,7 +80,28 @@
 				},
 				"ingame_text": "+30 G at START"
 			},
-			"unlock_trophies": 0
+			"unlock_trophies": 0,
+			"mission": {
+				"id": "crown_dominion",
+				"name": "Crown Dominion",
+				"description": "Hold every territory of one region (Regional Dominion).",
+				"metric": "dominion",
+				"target": 1,
+				"target_chaos": 1,
+				"reward": {
+					"gold": 400
+				}
+			},
+			"battle_mission": {
+				"id": "royal_guard",
+				"name": "Royal Guard",
+				"description": "Win with at least {n} of your units still standing.",
+				"metric": "survivors_win",
+				"target": 3,
+				"reward": {
+					"gold": 150
+				}
+			}
 		},
 		{
 			"id": "arcanum",
@@ -162,7 +183,29 @@
 				},
 				"ingame_text": "2 Reroll Tokens at start"
 			},
-			"unlock_trophies": 150
+			"unlock_trophies": 150,
+			"mission": {
+				"id": "spellweaver",
+				"name": "Spellweaver",
+				"description": "Roll {n} Special Dice.",
+				"metric": "special_dice",
+				"target": 2,
+				"target_chaos": 1,
+				"reward": {
+					"tokens": 2,
+					"die": true
+				}
+			},
+			"battle_mission": {
+				"id": "spellweaver",
+				"name": "Spellweaver",
+				"description": "Play {n} Support cards in the battle.",
+				"metric": "supports",
+				"target": 2,
+				"reward": {
+					"gold": 150
+				}
+			}
 		},
 		{
 			"id": "machina",
@@ -245,7 +288,29 @@
 				},
 				"ingame_text": "Battle Shop -10%"
 			},
-			"unlock_trophies": 400
+			"unlock_trophies": 400,
+			"mission": {
+				"id": "master_builder",
+				"name": "Master Builder",
+				"description": "Upgrade your territories {n} times.",
+				"metric": "upgrades",
+				"target": 4,
+				"target_chaos": 3,
+				"reward": {
+					"gold": 200,
+					"die": true
+				}
+			},
+			"battle_mission": {
+				"id": "siege_engine",
+				"name": "Siege Engine",
+				"description": "Destroy {n} enemy units.",
+				"metric": "kills",
+				"target": 5,
+				"reward": {
+					"gold": 150
+				}
+			}
 		},
 		{
 			"id": "sylvaris",
@@ -328,7 +393,29 @@
 				},
 				"ingame_text": "+2 G per territory each round"
 			},
-			"unlock_trophies": 700
+			"unlock_trophies": 700,
+			"mission": {
+				"id": "great_grove",
+				"name": "Great Grove",
+				"description": "Own {n} territories at the same time.",
+				"metric": "territories",
+				"target": 8,
+				"target_chaos": 5,
+				"reward": {
+					"gold": 150,
+					"life": 1
+				}
+			},
+			"battle_mission": {
+				"id": "unbroken_grove",
+				"name": "Unbroken Grove",
+				"description": "Win without losing a single unit.",
+				"metric": "flawless",
+				"target": 1,
+				"reward": {
+					"gold": 200
+				}
+			}
 		},
 		{
 			"id": "drakmor",
@@ -411,7 +498,29 @@
 				},
 				"ingame_text": "+30 G per duel won"
 			},
-			"unlock_trophies": 1100
+			"unlock_trophies": 1100,
+			"mission": {
+				"id": "dragons_wrath",
+				"name": "Dragon's Wrath",
+				"description": "Win {n} duels.",
+				"metric": "duel_wins",
+				"target": 3,
+				"target_chaos": 2,
+				"reward": {
+					"gold": 250,
+					"tokens": 1
+				}
+			},
+			"battle_mission": {
+				"id": "dragons_wrath",
+				"name": "Dragon's Wrath",
+				"description": "Destroy {n} enemy units.",
+				"metric": "kills",
+				"target": 7,
+				"reward": {
+					"gold": 200
+				}
+			}
 		},
 		{
 			"id": "thalassia",
@@ -494,7 +603,29 @@
 				},
 				"ingame_text": "Tax -25%"
 			},
-			"unlock_trophies": 1600
+			"unlock_trophies": 1600,
+			"mission": {
+				"id": "treasure_hunter",
+				"name": "Treasure Hunter",
+				"description": "Find {n} hidden treasures or mines.",
+				"metric": "deposits",
+				"target": 2,
+				"target_chaos": 1,
+				"reward": {
+					"gold": 200,
+					"tokens": 2
+				}
+			},
+			"battle_mission": {
+				"id": "tide_turner",
+				"name": "Tide Turner",
+				"description": "Win the battle within {n} ticks.",
+				"metric": "fast_win",
+				"target": 150,
+				"reward": {
+					"gold": 200
+				}
+			}
 		},
 		{
 			"id": "eclipsia",
@@ -577,7 +708,29 @@
 				},
 				"ingame_text": "+1 Reroll Token at START"
 			},
-			"unlock_trophies": 2200
+			"unlock_trophies": 2200,
+			"mission": {
+				"id": "rift_slayer",
+				"name": "Rift Slayer",
+				"description": "Defeat a hidden monster in battle.",
+				"metric": "monsters_won",
+				"target": 1,
+				"target_chaos": 1,
+				"reward": {
+					"tokens": 3,
+					"life": 1
+				}
+			},
+			"battle_mission": {
+				"id": "last_stand_hero",
+				"name": "Last Stand Hero",
+				"description": "Cast your King's skill.",
+				"metric": "king_skill",
+				"target": 1,
+				"reward": {
+					"gold": 150
+				}
+			}
 		}
 	]
 }

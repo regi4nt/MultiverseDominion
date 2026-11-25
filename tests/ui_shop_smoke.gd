@@ -29,10 +29,10 @@ func _ready() -> void:
 	var bs: Control = shop._views["buy_card"]  # one Buy Card tab: Support + unit cards
 	var ex: Control = shop._views["exchange"]
 	var tabs: Array = shop._tab_buttons.keys()
-	if tabs != ["gacha", "buy_card", "gamble", "exchange"] or (shop._tab_buttons["gacha"] as Button).text != "Card Gacha" or (shop._tab_buttons["buy_card"] as Button).text != "Buy Card" \
-			or (shop._tab_buttons["exchange"] as Button).text != "Exchange" or (shop._tab_buttons["gamble"] as Button).text != "Gamble":
+	if tabs != ["gacha", "buy_card", "auction", "gamble", "trading", "exchange"] or (shop._tab_buttons["gacha"] as Button).text != "Card Gacha" or (shop._tab_buttons["buy_card"] as Button).text != "Buy Card" \
+			or (shop._tab_buttons["exchange"] as Button).text != "Exchange" or (shop._tab_buttons["auction"] as Button).text != "Auction" or (shop._tab_buttons["gamble"] as Button).text != "Gamble" or (shop._tab_buttons["trading"] as Button).text != "Trading":
 		fails += 1
-		push_error("tab order: Card Gacha, Buy Card, Gamble, Exchange (%s)" % str(tabs))
+		push_error("tab order: Card Gacha, Buy Card, Auction, Gamble, Trading, Exchange (%s)" % str(tabs))
 	if not gs.visible or bs.visible or gs.pull10.disabled:
 		fails += 1
 	gs._on_pull(10)
@@ -44,9 +44,9 @@ func _ready() -> void:
 	shop._show_tab("buy_card")
 	await get_tree().process_frame
 	var n_all: int = bs.grid.get_child_count()
-	if bs.kind != "all" or n_all == 0 or n_all != ShopSystem.locked_supports().size() + ShopSystem.shop_units("", true).size():
+	if bs.kind != "all" or n_all == 0 or n_all != ShopSystem.locked_supports().size() + ShopSystem.shop_units("", true).size() + ShopSystem.shop_kings(true).size():
 		fails += 1
-		push_error("the Buy Card tab (All) should list every locked Support and unit card (%d)" % n_all)
+		push_error("the Buy Card tab (All) should list every locked Support and unit card plus the Kings below B3 (%d)" % n_all)
 	# --- Buy Card: Support filter
 	bs.kind = "support"
 	bs.rebuild()
@@ -105,40 +105,16 @@ func _ready() -> void:
 	bs.rebuild()
 	if bs.grid.get_child_count() != ShopSystem.locked_supports("Magic").size():
 		fails += 1
-	# --- Card Gacha pools: Unit + Support, Unit, Support
+	# --- Card Gacha: one pool
 	shop._show_tab("gacha")
 	SaveManager.data["wallet"]["tickets"] = 100
 	shop._refresh()
-	if not gs.visible or gs.pull10.disabled or gs.mode != "mix" or not (gs._mode_buttons["mix"] as Button).button_pressed:
+	if not gs.visible or gs.pull10.disabled:
 		fails += 1
-		push_error("the Card Gacha tab opens on Unit + Support with usable pull buttons")
-	if gs._mode_buttons.keys() != ["mix", "unit", "support"] or (gs._mode_buttons["unit"] as Button).text != "Unit" or (gs._mode_buttons["support"] as Button).text != "Support":
+		push_error("the Card Gacha tab opens with usable pull buttons")
+	if gs.pity_bars.size() != 3 or gs.pity_bars["legendary"].max_value != ShopSystem.PITY_LIMITS["legendary"] or gs._chips.get_child_count() != ShopSystem.RATES.size():
 		fails += 1
-		push_error("the Card Gacha has three pool buttons: Unit + Support, Unit, Support")
-	gs.set_mode("unit")
-	await get_tree().process_frame
-	if gs.mode != "unit" or gs.pity_bar.max_value != ShopSystem.UNIT_PITY_LIMIT or gs._chips.get_child_count() != ShopSystem.UNIT_RATES.size():
-		fails += 1
-		push_error("the Unit pool shows its own rates and pity")
-	var locked_before := ShopSystem.shop_units("", true).size()
-	gs._on_pull(10)
-	await get_tree().process_frame
-	if gs.result_flow.get_child_count() != 10:
-		fails += 1
-		push_error("10 unit pulls should show 10 cards")
-	if ShopSystem.shop_units("", true).size() >= locked_before:
-		fails += 1
-		push_error("unit pulls should unlock unit cards")
-	gs.set_mode("support")
-	if gs.pity_bar.max_value != ShopSystem.PITY_LIMIT or gs._chips.get_child_count() != ShopSystem.RATES.size():
-		fails += 1
-		push_error("the Support pool shows the Support rates and pity")
-	gs._on_pull(10)
-	await get_tree().process_frame
-	if gs.result_flow.get_child_count() != 10:
-		fails += 1
-		push_error("10 Support pulls should show 10 cards")
-	gs.set_mode("mix")
+		push_error("the Card Gacha shows the rates and pity")
 	gs._on_pull(10)
 	await get_tree().process_frame
 	if gs.result_flow.get_child_count() != 10:

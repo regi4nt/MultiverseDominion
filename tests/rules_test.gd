@@ -259,10 +259,34 @@ func _test_bank_casino() -> void:
 	q.gold = 1000
 	land_on(c, 1, BoardTile.Type.CASINO)
 	check(String(c.pending.get("type", "")) == "casino", "landing on the Casino opens a bet offer")
-	var pot0 := c.casino_pot
-	c.decide("bet")
-	check(c.pending.is_empty() and c.stats["bets"] == 1, "bet resolves in one step")
-	check(q.gold != 1000 or c.casino_pot != pot0, "bet was paid")
+	check(c.get_decision_options().size() == 1 and String(c.get_decision_options()[0]["id"]) == "leave", "the Casino offers only Leave: the games are played in the Gamble panel")
+	check(not bool(c.casino_play("coin", "heads", 7)["ok"]) and q.gold == 1000, "a bet that is not in casino_bets is refused")
+	check(not bool(c.casino_play("roulette", "", 50)["ok"]) and q.gold == 1000, "an unknown game is refused")
+	var drawn := String(c.pending["game"])
+	check(drawn in ["coin", "dice", "slots"], "the Casino draws one of the three Gamble games")
+	var other := "slots" if drawn != "slots" else "coin"
+	check(not bool(c.casino_play(other, c.casino_default_choice(other), 50)["ok"]) and q.gold == 1000, "only the drawn game can be played")
+	q.gold = 20
+	check(not bool(c.casino_play(drawn, c.casino_default_choice(drawn), 50)["ok"]) and q.gold == 20, "a bet above the player's gold is refused")
+	q.gold = 1000
+	var cr := c.casino_play(drawn, c.casino_default_choice(drawn), 50)  # one round of the drawn game, paid in gold
+	check(bool(cr["ok"]) and int(cr["net"]) == int(cr["payout"]) - 50, "Casino %s plays a round" % drawn)
+	check(q.gold == 1000 + int(cr["net"]) and c.stats["bets"] == 1, "the round moves gold by the net result and counts as a bet")
+	check(not bool(c.casino_play(drawn, c.casino_default_choice(drawn), 50)["ok"]) and q.gold == 1000 + int(cr["net"]), "only one round per Casino visit")
+	q.gold = 1000
+	var seen_games := {}
+	for sd in range(1, 40):  # the game is random: over many visits all three show up
+		var cg := new_match(sd)
+		cg.players[1].gold = 1000
+		land_on(cg, 1, BoardTile.Type.CASINO)
+		seen_games[String(cg.pending["game"])] = true
+	check(seen_games.size() == 3, "the Casino draws all three games over many visits")
+	c.decide("leave")
+	check(c.pending.is_empty(), "Leave closes the Casino")
+	check(not bool(c.casino_play(drawn, c.casino_default_choice(drawn), 50)["ok"]), "no Casino rounds without an open Casino")
+	land_on(c, 1, BoardTile.Type.CASINO)
+	c.decide("bet")  # quick bet (AI / headless): one round of the drawn game at the lowest bet
+	check(c.pending.is_empty() and c.stats["bets"] == 2, "the quick bet resolves in one step")
 	var q2 := c.players[2]
 	q2.gold = 10
 	land_on(c, 2, BoardTile.Type.CASINO)
@@ -299,18 +323,16 @@ func _test_bank_casino() -> void:
 	cm._shift_market(-0.2)
 	check(cm.players[0].stock_value == 960, "Market Crash lowers every portfolio")
 	var g1 := cm.players[2].gold
-	var pot1 := cm.casino_pot
-	cm._casino_draw(cm.players[2], true)
-	check(cm.players[2].gold >= g1 and cm.casino_pot <= pot1, "free chip costs nothing and adds nothing to the pot")
-	# Save / load keeps portfolio, market and pot
+	cm._casino_free_chip(cm.players[2])
+	check(cm.players[2].gold >= g1, "free chip costs nothing: it can only add gold")
+	# Save / load keeps portfolio and market
 	p.stock_value = 120
 	p.stock_basis = 100
 	c.market_change = 0.12
-	c.casino_pot = 777
 	c.state = MatchController.State.AWAIT_ROLL
 	c.pending = {}
 	var c2 := MatchController.from_dict(c.to_dict())
-	check(c2.players[0].stock_value == 120 and c2.players[0].stock_basis == 100 and absf(c2.market_change - 0.12) < 0.001 and c2.casino_pot == 777, "save / load keeps bank + casino state")
+	check(c2.players[0].stock_value == 120 and c2.players[0].stock_basis == 100 and absf(c2.market_change - 0.12) < 0.001, "save / load keeps the bank state")
 
 
 func _free_land(c: MatchController, region: int = 0) -> BoardTile:
@@ -403,6 +425,16 @@ func _test_lease() -> void:
 
 
 func _test_commander() -> void:
+	var seen_pairs := {}
+	var mis_ok := true
+	for cid in GameData.champions.keys():
+		var ms: Array = CommanderSystem.missions_for(String(cid))
+		mis_ok = mis_ok and ms.size() == 2 and String(ms[0]["id"]) != String(ms[1]["id"]) and int(ms[0]["target"]) > 0 and int(ms[0].get("bc_target", 0)) > 0 and String(ms[1].get("bc_metric", "")) != ""
+		seen_pairs[String(ms[0]["metric"]) + "/" + String(ms[1]["metric"])] = true
+	check(mis_ok and seen_pairs.size() == GameData.champions.size(), "every faction has its own pair of Commander missions (Territory + Battle Chess version)")
+	var bcp := PlayerState.new()
+	bcp.champion_id = "champion_solvaris"
+	check(CommanderSystem.add_progress_battle(bcp, "bc_wins", 1) == false and bcp.mission_progress == 1 and CommanderSystem.add_progress_battle(bcp, "bc_wins", 1) and bcp.commander_star == 2, "Battle Chess: two won rounds level the King (Solvaris mission 1)")
 	var c := new_match(31)
 	var p := c.players[0]
 	check(p.commander_star == 1 and p.mission_progress == 0, "the Commander starts at 1 star")

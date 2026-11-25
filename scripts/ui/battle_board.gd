@@ -15,7 +15,8 @@ var rng := RandomNumberGenerator.new()
 var terrain: Dictionary = {}  # highland cells of this duel: drawn at random every time the board opens
 var deck: Deck
 var champion_id: String = ""
-var commander_star: int = 1  # Commander stars (duels use the player's; practice is 1 star)
+var commander_star: int = 1  # Commander stars (duels use the player's; Battle Chess: raised by the faction missions of the run)
+var _cmd: PlayerState = null  # Battle Chess run: holds the King's level and faction-mission progress (CommanderSystem.add_progress_battle)
 var hand: Array = []
 var phase: String = "prep"
 var selected: UnitInstance
@@ -57,6 +58,8 @@ var _log_index: int = 0
 var _enemy_champion: String = ""
 var _enemy_hand: Array = []
 var _result_shown := false
+var _bm: Dictionary = {}  # Battle Chess Continent Mission of the played continent ({} in duels)
+var _bm_done: bool = false
 var _duel_msg: String = ""
 var _tip_panel: PanelContainer = null
 var _tip_label: Label = null
@@ -65,6 +68,11 @@ var _start_dialog: UiDialog
 var _wager: int = 0  # Battle Chess stake (already paid); a win pays stake x odds, a draw returns it
 var _wager_odds: float = 2.0
 var _series: String = "single"  # Battle Chess length (GameSession.battle_series): "single" | "ten" | "survival"
+var _series_diff: String = "normal"  # difficulty of the run: sets the number of rounds of the multi-round run (Easy 5 / Normal 3 / Hard 1)
+var _duel_rounds: int = 1  # rounds of a ruler duel inside a match: Easy 5 / Normal 3 / Hard 1 (1 = a single battle: monsters, tutorial)
+var _duel_enemy_cfg: Dictionary = {}  # the enemy army of round 1, reused in the next rounds of the same duel
+var _duel_bonus: Array = [0, 0]  # bonus gold of the rounds each side won
+var _duel_delta: Array = [0, 0]  # gold the Support cards gave or took over all rounds
 var _round: int = 1
 var _wins: int = 0
 var _losses: int = 0
@@ -82,13 +90,20 @@ func _ready() -> void:
 		_wager = GameSession.wager
 		_wager_odds = GameSession.wager_odds
 		GameSession.wager = 0
-		_series = GameSession.battle_series if ShopSystem.SERIES_IDS.has(GameSession.battle_series) else "single"
+		_series = "survival"  # every Battle Chess run is Survival; the difficulty only sets the lives
+		_series_diff = String(GameSession.difficulty)
 	if duel_context.is_empty():
 		CardDatabase.set_continent(GameSession.continent_id)
 		WorldMods.apply(GameData.get_continent(CardDatabase.active_continent))
-		deck = SaveManager.get_deck(GameSession.continent_id)
+		_bm = BattleMission.of(GameSession.continent_id)
+		var deck_cont := GameSession.battle_deck_continent if GameSession.battle_deck_continent != "" else GameSession.continent_id
+		GameSession.battle_deck_continent = ""
+		deck = SaveManager.get_deck(deck_cont)
 		champion_id = deck.champion_id
+		_cmd = PlayerState.new()
+		_cmd.champion_id = champion_id
 		prep = BattlePrep.new(deck, rng, int(GameData.b("practice_gold")), int(GameData.b("practice_gold")), int(GameData.b("start_level")))
+		prep.give_starter_pawns(int(GameData.b("starter_units")))  # Battle Chess: 3 random Pawns of the deck right at the start
 		hand = prep.hand
 	else:
 		var me: PlayerState = duel_context["human"]
@@ -99,6 +114,8 @@ func _ready() -> void:
 		prep = BattlePrep.new(deck, rng, me.gold, budget, me.level, me.roster, me.battle_deck, me.hand)
 		hand = prep.hand
 		prep.price_mult = me.battle_price_mult()  # Quartermaster passive (prices are computed on display)
+		if not duel_context.has("monster") and not bool(duel_context.get("tutorial", false)) and duel_context.has("difficulty"):
+			_duel_rounds = ShopSystem.series_rounds(String(duel_context["difficulty"]))
 	terrain = Terrain.generate(rng)
 	prep.set_terrain(terrain)
 	var own_faction := String(GameData.get_champion(champion_id).get("faction", ""))
@@ -355,10 +372,21 @@ func _build_ui() -> void:
 
 ## "Round 3 / 10  W2 L0 D1\n" (10 rounds), "Round 4  W3 L0 D1\n" (survival), "" for a single battle or a duel.
 func _round_line() -> String:
-	if not duel_context.is_empty() or _series == "single":
+	if not duel_context.is_empty():
+		if _duel_rounds <= 1:
+			return ""
+		return "Duel round %d / %d  W%d L%d D%d\n" % [_round, _duel_rounds, _wins, _losses, _draws]
+	if _series == "single":
 		return ""
-	var of_txt := " / %d" % ShopSystem.SERIES_TEN_ROUNDS if _series == "ten" else ""
-	return "Round %d%s  W%d L%d D%d\n" % [_round, of_txt, _wins, _losses, _draws]
+	var of_txt := " / %d" % ShopSystem.series_rounds(_series_diff) if _series == "ten" else ""
+	var mis := ("\nKing mission: " + CommanderSystem.mission_text_battle(_cmd)) if _cmd != null else ""
+	var lives_txt := "  Lives %d/%d" % [_lives_left(), ShopSystem.series_lives(_series_diff)] if _series == "survival" else ""
+	return "Round %d%s  W%d L%d D%d%s%s\n" % [_round, of_txt, _wins, _losses, _draws, lives_txt, mis]
+
+
+## Lives left in a Battle Chess Survival run (Easy 5 / Normal 3 / Hard 1 at the start; every defeat costs one).
+func _lives_left() -> int:
+	return maxi(ShopSystem.series_lives(_series_diff) - _losses, 0)
 
 
 ## Menu button / Android Back in Battle Chess: ask first, unless the run is already over.
@@ -394,6 +422,8 @@ func _on_start_pressed() -> void:
 
 func _refresh_prep() -> void:
 	status_label.text = "%sGold %d | Budget %d\nLevel %d | Capacity %d/%d" % [_round_line(), prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
+	if not _bm.is_empty() and duel_context.is_empty():
+		status_label.text += "\nMission: %s  (+%d G)" % [BattleMission.text(_bm), BattleMission.reward_gold(_bm)]
 	lineup_legend.visible = deck != null and deck.has_support_lineup()
 	for c in shop_box.get_children():
 		shop_box.remove_child(c)
@@ -757,11 +787,14 @@ func _on_start_battle() -> void:
 	if duel_context.is_empty():
 		var diff := String(GameSession.difficulty)
 		var enemy_level := prep.level  # the enemy's level (shop level / capacity) follows OURS, not the King level; it grows only through its budget
-		var enemy_prep := BattleAI.build_enemy(diff, enemy_level, rng, deck, terrain, ShopSystem.series_budget_mult(_round))
-		_enemy_champion = BattleAI.pick_champion(rng, champion_id)
-		_enemy_hand = BattleAI.pick_hand(deck, rng, 2)
-		commander_star = ShopSystem.series_king_star(_series, _round)  # Battle Chess series: both Kings level up as the rounds go on
-		enemy_cfg = enemy_prep.to_side_cfg(_enemy_champion, _enemy_hand, commander_star)
+		# The AI follows the MAP continent (King of that continent + its units); only the player's army is the personal Card Hub deck.
+		_enemy_champion = BattleAI.pick_continent_champion(rng, CardDatabase.active_continent, champion_id)
+		var enemy_deck := BattleAI.continent_deck(CardDatabase.active_continent, _enemy_champion)
+		var enemy_prep := BattleAI.build_enemy(diff, enemy_level, rng, enemy_deck, terrain, ShopSystem.series_budget_mult(_round))
+		_enemy_hand = BattleAI.pick_hand(enemy_deck, rng, 2)
+		commander_star = _cmd.commander_star if _cmd != null else 1  # YOUR King levels up through its faction missions
+		var enemy_star := ShopSystem.series_king_star(_series, _round)  # the enemy King levels up as the rounds go on (Lv 2 from round 4, Lv 3 from round 7)
+		enemy_cfg = enemy_prep.to_side_cfg(_enemy_champion, _enemy_hand, enemy_star)
 	else:
 		var me: PlayerState = duel_context["human"]
 		prep.finish()  # unbought offers go back to the pile; spending is permanent
@@ -770,10 +803,14 @@ func _on_start_battle() -> void:
 		me.capacity = prep.capacity()
 		if duel_context.has("monster"):
 			enemy_cfg = {"units": [], "champion": "", "supports": [], "foes": [String(duel_context["monster"])], "foe_star": commander_star}  # same side config as MonsterSystem.fight
+		elif _round > 1 and not _duel_enemy_cfg.is_empty():
+			enemy_cfg = _duel_enemy_cfg.duplicate(true)  # later rounds of the duel: the same enemy army (the AI does not shop again)
 		else:
 			enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1, terrain)
+			_duel_enemy_cfg = enemy_cfg.duplicate(true)
+	_bm_done = false
 	engine = BattleEngine.new()
-	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "manual_king": [true, false], "terrain": terrain, "sides": [
+	engine.setup({"seed": rng.randi(), "ai_supports": [false, true], "manual_king": [true, false], "king_skill_locked": [_king_skill_locked(), false], "terrain": terrain, "sides": [
 		prep.to_side_cfg(champion_id, hand, commander_star, _own_monster_id(), _own_monster_star()), enemy_cfg]})
 	phase = "battle"
 	_set_tip(TutorialGuide.BATTLE["fight"])
@@ -833,6 +870,7 @@ func _on_tick() -> void:
 		return
 	engine.step()
 	grid.notify_tick()
+	_check_battle_mission()
 	_battle_sounds()
 	_update_battle_ui()
 	if engine.finished:
@@ -844,12 +882,25 @@ func _on_tick() -> void:
 		_show_result()
 
 
+## Battle Chess mission: completes live (or when the battle ends); the Gold goes straight to the preparation panel.
+func _check_battle_mission() -> void:
+	if _bm.is_empty() or _bm_done or not duel_context.is_empty() or not BattleMission.is_done(_bm, engine):
+		return
+	_bm_done = true
+	var g := BattleMission.reward_gold(_bm)
+	prep.gold += g
+	prep.budget_left += g
+	log_view.add_text("MISSION COMPLETE! %s: +%d gold.\n" % [String(_bm.get("name", "")), g])
+
+
 func _update_battle_ui() -> void:
 	while _log_index < engine.log_lines.size():
 		log_view.add_text(engine.log_lines[_log_index] + "\n")
 		_log_index += 1
 	status_label.text = "%sTick %d / %d" % [_round_line(), engine.tick, BattleEngine.MAX_TICKS]
 	battle_status.text = "You: %d units, HP %d\nEnemy: %d units, HP %d" % [engine.regulars_alive(0), engine.total_hp(0), engine.regulars_alive(1), engine.total_hp(1)]
+	if not _bm.is_empty() and duel_context.is_empty():
+		battle_status.text += "\n" + BattleMission.status_line(_bm, engine, _bm_done)
 	_refresh_king_btn()
 	_refresh_energy()
 	grid.queue_redraw()
@@ -925,7 +976,9 @@ func _refresh_king_btn() -> void:
 		summon_btn.disabled = not engine.can_summon_king(0)
 	var ch := GameData.get_champion(champion_id)
 	var base := "[%d E] %s - %s" % [engine.king_energy_cost(), ch.get("active_name", "King skill"), ch.get("active_desc", "")]
-	if bool(engine.king_skill_used[0]):
+	if bool(engine.king_skill_locked[0]):
+		king_btn.text = "%s\n(LOCKED: needs B2, a second copy of this King card)" % ch.get("active_name", "King skill")
+	elif bool(engine.king_skill_used[0]):
 		king_btn.text = "%s (used)" % ch.get("active_name", "King skill")
 	elif not bool(engine.king_entered[0]):
 		king_btn.text = "%s\n(available once the King enters in Last Stand)" % base
@@ -1068,6 +1121,11 @@ func _show_result() -> void:
 		v.add_child(tl)
 	v.add_child(UiTheme.make_label("Ticks: %d | Your survivors: %d | Enemy survivors: %d" % [engine.tick, engine.regulars_alive(0), engine.regulars_alive(1)], 18))
 	if duel_context.is_empty():
+		if not _bm.is_empty():
+			_check_battle_mission()  # end-of-battle goals (win with survivors, flawless, fast win) are decided now
+			var done_txt := "Mission complete: %s  +%d gold%s" % [String(_bm.get("name", "")), BattleMission.reward_gold(_bm), " (kept for the next round)" if _series != "single" else ""]
+			var fail_txt := "Mission failed: %s" % BattleMission.text(_bm)
+			v.add_child(UiTheme.make_label(done_txt if _bm_done else fail_txt, 18, Color("59cd90") if _bm_done else UiTheme.COL_MUTED))
 		_result_dim = dim
 		_result_rewards(v, won)
 	else:
@@ -1076,9 +1134,39 @@ func _show_result() -> void:
 			var ml := UiTheme.make_label(mt, 16, UiTheme.COL_GOLD if won else UiTheme.COL_DANGER)
 			ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			v.add_child(ml)
+		if _duel_rounds > 1 and not duel_context.has("monster"):
+			_tally_duel_round()  # once per round: _result_shown guards this screen
+			var opp_name := String((duel_context["opponent"] as PlayerState).display_name)
+			v.add_child(UiTheme.make_label("Duel round %d / %d  |  Won %d  Lost %d  Drawn %d" % [_round, _duel_rounds, _wins, _losses, _draws], 20, UiTheme.COL_TEXT))
+			if _round < _duel_rounds:
+				var nxt_d := UiTheme.make_button("Next Round", 60)
+				nxt_d.pressed.connect(_next_round)
+				v.add_child(nxt_d)
+				return
+			var verdict := "You win the duel against %s." % opp_name if _wins > _losses else ("You lose the duel against %s." % opp_name if _losses > _wins else "The duel against %s ends in a draw." % opp_name)
+			var vl := UiTheme.make_label(verdict, 18, UiTheme.COL_GOLD if _wins > _losses else UiTheme.COL_DANGER)
+			vl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			v.add_child(vl)
 		var cont := UiTheme.make_button("Continue", 60)
 		cont.pressed.connect(_finish_duel)
 		v.add_child(cont)
+
+
+## Battle Chess run (10 rounds / Survival): counts this round for the King's faction mission (CommanderSystem, "bc_*" metrics:
+## rounds won, enemy units destroyed, King skill used, survivors of won rounds). A new level applies from the next round.
+## Returns the line shown on the result screen ("" for a single battle: there is no next round to level up for).
+func _bc_mission_update(won: bool) -> String:
+	if _cmd == null or _series == "single":
+		return ""
+	var before := _cmd.commander_star
+	var counts := [["bc_wins", 1 if won else 0], ["bc_kills", int(engine.kills[0])], ["bc_king_skill", 1 if bool(engine.king_skill_used[0]) else 0], ["bc_survivors", engine.regulars_alive(0) if won else 0]]
+	for cnt in counts:
+		CommanderSystem.add_progress_battle(_cmd, String(cnt[0]), int(cnt[1]))
+	commander_star = _cmd.commander_star
+	var line := "King mission: " + CommanderSystem.mission_text_battle(_cmd)
+	if _cmd.commander_star > before:
+		line = "COMMANDER UP! Your King reaches %s from the next round.  " % CommanderSystem.star_text(_cmd.commander_star) + line
+	return line
 
 
 ## Battle Chess result: coins of this round, then either "Next Round" (the run goes on) or the final summary + wager.
@@ -1097,11 +1185,15 @@ func _result_rewards(v: VBoxContainer, won: bool) -> void:
 		SaveManager.save_game()
 	coins += bonus
 	_series_coins += coins
+	var cmd_line := _bc_mission_update(won)
 	v.add_child(UiTheme.make_label(SaveManager.xp_line(), 18, UiTheme.COL_GOLD))
-	var goes_on := ShopSystem.series_continues(_series, _round, _losses)
+	var goes_on := ShopSystem.series_continues(_series, _round, _losses, _series_diff)
 	_series_over = not goes_on
 	if _series != "single":
-		v.add_child(UiTheme.make_label("Round %d%s  |  Won %d  Lost %d  Drawn %d" % [_round, " / %d" % ShopSystem.SERIES_TEN_ROUNDS if _series == "ten" else "", _wins, _losses, _draws], 20, UiTheme.COL_TEXT))
+		var lives_part := "  |  Lives %d/%d" % [_lives_left(), ShopSystem.series_lives(_series_diff)] if _series == "survival" else ""
+		v.add_child(UiTheme.make_label("Round %d%s  |  Won %d  Lost %d  Drawn %d%s" % [_round, " / %d" % ShopSystem.series_rounds(_series_diff) if _series == "ten" else "", _wins, _losses, _draws, lives_part], 20, UiTheme.COL_TEXT))
+		if _series == "survival" and not won and not draw and goes_on:
+			v.add_child(UiTheme.make_label("You lose a life. The run goes on.", 16, UiTheme.COL_DANGER))
 	if bonus > 0:
 		v.add_child(UiTheme.make_label("Aether Coins: +%d  (round bonus +%d, total %d)" % [coins, bonus, SaveManager.coins()], 20, UiTheme.COL_GOLD))
 	else:
@@ -1109,8 +1201,12 @@ func _result_rewards(v: VBoxContainer, won: bool) -> void:
 	if goes_on:
 		var income := ShopSystem.series_income(_round)
 		var next_star := ShopSystem.series_king_star(_series, _round + 1)
-		var king_up := "  Both Kings reach %s." % CommanderSystem.star_text(next_star) if next_star > ShopSystem.series_king_star(_series, _round) else ""
+		var king_up := "  The enemy King reaches %s." % CommanderSystem.star_text(next_star) if next_star > ShopSystem.series_king_star(_series, _round) else ""
 		v.add_child(UiTheme.make_label("Next: round %d. You get +%d gold and keep your army; the enemy grows stronger.%s" % [_round + 1, income, king_up], 16, UiTheme.COL_MUTED))
+		if cmd_line != "":
+			var ml := UiTheme.make_label(cmd_line, 16, UiTheme.COL_GOLD)
+			ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			v.add_child(ml)
 		var nxt := UiTheme.make_button("Next Round", 60)
 		nxt.pressed.connect(_next_round)
 		v.add_child(nxt)
@@ -1126,7 +1222,7 @@ func _finish_series(v: VBoxContainer, won: bool) -> void:
 	var outcome := "loss" if _forfeited else ShopSystem.series_outcome(_series, _wins, _losses, 0 if won else (-1 if engine.winner < 0 else 1))
 	if _series != "single":
 		var head := "RUN COMPLETE" if _series == "ten" else "RUN ENDED"
-		v.add_child(UiTheme.make_label("%s: %s  |  %d won, %d lost, %d drawn  |  %d coins earned" % [head, ShopSystem.series_title(_series), _wins, _losses, _draws, _series_coins], 20, UiTheme.COL_GOLD))
+		v.add_child(UiTheme.make_label("%s: %s  |  %d won, %d lost, %d drawn  |  %d coins earned" % [head, ShopSystem.series_title(_series, _series_diff), _wins, _losses, _draws, _series_coins], 20, UiTheme.COL_GOLD))
 	if _wager > 0:
 		var paid := SaveManager.settle_wager(_wager, outcome, _wager_odds)
 		match outcome:
@@ -1161,7 +1257,7 @@ func _end_run_early(v: VBoxContainer, nxt: Button, quit: Button) -> void:
 func _next_round() -> void:
 	var played := _round
 	_round += 1
-	prep.start_next_round(ShopSystem.series_income(played))
+	prep.start_next_round(ShopSystem.series_income(played) if duel_context.is_empty() else 0)  # a duel gives no income: the real Dominion Gold is used
 	prep.capacity_bonus = 0  # Mercenary Pact lasts one battle
 	terrain = Terrain.generate(rng)
 	prep.set_terrain(terrain)
@@ -1187,6 +1283,20 @@ func _next_round() -> void:
 	_refresh_prep()
 
 
+## Multi-round duel: adds the round that was just fought to the score and to the gold totals.
+func _tally_duel_round() -> void:
+	if engine.winner == 0:
+		_wins += 1
+		_duel_bonus[0] += int(engine.bonus_gold[0])
+	elif engine.winner == 1:
+		_losses += 1
+		_duel_bonus[1] += int(engine.bonus_gold[1])
+	else:
+		_draws += 1
+	_duel_delta[0] += int(engine.gold_delta[0])
+	_duel_delta[1] += int(engine.gold_delta[1])
+
+
 ## Duel mode: report the result to the Territory Board (winner is a PLAYER id, -1 = draw).
 func _finish_duel() -> void:
 	var me: PlayerState = duel_context["human"]
@@ -1196,6 +1306,16 @@ func _finish_duel() -> void:
 	var opp: PlayerState = duel_context["opponent"]
 	var winner_pid := -1
 	var bonus := 0
+	if _duel_rounds > 1:  # multi-round duel: more rounds won than lost wins it, equal = draw (the defender keeps the tile)
+		if _wins > _losses:
+			winner_pid = me.id
+			bonus = int(_duel_bonus[0])
+		elif _losses > _wins:
+			winner_pid = opp.id
+			bonus = int(_duel_bonus[1])
+		battle_finished.emit({"winner": winner_pid, "bonus_gold": bonus,
+			"gold_delta": {me.id: int(_duel_delta[0]), opp.id: int(_duel_delta[1])}})
+		return
 	if engine.winner == 0:
 		winner_pid = me.id
 		bonus = int(engine.bonus_gold[0])
@@ -1213,3 +1333,8 @@ func _buff_line(card_id: String) -> String:
 		return ""
 	var off := "" if _own_faction == "" or GameData.is_home_faction(_own_faction, CardDatabase.active_continent) else " (inactive: foreign faction)"
 	return " | Buff %s: %s%s" % [bf["name"], bf["desc"], off]
+
+
+## The King's active skill is locked while the player's King is below B2 (a second copy of the King card). The tutorial has no lock.
+func _king_skill_locked() -> bool:
+	return GameSession.mode != "tutorial" and not SaveManager.king_battle_skill_unlocked(champion_id)

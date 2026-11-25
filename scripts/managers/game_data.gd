@@ -12,6 +12,7 @@ var continent_flavor: Dictionary = {}  # continent id -> {events: 12 cards, dice
 var cards: Dictionary = {}
 var card_buffs: Dictionary = {}  # continent id -> card id -> buff {name, type, value, desc}
 var king_buffs: Dictionary = {}  # champion id -> buff {name, type, value, desc}; only active on the King's home continent
+var commander_missions: Dictionary = {}  # champion id -> [Lv1->2 mission, Lv2->3 mission] (data/commander_missions.json; each faction has its own)
 var king_passives: Dictionary = {}  # champion id -> battle passive {name, type, value, desc}; works on every continent
 var special_dice: Array = []  # ACTIVE Special Dice of the continent being played (see apply_flavor)
 var base_special_dice: Array = []  # neutral dice from data/special_dice.json
@@ -30,6 +31,7 @@ func _ready() -> void:
 	card_buffs = _load_json("res://data/card_buffs.json")
 	king_buffs = _load_json("res://data/king_buffs.json")
 	king_passives = _load_json("res://data/king_passives.json")
+	commander_missions = _load_json("res://data/commander_missions.json").get("champions", {})
 	base_special_dice = _load_json("res://data/special_dice.json").get("dice", [])
 	monsters = _load_json("res://data/monsters.json").get("continents", {})
 	deposits = _load_json("res://data/deposits.json").get("continents", {})

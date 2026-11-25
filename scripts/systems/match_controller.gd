@@ -38,6 +38,7 @@ var pending: Dictionary = {}
 var last_dice: Vector2i = Vector2i.ZERO
 var winner_id: int = -1
 var human_present: bool = true
+var human_king_b: int = 3  # B level of the human's King (cfg "king_b"; default = unlocked, as in the tests and the tutorial)
 var team_mode: bool = false  # 2vs2: seats 0 + 2 (Team A) against seats 1 + 3 (Team B)
 var winner_team: int = -1
 var wager: int = 0  # Arena wager: the stake was paid at the start; a human win pays stake x wager_odds (see SaveManager.settle_wager)
@@ -67,8 +68,14 @@ var monsters: Array = []
 var monster_battles_interactive: bool = false
 ## Hidden territory treasures and mines (see DepositSystem): [{"tile", "id", "taken", "owner", "left", "paid"}]. Never shown on the map.
 var deposits: Array = []
-## Casino pot: grows with every bet placed, paid out (and reset) on a jackpot.
-var casino_pot: int = 0
+
+## Continent Mission (Arena and Chaos only; never Journey or the tutorial): ONE special mission per continent, set in
+## data/continents.json ("mission"). The human completes it during the match for a bonus reward paid on the result screen.
+var mission: Dictionary = {}  # {} = no mission in this match
+var mission_target: int = 0
+var mission_progress: int = 0
+var mission_done: bool = false
+var mission_paid: bool = false  # kept for old saves; the reward is paid the moment the mission completes
 
 var _roll_was_double: bool = false
 var _extra_roll: bool = false
@@ -94,18 +101,18 @@ func setup(cfg: Dictionary) -> void:
 	PortalSystem.randomize_portals(tiles, rng)
 	monsters = []
 	if bool(cfg.get("monsters", true)) and not bool(cfg.get("tutorial", false)):  # the guided tutorial match has none
-		monsters = MonsterSystem.place(tiles, String(continent["id"]), rng)
+		monsters = MonsterSystem.place(tiles, String(continent["id"]), rng, 4 if bool(cfg.get("team_mode", false)) else clampi(int(cfg.get("ai_count", 3)), 1, 3) + 1, not bool(cfg.get("journey", false)))
 	deposits = []
 	if bool(cfg.get("deposits", true)) and not bool(cfg.get("tutorial", false)):  # the guided tutorial match has none
 		# Own generator derived from the match seed: the main rng stream (and so every other seeded behaviour) is untouched.
 		var drng := RandomNumberGenerator.new()
 		drng.seed = hash("deposits:" + str(rng.seed))
 		deposits = DepositSystem.place(tiles, String(continent["id"]), drng, monsters.map(func(e): return int(e["tile"])))
-	casino_pot = int(GameData.b("casino_pot_seed"))
 	market_change = 0.0
 
 	players.clear()
 	human_present = not bool(cfg.get("all_ai", false))
+	human_king_b = int(cfg.get("king_b", SaveManager.KING_MAX_COPIES))  # B level of the human's King: the territory skill needs B3
 	team_mode = bool(cfg.get("team_mode", false))
 	journey = bool(cfg.get("journey", false))
 	wager = maxi(int(cfg.get("wager", 0)), 0)
@@ -114,6 +121,7 @@ func setup(cfg: Dictionary) -> void:
 	var difficulty: String = cfg.get("difficulty", "normal")
 	match_difficulty = difficulty
 	tutorial = bool(cfg.get("tutorial", false))  # set before the seats are made: the tutorial keeps the standard Life
+	_init_mission()
 	var faction_ids: Array = []
 	for f in continent.get("factions", []):
 		faction_ids.append(f["id"])
@@ -220,6 +228,9 @@ func _make_player(id: int, faction_id: String, is_ai: bool, difficulty: String, 
 	var champ := GameData.get_champion(p.champion_id)
 	p.passive = champ.get("passive", "")
 	p.passive_value = float(champ.get("passive_value", 0.0))
+	if not is_ai and id == 0 and human_king_b < SaveManager.KING_MAX_COPIES:  # the human's King below B3 has no territory skill yet
+		p.passive = ""
+		p.passive_value = 0.0
 	p.color = PLAYER_COLORS[id % PLAYER_COLORS.size()]
 	p.gold = int(GameData.b("start_gold")) if tutorial else GameData.gold_for(match_difficulty)  # by difficulty; the guided tutorial keeps the standard gold
 	# Life depends on the match difficulty (easy 5 / normal 3 / hard 1); the guided tutorial keeps the standard 3
@@ -412,10 +423,8 @@ func get_decision_options() -> Array:
 				out.append({"id": "invest_%d" % int(amt), "label": "Invest %d G" % int(amt), "enabled": p.gold >= int(amt)})
 			out.append({"id": "withdraw", "label": "Sell all stocks (%d G)" % p.stock_value, "enabled": p.stock_value > 0})
 			out.append({"id": "leave", "label": "Leave bank", "enabled": true})
-		"casino":
-			var tp := casino_bet_price()
-			out.append({"id": "bet", "label": "Place bet (%d G)" % tp, "enabled": p.gold >= tp})
-			out.append({"id": "skip", "label": "Pass", "enabled": true})
+		"casino":  # the games themselves are played in the Gamble panel (casino_play); here the player only leaves
+			out.append({"id": "leave", "label": "Leave casino", "enabled": true})
 		"monster":
 			out.append({"id": "fight", "label": "Fight the monster", "enabled": true})
 			out.append({"id": "flee", "label": "Flee", "enabled": true})
@@ -465,8 +474,7 @@ func describe_tile(idx: int) -> String:
 			s += "\nBank & Stocks: invest gold in the market (it moves every round: %d%% to +%d%%), or cash out." % [
 				int(round(float(GameData.b("stock_change_min")) * 100.0)), int(round(float(GameData.b("stock_change_max")) * 100.0))]
 		BoardTile.Type.CASINO:
-			s += "\nCasino: a bet costs %d G. Pot: %d G (small prize x%d, big prize x%d, or the whole pot)." % [
-				casino_bet_price(), casino_pot, int(GameData.b("casino_small_mult")), int(GameData.b("casino_big_mult"))]
+			s += "\nCasino: a random Gamble game (Coin Flip, Dice or Slots) each visit, played with Dominion Gold. Bets from %d G." % casino_bet_price()
 		BoardTile.Type.CORNER:
 			s += "\n" + _corner_text(t.corner_kind)
 	return s
@@ -477,7 +485,7 @@ func _corner_text(kind: String) -> String:
 		"start": return "Pass or land: collect start bonus gold."
 		"sanctuary": return "Rest: receive a small amount of gold."
 		"rift": return "Trapped: skip your next turn."
-		"crossroads": return "Free warp to a random active portal."
+		"crossroads": return "Free warp to a random active portal." if not PortalSystem.active_indices(tiles).is_empty() else "Free warp to a random place on the board."
 	return ""
 
 
@@ -608,8 +616,11 @@ func decide(choice: Variant) -> void:
 				pending = {}
 				_finish_landing()
 		"casino":
-			if String(choice) == "bet":
-				_casino_draw(p)
+			if String(choice) == "bet":  # quick bet (AI / headless): one round of the drawn game for the lowest bet
+				var qg := String(pending.get("game", "coin"))
+				var qr := casino_play(qg, casino_default_choice(qg), casino_bet_price())
+				if bool(qr["ok"]):
+					casino_report(p, qr)
 			pending = {}
 			_finish_landing()
 		"encounter":
@@ -647,6 +658,7 @@ func decide(choice: Variant) -> void:
 			var ct: BoardTile = tiles[int(pending["tile"])]
 			if String(choice) == "conquest":
 				stats["conquests"] += 1
+				_mission_progress(p, "conquests")
 				ct.owner_id = p.id
 				ct.lease_left = 0  # a conquered land is owned for good
 				ct.lease_paid = 0
@@ -686,6 +698,7 @@ func end_turn() -> void:
 # ------------------------------------------------------------------ internals
 
 func _advance_turn() -> void:
+	_mission_check_state()
 	_bonus_rolls = 0
 	_extra_roll = false
 	_roll_was_double = false
@@ -753,6 +766,15 @@ func _warp(p: PlayerState, dest: int, label: String) -> void:
 	p.position = dest
 	_log("%s: %s warps to %s." % [label, p.display_name, tiles[dest].name])
 	player_moved.emit(p.id, from, dest, true)
+
+
+## Random place for a warp when the board has no portals (Chaos): any tile except the corners and the current one. -1 = none.
+func _random_warp_dest(p: PlayerState) -> int:
+	var cands: Array[int] = []
+	for t in tiles:
+		if t.type != BoardTile.Type.CORNER and t.index != p.position:
+			cands.append(t.index)
+	return cands[rng.randi() % cands.size()] if not cands.is_empty() else -1
 
 
 func _give_start_bonus(p: PlayerState) -> void:
@@ -824,7 +846,7 @@ func _resolve_landing(p: PlayerState) -> void:
 			if p.gold < casino_bet_price():
 				_log("%s cannot afford a Casino bet." % p.display_name)
 			else:
-				_set_pending({"type": "casino"})
+				_set_pending({"type": "casino", "game": random_casino_game()})  # the game is drawn at random each visit
 
 
 func _resolve_corner(p: PlayerState, t: BoardTile) -> void:
@@ -840,7 +862,11 @@ func _resolve_corner(p: PlayerState, t: BoardTile) -> void:
 			_log("%s is trapped in the Rift (skips next turn)." % p.display_name)
 		"crossroads":
 			var actives := PortalSystem.active_indices(tiles)
-			if actives.is_empty():
+			if actives.is_empty():  # no portals on this board (Chaos): the Crossroads warps to a random place instead
+				var rd := _random_warp_dest(p)
+				if rd >= 0:
+					_warp(p, rd, "Crossroads")
+					_nested_resolve(p)
 				return
 			_warp(p, actives[rng.randi() % actives.size()], "Crossroads")
 	players_changed.emit()
@@ -907,7 +933,7 @@ func _find_deposit(p: PlayerState, t: BoardTile) -> void:
 	e["taken"] = true
 	if String(d["kind"]) == "treasure":
 		var parts: Array[String] = []
-		var gold := int(d.get("gold", 0))
+		var gold := DepositSystem.gold_of(int(d.get("gold", 0)))
 		p.gold += gold
 		parts.append("%d G" % gold)
 		var tk := int(d.get("tokens", 0))
@@ -918,14 +944,16 @@ func _find_deposit(p: PlayerState, t: BoardTile) -> void:
 			_give_special_die(p)
 			parts.append("a Special Die")
 		stats["treasures_found"] += 1
+		_mission_event(p, "deposits")
 		_log("Hidden treasure! %s unearths the %s on %s: %s." % [p.display_name, d["name"], t.name, " + ".join(parts)])
 		deposit_event.emit(p.id, "treasure", String(d["id"]))
 	else:
 		e["owner"] = p.id
-		e["left"] = int(d.get("rounds", 0))
+		e["left"] = DepositSystem.rounds_of(int(d.get("rounds", 0)))
 		e["paid"] = 0
 		stats["mines_found"] += 1
-		_log("Hidden mine! %s strikes the %s on %s: %d G every round for %d rounds." % [p.display_name, d["name"], t.name, int(d.get("income", 0)), int(d.get("rounds", 0))])
+		_mission_event(p, "deposits")
+		_log("Hidden mine! %s strikes the %s on %s: %d G every round for %d rounds." % [p.display_name, d["name"], t.name, DepositSystem.gold_of(int(d.get("income", 0))), DepositSystem.rounds_of(int(d.get("rounds", 0)))])
 		deposit_event.emit(p.id, "mine", String(d["id"]))
 	players_changed.emit()
 	tiles_changed.emit()
@@ -943,7 +971,7 @@ func _pay_mines() -> void:
 		if String(d.get("kind", "")) != "mine":
 			continue
 		var mp: PlayerState = players[oid]
-		var inc := int(d.get("income", 0))
+		var inc := DepositSystem.gold_of(int(d.get("income", 0)))
 		mp.gold += inc
 		e["paid"] = int(e["paid"]) + 1
 		e["left"] = int(e["left"]) - 1
@@ -1009,6 +1037,7 @@ func _monster_fight_result(p: PlayerState, t: BoardTile, mid: String, won: bool,
 		p.monster_id = mid
 		p.monster_star = p.commander_star  # the ally keeps the King level it was won at
 		stats["monsters_won"] += 1
+		_mission_event(p, "monsters_won")
 		_log("%s defeats the %s in %d ticks! Monster card won (King Lv %d): it fights beside the King in Duels with Lv %d stats." % [p.display_name, m.get("name", "monster"), ticks, p.monster_star, p.monster_star])
 		monster_event.emit(p.id, "won", mid)
 	else:
@@ -1134,6 +1163,7 @@ func _auction_end() -> void:
 		w.gold -= bid
 		t.owner_id = leader
 		stats["auctions"] += 1
+		_mission_progress(w, "auctions")
 		_log("SOLD! %s wins %s for %d G." % [w.display_name, t.name, bid])
 		_announce_region(w, t)
 		tiles_changed.emit()
@@ -1174,7 +1204,7 @@ func _resolve_event(p: PlayerState) -> void:
 		"market_down":
 			_shift_market(-float(value) / 100.0)
 		"free_bet":
-			_casino_draw(p, true)
+			_casino_free_chip(p)
 		"gain_per_land":  # continent cards: gold for every territory the player owns
 			var n := _owned_land_count(p)
 			p.gold += value * n
@@ -1208,6 +1238,11 @@ func _resolve_event(p: PlayerState) -> void:
 			if not act.is_empty():
 				_warp(p, act[rng.randi() % act.size()], "Event")
 				_nested_resolve(p)
+			else:  # no portals on this board (Chaos): warp to a random place
+				var rd := _random_warp_dest(p)
+				if rd >= 0:
+					_warp(p, rd, "Event")
+					_nested_resolve(p)
 		"warp_start":
 			_warp(p, 0, "Event")
 			_give_start_bonus(p)
@@ -1257,6 +1292,7 @@ func _do_lease(p: PlayerState, t: BoardTile, cost: int) -> void:
 	t.lease_left = int(GameData.b("lease_rounds"))
 	t.lease_paid = cost
 	stats["leases"] = int(stats.get("leases", 0)) + 1
+	_mission_progress(p, "leases")
 	_log("%s leases %s for %d G (%d rounds)." % [p.display_name, t.name, cost, t.lease_left])
 	tiles_changed.emit()
 	players_changed.emit()
@@ -1310,6 +1346,8 @@ func _do_upgrade(p: PlayerState, t: BoardTile, cost: int) -> void:
 	p.gold -= cost
 	t.level += 1
 	stats["upgrades"] = int(stats.get("upgrades", 0)) + 1
+	_mission_progress(p, "upgrades")
+	_mission_event(p, "upgrades")
 	if t.is_landmark():
 		_log("%s raises a LANDMARK on %s (%d G). Rent is now %d G." % [p.display_name, t.name, cost, EconomySystem.rent_of(t, tiles)])
 	else:
@@ -1320,7 +1358,113 @@ func _do_upgrade(p: PlayerState, t: BoardTile, cost: int) -> void:
 		_mission_progress(p, "landmarks")
 
 
+## Arena / Chaos with a human seat only: the continent's mission is active.
+func _init_mission() -> void:
+	mission = {}
+	mission_target = 0
+	mission_progress = 0
+	mission_done = false
+	mission_paid = false
+	if not human_present or journey or tutorial:
+		return
+	var m: Dictionary = continent.get("mission", {})
+	if m.is_empty():
+		return
+	mission = m
+	mission_target = maxi(int(m.get("target_chaos", m.get("target", 1))) if chaos else int(m.get("target", 1)), 1)
+
+
+func has_mission() -> bool:
+	return not mission.is_empty()
+
+
+## "Name: description" with the target filled in.
+func mission_text() -> String:
+	if mission.is_empty():
+		return ""
+	return "%s: %s" % [String(mission.get("name", "Mission")), String(mission.get("description", "")).replace("{n}", str(mission_target))]
+
+
+func mission_reward() -> Dictionary:
+	return mission.get("reward", {}) if not mission.is_empty() else {}
+
+
+## Reward text, e.g. "+250 G, +1 Reroll Token, +1 Special Die, +1 Life". The whole reward is paid in the match, at once.
+func mission_reward_text() -> String:
+	var r := mission_reward()
+	var parts: Array[String] = []
+	if int(r.get("gold", 0)) > 0:
+		parts.append("+%d G" % int(r["gold"]))
+	if int(r.get("tokens", 0)) > 0:
+		parts.append("+%d Reroll Token%s" % [int(r["tokens"]), "" if int(r["tokens"]) == 1 else "s"])
+	if bool(r.get("die", false)):
+		parts.append("+1 Special Die")
+	if int(r.get("life", 0)) > 0:
+		parts.append("+%d Life" % int(r["life"]))
+	return ", ".join(parts)
+
+
+## Pays the reward to the human now. A Special Die with a full die bag, or a Life at full Life, turns into gold instead.
+func _mission_pay(p: PlayerState) -> void:
+	var r := mission_reward()
+	p.gold += int(r.get("gold", 0))
+	p.reroll_tokens += int(r.get("tokens", 0))
+	if bool(r.get("die", false)):
+		if p.special_dice.size() < int(GameData.b("max_special_dice")) and not GameData.special_dice.is_empty():
+			_give_special_die(p)
+		else:
+			p.gold += 100
+	var lives := int(r.get("life", 0))
+	if lives > 0:
+		var add := mini(lives, p.max_life - p.life)
+		p.life += add
+		if add < lives:
+			p.gold += 100 * (lives - add)
+
+
+## Counts an event of `metric` for the human's mission (other players never count).
+func _mission_event(p: PlayerState, metric: String, amount: int = 1) -> void:
+	if mission.is_empty() or mission_done or not _is_human(p) or String(mission.get("metric", "")) != metric:
+		return
+	_mission_set(mission_progress + amount)
+
+
+func _mission_set(value: int) -> void:
+	if mission.is_empty() or mission_done:
+		return
+	mission_progress = mini(maxi(value, mission_progress), mission_target)
+	if mission_progress >= mission_target:
+		mission_done = true
+		_mission_pay(players[0])
+		_log("MISSION COMPLETE! %s - reward: %s." % [String(mission.get("name", "Mission")), mission_reward_text()])
+	players_changed.emit()
+
+
+## State-based missions (territories owned, Regional Dominion): checked whenever land changes hands and at every turn change.
+func _mission_check_state() -> void:
+	if mission.is_empty() or mission_done or not human_present:
+		return
+	var hp := players[0]
+	match String(mission.get("metric", "")):
+		"territories":
+			var n := 0
+			for t in tiles:
+				if t.type == BoardTile.Type.TERRITORY and t.owner_id == hp.id and t.lease_left <= 0:  # leased land does not count
+					n += 1
+			_mission_set(n)
+		"dominion":
+			var regions := {}
+			for t in tiles:
+				if t.type == BoardTile.Type.TERRITORY:
+					regions[t.region] = true
+			for r in regions:
+				if EconomySystem.region_count(tiles, int(r), hp.id) >= BoardBuilder.region_size:
+					_mission_set(mission_target)
+					break
+
+
 func _announce_region(p: PlayerState, t: BoardTile) -> void:
+	_mission_check_state()
 	var owned := EconomySystem.region_count(tiles, t.region, p.id)
 	if owned == BoardBuilder.region_size:
 		_log("*** %s achieves REGIONAL DOMINION over %s! ***" % [p.display_name, _region_name(t.region)])
@@ -1534,6 +1678,7 @@ func _richest(list: Array[PlayerState]) -> int:
 func _end_game(winner: int) -> void:
 	if state == State.GAME_OVER:
 		return
+	_mission_check_state()
 	state = State.GAME_OVER
 	pending = {}
 	winner_id = winner
@@ -1611,7 +1756,7 @@ func get_decision_prompt() -> String:
 			return "Bank & Stocks. Portfolio: %d G (%s%d G vs. invested). Last round: %+d%%." % [
 				bp.stock_value, "+" if pl >= 0 else "", pl, int(round(market_change * 100.0))]
 		"casino":
-			return "Casino! Bet %d G. Pot: %d G." % [casino_bet_price(), casino_pot]
+			return "Casino! Today's game: %s. Bets from %d G." % [casino_game_name(String(pending.get("game", "coin"))), casino_bet_price()]
 	return ""
 
 
@@ -1639,27 +1784,51 @@ func auto_duel() -> void:
 	var ground := Terrain.generate(rng)  # every duel is fought on new random ground
 	var cfg_a := BattleAI.prepare_ai_army(a, rng, 0, ground)
 	var cfg_d := BattleAI.prepare_ai_army(d, rng, 1, ground)
-	var e := BattleEngine.new()
-	e.setup({"seed": rng.randi(), "ai_supports": [true, true], "terrain": ground, "sides": [cfg_a, cfg_d]})
-	var guard := 0
-	while not e.finished and guard < BattleEngine.MAX_TICKS + 5:
-		e.step()
-		guard += 1
-	a.consume_supports(e.used_supports[0])  # played Support cards are spent
-	d.consume_supports(e.used_supports[1])
+	var rounds := 1 if tutorial else ShopSystem.series_rounds(match_difficulty)  # like a human duel: Easy 5 / Normal 3 / Hard 1 rounds
+	var wins_a := 0
+	var wins_d := 0
+	var bonus_a := 0
+	var bonus_d := 0
+	var delta_a := 0
+	var delta_d := 0
+	var used_a: Array = []
+	var used_d: Array = []
+	var ticks := 0
+	for r in range(rounds):
+		var e := BattleEngine.new()
+		e.setup({"seed": rng.randi(), "ai_supports": [true, true], "terrain": ground, "sides": [cfg_a.duplicate(true), cfg_d.duplicate(true)]})
+		var guard := 0
+		while not e.finished and guard < BattleEngine.MAX_TICKS + 5:
+			e.step()
+			guard += 1
+		ticks += e.tick
+		for sid in e.used_supports[0]:
+			used_a.append(sid)
+		for sid in e.used_supports[1]:
+			used_d.append(sid)
+		if e.winner == 0:
+			wins_a += 1
+			bonus_a += int(e.bonus_gold[0])
+		elif e.winner == 1:
+			wins_d += 1
+			bonus_d += int(e.bonus_gold[1])
+		delta_a += int(e.gold_delta[0])
+		delta_d += int(e.gold_delta[1])
+	a.consume_supports(used_a)  # played Support cards are spent
+	d.consume_supports(used_d)
 	var winner_pid := -1
 	var bonus := 0
-	if e.winner == 0:
+	if wins_a > wins_d:
 		winner_pid = a.id
-		bonus = int(e.bonus_gold[0])
-	elif e.winner == 1:
+		bonus = bonus_a
+	elif wins_d > wins_a:
 		winner_pid = d.id
-		bonus = int(e.bonus_gold[1])
-	_log("Duel at %s: %s vs %s - %s after %d ticks." % [
+		bonus = bonus_d
+	_log("Duel at %s: %s vs %s - %s (%d-%d in %d round%s, %d ticks)." % [
 		tiles[int(pending["tile"])].name, a.display_name, d.display_name,
-		(players[winner_pid].display_name + " wins") if winner_pid >= 0 else "draw", e.tick])
+		(players[winner_pid].display_name + " wins") if winner_pid >= 0 else "draw", wins_a, wins_d, rounds, "" if rounds == 1 else "s", ticks])
 	finish_duel({"winner": winner_pid, "bonus_gold": bonus,
-		"gold_delta": {a.id: int(e.gold_delta[0]), d.id: int(e.gold_delta[1])}})
+		"gold_delta": {a.id: delta_a, d.id: delta_d}})
 
 
 ## result = {"winner": player_id or -1 (draw), "bonus_gold": int}. A draw goes to the defender.
@@ -1677,6 +1846,7 @@ func finish_duel(result: Dictionary) -> void:
 	var duel_winner := int(result.get("winner", -1))
 	if duel_winner >= 0 and duel_winner < players.size():
 		_mission_progress(players[duel_winner], "duel_wins")
+		_mission_event(players[duel_winner], "duel_wins")
 	if duel_winner >= 0 and duel_winner < players.size() and _is_human(players[duel_winner]):
 		bonus += int(random_ingame().get("duel_win_gold", 0))
 	if int(result.get("winner", -1)) != attacker.id:
@@ -1751,7 +1921,8 @@ func to_dict() -> Dictionary:
 		"version": SAVE_FORMAT, "continent_id": continent["id"], "round": round_number, "current": current, "first_seat": first_seat,
 		"state": int(state), "last_dice": [last_dice.x, last_dice.y], "winner_id": winner_id,
 		"human_present": human_present, "team_mode": team_mode, "winner_team": winner_team, "roll_double": _roll_was_double, "extra_roll": _extra_roll, "bonus_rolls": _bonus_rolls,
-		"tutorial": tutorial, "difficulty": match_difficulty, "journey": journey, "wager": wager, "wager_odds": wager_odds, "random_map": random_map, "chaos": chaos, "wager_settled": wager_settled, "round_limit": round_limit, "market": market_change, "pot": casino_pot, "tutorial_seen": tutorial_seen.duplicate(),
+		"tutorial": tutorial, "difficulty": match_difficulty, "journey": journey, "wager": wager, "wager_odds": wager_odds, "random_map": random_map, "chaos": chaos, "wager_settled": wager_settled, "round_limit": round_limit, "market": market_change, "tutorial_seen": tutorial_seen.duplicate(),
+		"mission": {"progress": mission_progress, "done": mission_done, "paid": mission_paid},
 		"monsters": monsters.map(func(e): return [int(e["tile"]), String(e["id"]), bool(e["taken"])]),
 		"deposits": deposits.map(func(e): return [int(e["tile"]), String(e["id"]), bool(e["taken"]), int(e["owner"]), int(e["left"]), int(e["paid"])]),
 		"stats": stats.duplicate(), "players": plist, "tiles": tl, "log": recent_log.duplicate(),
@@ -1841,9 +2012,13 @@ static func from_dict(d: Dictionary) -> MatchController:
 	c.wager_settled = bool(d.get("wager_settled", false))
 	c.round_limit = int(d.get("round_limit", int(GameData.b("max_rounds"))))
 	c.market_change = float(d.get("market", 0.0))
-	c.casino_pot = int(d.get("pot", int(GameData.b("casino_pot_seed"))))
 	for id in d.get("tutorial_seen", []):
 		c.tutorial_seen.append(String(id))
+	c._init_mission()  # older saves have no mission block: the match then simply starts with 0 progress
+	var md: Dictionary = d.get("mission", {})
+	c.mission_progress = mini(int(md.get("progress", 0)), c.mission_target)
+	c.mission_done = bool(md.get("done", false)) and not c.mission.is_empty()
+	c.mission_paid = bool(md.get("paid", false))
 	c.round_number = int(d["round"])
 	c.current = int(d["current"])
 	c.first_seat = int(d.get("first_seat", 0))
@@ -1865,8 +2040,17 @@ static func from_dict(d: Dictionary) -> MatchController:
 
 # ------------------------------------------------------------------ Bank & Casino
 
+## Bets of the Casino (Dominion Gold): data/balance.json "casino_bets".
+func casino_bets() -> Array:
+	return GameData.b("casino_bets").map(func(b): return int(b))
+
+
+## The lowest bet = what a player needs to be let into the Casino.
 func casino_bet_price() -> int:
-	return int(GameData.b("casino_bet"))
+	var lowest := 0
+	for b in casino_bets():
+		lowest = int(b) if lowest == 0 else mini(lowest, int(b))
+	return lowest
 
 
 func _bank_invest(p: PlayerState, amount: int) -> void:
@@ -1880,6 +2064,7 @@ func _bank_invest(p: PlayerState, amount: int) -> void:
 	p.stock_value += amount
 	p.stock_basis += amount
 	stats["bank_deposits"] = int(stats.get("bank_deposits", 0)) + 1
+	_mission_progress(p, "bank_deposits")
 	_log("%s invests %d G in the stock market (portfolio %d G)." % [p.display_name, amount, p.stock_value])
 
 
@@ -1948,35 +2133,76 @@ func _shift_market(change: float) -> void:
 	_log("Stock market: every portfolio %+d%%%s." % [int(round(change * 100.0)), "" if any else " (nobody is invested)"])
 
 
-## `free` = free chip from an Event card: costs nothing and adds nothing to the pot.
-func _casino_draw(p: PlayerState, free: bool = false) -> void:
-	var price := casino_bet_price()
-	if not free:
-		if p.gold < price:
-			return
-		p.gold -= price
-		casino_pot += price
+## The Casino draws one of the Gamble games at random every time a player enters.
+func random_casino_game() -> String:
+	return String(ShopSystem.GAMBLE_GAMES[rng.randi() % ShopSystem.GAMBLE_GAMES.size()])
+
+
+func casino_game_name(game: String) -> String:
+	return {"coin": "Coin Flip", "dice": "Dice", "slots": "Slots"}.get(game, game)
+
+
+## The pick used when nobody chooses (AI, headless quick bet, free chip): heads, Low (the best odds of the dice), no pick for Slots.
+func casino_default_choice(game: String) -> String:
+	return {"coin": "heads", "dice": "low"}.get(game, "")
+
+
+## One round of the Casino (only the game that was drawn on entering), the same rules and payouts as the Shop > Gamble tab (ShopSystem.gamble_round) but paid in Dominion Gold.
+## ONE round per visit: after it the pending Casino only offers Leave. The pending Casino decision's player pays the bet and receives the payout. Returns the round dictionary (ok = false: nothing happened).
+## Call `casino_report` once the result is shown (the log line and the player cards update then, so an animation is not spoiled).
+func casino_play(game: String, choice: String, bet: int) -> Dictionary:
+	var fail := {"ok": false, "error": "No Casino is open.", "win": false, "payout": 0, "net": 0, "bet": bet, "game": game, "detail": {}}
+	if state != State.AWAIT_DECISION or String(pending.get("type", "")) != "casino":
+		return fail
+	var p := decision_actor()
+	if bool(pending.get("played", false)):
+		fail["error"] = "One round per Casino visit."
+		return fail
+	if game != String(pending.get("game", "coin")):
+		fail["error"] = "That game is not at this Casino today."
+		return fail
+	if not casino_bets().has(bet):
+		fail["error"] = "Pick a bet."
+		return fail
+	if p.gold < bet:
+		fail["error"] = "Not enough gold."
+		return fail
+	var r := ShopSystem.gamble_round(game, choice, bet, rng)
+	if not bool(r["ok"]):
+		return r
+	p.gold += int(r["net"])
+	pending["played"] = true  # one round per visit
 	stats["bets"] = int(stats.get("bets", 0)) + 1
-	var r := rng.randf()
-	var jack := float(GameData.b("casino_jackpot_chance"))
-	var big := float(GameData.b("casino_big_chance"))
-	var small := float(GameData.b("casino_small_chance"))
-	if r < jack:
-		var pot := casino_pot
-		p.gold += pot
-		casino_pot = int(GameData.b("casino_pot_seed"))
+	_mission_progress(p, "bets")
+	if String(r["detail"].get("kind", "")) == "jackpot":
 		stats["jackpots"] = int(stats.get("jackpots", 0)) + 1
-		_log("CASINO JACKPOT! %s wins the whole pot: %d G!" % [p.display_name, pot])
-	elif r < jack + big:
-		var prize := price * int(GameData.b("casino_big_mult"))
-		p.gold += prize
-		_log("Casino: %s wins the big prize, %d G!" % [p.display_name, prize])
-	elif r < jack + big + small:
-		var prize2 := price * int(GameData.b("casino_small_mult"))
-		p.gold += prize2
-		_log("Casino: %s wins %d G." % [p.display_name, prize2])
+	return r
+
+
+## Logs a finished Casino round and refreshes the player cards.
+func casino_report(p: PlayerState, r: Dictionary) -> void:
+	var names := {"coin": "Coin Flip", "dice": "Dice", "slots": "Slots"}
+	var net := int(r["net"])
+	if net > 0:
+		_log("Casino (%s): %s bets %d G and wins %d G!%s" % [names.get(r["game"], r["game"]), p.display_name, int(r["bet"]), net, " JACKPOT!" if String(r["detail"].get("kind", "")) == "jackpot" else ""])
+	elif net == 0:
+		_log("Casino (%s): %s bets %d G and gets the bet back." % [names.get(r["game"], r["game"]), p.display_name, int(r["bet"])])
 	else:
-		_log("Casino: %s %s - no luck." % [p.display_name, "plays a free chip" if free else "bets %d G" % price])
+		_log("Casino (%s): %s bets %d G - no luck." % [names.get(r["game"], r["game"]), p.display_name, int(r["bet"])])
+	players_changed.emit()
+
+
+## Free chip from an Event card: one free round of a random Gamble game at the lowest bet. A win pays the full payout, a loss costs nothing.
+func _casino_free_chip(p: PlayerState) -> void:
+	var game := random_casino_game()
+	var r := ShopSystem.gamble_round(game, casino_default_choice(game), casino_bet_price(), rng)
+	stats["bets"] = int(stats.get("bets", 0)) + 1
+	var won := int(r["payout"])
+	if won > 0:
+		p.gold += won
+		_log("Casino: %s plays a free %s chip and wins %d G!" % [p.display_name, casino_game_name(game), won])
+	else:
+		_log("Casino: %s plays a free %s chip - no luck." % [p.display_name, casino_game_name(game)])
 	players_changed.emit()
 
 
@@ -2009,6 +2235,8 @@ func use_special_die(index: int) -> String:
 	p.special_dice.remove_at(index)
 	var face = (def["faces"] as Array)[rng.randi() % 6]
 	stats["special_dice"] += 1
+	_mission_progress(p, "special_dice")
+	_mission_event(p, "special_dice")
 	_log("%s rolls the %s: %s." % [p.display_name, def["name"], str(face)])
 	match String(def["kind"]):
 		"move":

@@ -273,6 +273,11 @@ func _on_card(id: String) -> void:
 func _ask_battle_wager() -> void:
 	GameSession.wager = 0
 	GameSession.category = "battle_chess"
+	# The map (continent: world bonuses, cards shown) is random each battle; the army always comes from the Deck saved in the Card Hub.
+	GameSession.battle_deck_continent = SaveManager.last_deck_continent()
+	var maps := _open_continents()
+	if not maps.is_empty():
+		GameSession.continent_id = String(maps[randi() % maps.size()])
 	var panel := WagerPanel.new("battle_chess", true)
 	var dlg := UiDialog.new()
 	dlg.name = "BattleWagerDialog"
@@ -512,7 +517,7 @@ func _build_match_column(parent: Control) -> void:
 	if _kind == "arena":
 		var note_text := "Free match against AI. Wins here do not unlock continents."
 		if GameSession.chaos_mode:
-			note_text = "CHAOS: a free match on a 40-tile board, 4 territories per region (majority 3, Dominion 4). You pass the Gate far more often. Wins here do not unlock continents."
+			note_text = "CHAOS: a free match on a 40-tile board, 5 territories per region (majority 3, Dominion 5) and no portals. You pass the Gate far more often. Wins here do not unlock continents."
 		var note := UiTheme.make_label(note_text, 15, UiTheme.COL_MUTED)
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		c.add_child(note)

@@ -18,7 +18,7 @@ func _ready() -> void:
 	SaveManager.data["collection"].clear()
 	SaveManager.ensure_collection()
 	SaveManager.data["wallet"]["coins"] = ShopSystem.START_COINS
-	SaveManager.data["shop"] = {"pity": 0, "pulls": 0}
+	SaveManager.data["shop"] = {"pity": 0, "pity_rare": 0, "pity_legendary": 0, "pulls": 0}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 
@@ -145,8 +145,18 @@ func _ready() -> void:
 		else:
 			streak += 1
 			worst = maxi(worst, streak)
-	check(worst < ShopSystem.PITY_LIMIT, "never %d pulls in a row without an Epic or better (worst streak %d)" % [ShopSystem.PITY_LIMIT, worst])
-	check(ShopSystem.roll_rarity(rng, ShopSystem.PITY_LIMIT - 1) in ["epic", "legendary"], "the pity pull is Epic or Legendary")
+	check(worst < ShopSystem.PITY_LIMITS["epic"], "never %d pulls in a row without an Epic or better (worst streak %d)" % [ShopSystem.PITY_LIMITS["epic"], worst])
+	check(ShopSystem.roll_rarity(rng, {"epic": ShopSystem.PITY_LIMITS["epic"] - 1}) in ["epic", "legendary"], "the Epic pity pull is Epic or Legendary")
+	check(ShopSystem.roll_rarity(rng, {"rare": ShopSystem.PITY_LIMITS["rare"] - 1}) != "common", "the Rare pity pull is Rare or better")
+	check(ShopSystem.roll_rarity(rng, {"legendary": ShopSystem.PITY_LIMITS["legendary"] - 1}) == "legendary", "the Legendary pity pull is Legendary")
+	SaveManager.data["shop"] = {"pity": 5, "pity_rare": 5, "pity_legendary": 5, "pulls": 0}
+	var plegs := 0
+	for i in range(ShopSystem.PITY_LIMITS["legendary"]):
+		var pr: Dictionary = ShopSystem.pull_batch(1, rng)[0]
+		if String(pr["rarity"]) == "legendary":
+			plegs += 1
+			break
+	check(plegs == 1, "a Legendary always drops within %d pulls" % ShopSystem.PITY_LIMITS["legendary"])
 	var counts := {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
 	for i in range(4000):
 		counts[ShopSystem.roll_rarity(rng, 0)] += 1
@@ -233,56 +243,33 @@ func _ready() -> void:
 	var still_locked := String(ShopSystem.shop_units("", true)[0]["id"])
 	check(d2.is_owned(arc_unit) and not d2.is_owned(still_locked), "the deck sees which unit cards are owned")
 
-	# --- Card Gacha, three pools: Unit + Support ("mix"), Unit, Support
+	# --- Card Gacha: one pool (Support + unit + King cards)
 	var urng := RandomNumberGenerator.new()
 	urng.seed = 7
 	SaveManager.data["wallet"]["tickets"] = 100000
 	var units_open := ShopSystem.shop_units("", false)
 	var before_units := ShopSystem.shop_units("", true).size()
-	check(ShopSystem.GACHA_MODES == ["mix", "unit", "support"], "three pools: mix, unit, support")
-	check(ShopSystem.pull_batch(1, urng, "nope").is_empty(), "an unknown pool pulls nothing")
 	var saw_unit := false
 	var saw_support := false
 	var units_only_rare_epic := true
 	var owned_ok := true
-	for i in range(60):  # mix: Support + unit cards
-		for r in ShopSystem.pull_batch(10, urng, "mix"):
+	for i in range(60):
+		for r in ShopSystem.pull_batch(10, urng):
 			var is_unit := ShopSystem.is_unit_card(ShopSystem.card_by_id(String(r["id"])))
-			saw_unit = saw_unit or is_unit
+			var is_king := ShopSystem.is_king_card(ShopSystem.card_by_id(String(r["id"])))
+			saw_unit = saw_unit or (is_unit and not is_king)
 			saw_support = saw_support or not is_unit
-			units_only_rare_epic = units_only_rare_epic and (not is_unit or String(r["rarity"]) in ["rare", "epic"])
+			units_only_rare_epic = units_only_rare_epic and (not is_unit or is_king or String(r["rarity"]) in ["rare", "epic"])
 			owned_ok = owned_ok and SaveManager.owned_count(String(r["id"])) > 0
-	check(saw_support and (saw_unit or units_open.is_empty()), "the mixed pool gives Support cards and unit cards")
+	check(saw_support and (saw_unit or units_open.is_empty()), "the Gacha gives Support cards and unit cards")
 	check(units_only_rare_epic and owned_ok, "unit cards come only as Rare / Epic, and every pulled card is owned")
-	var support_only := true
-	for i in range(30):  # support only
-		for r in ShopSystem.pull_batch(10, urng, "support"):
-			support_only = support_only and not ShopSystem.is_unit_card(ShopSystem.card_by_id(String(r["id"])))
-	check(support_only, "the Support pool never gives a unit card")
-	var before_units_pity := ShopSystem.unit_pity()
-	var up := ShopSystem.pull_batch(10, urng, "unit")
-	var all_units_ok := up.size() == 10
-	for r in up:
-		all_units_ok = all_units_ok and ShopSystem.is_unit_card(ShopSystem.card_by_id(String(r["id"]))) and String(r["rarity"]) in ["rare", "epic"] and SaveManager.owned_count(String(r["id"])) > 0
-	check(all_units_ok, "the Unit pool gives only Rare / Epic unit cards and owns them")
 	check(ShopSystem.shop_units("", true).size() < before_units or before_units == 0, "new unit cards leave the locked list")
-	var upity := RandomNumberGenerator.new()
-	upity.seed = 3
-	check(ShopSystem.roll_unit_rarity(upity, ShopSystem.UNIT_PITY_LIMIT - 1) == "epic", "the unit pity pull is Epic")
-	var ucount := {"rare": 0, "epic": 0}
-	for i in range(3000):
-		ucount[ShopSystem.roll_unit_rarity(upity, 0)] += 1
-	check(ucount["rare"] > ucount["epic"] * 3 and ucount["epic"] > 0, "unit rarity frequencies follow the rates (%s)" % str(ucount))
-	SaveManager.data["shop"]["pity"] = 7
-	var unit_pity_now := ShopSystem.unit_pity()
-	ShopSystem.pull_batch(1, urng, "unit")
-	check(int(SaveManager.data["shop"]["pity"]) == 7 and (ShopSystem.unit_pity() == unit_pity_now + 1 or ShopSystem.unit_pity() == 0), "the Unit pool keeps its own pity (the other pity is untouched)")
 	# tickets pay a pull
 	SaveManager.data["wallet"]["tickets"] = 0
-	check(ShopSystem.pull_batch(1, urng, "mix").is_empty() and ShopSystem.pull_batch(1, urng, "unit").is_empty() and ShopSystem.pull_batch(1, urng, "support").is_empty(), "a ticket pull without tickets fails in every pool")
+	check(ShopSystem.pull_batch(1, urng).is_empty(), "a ticket pull without tickets fails")
 	SaveManager.data["wallet"]["tickets"] = ShopSystem.TICKET_PULL10
 	var coins_now := SaveManager.coins()
-	check(ShopSystem.pull_batch(10, urng, "unit").size() == 10 and SaveManager.tickets() == 0 and SaveManager.coins() == coins_now, "a 10-pull costs 9 tickets and no coins")
+	check(ShopSystem.pull_batch(10, urng).size() == 10 and SaveManager.tickets() == 0 and SaveManager.coins() == coins_now, "a 10-pull costs 9 tickets and no coins")
 
 	# --- Exchange (penukaran)
 	SaveManager.data["wallet"] = {"coins": 1000, "fragments": 0, "tickets": 0, "crystals": 0, "chips": 0}
@@ -333,6 +320,55 @@ func _ready() -> void:
 	SaveManager.data["wallet"]["chips"] = 1000
 	var w := ShopSystem.gamble("coin", "heads", 1000, grng)
 	check(SaveManager.chips() == int(w["payout"]) and (int(w["payout"]) == 2000 or int(w["payout"]) == 0), "a coin flip pays double or nothing")
+
+	# --- Trading: deterministic live market paid in Chips
+	SaveManager.data["trading"] = {"pos": {}, "realized": 0}
+	var t0 := 1800000000.0
+	var all_pos := true
+	var moves := true
+	for a in TradeSystem.ASSETS:
+		var aid := String(a["id"])
+		all_pos = all_pos and TradeSystem.price(aid, t0) > 0.0 and TradeSystem.price(aid, t0) == TradeSystem.price(aid, t0)
+		moves = moves and absf(TradeSystem.price(aid, t0 + 60.0) - TradeSystem.price(aid, t0)) > 0.0001
+	check(all_pos and moves, "every trading asset has a positive, deterministic price that moves")
+	var swing := 0.0
+	for i in range(0, 7200, 30):
+		swing = maxf(swing, absf(TradeSystem.price("eclp", t0 + float(i)) / TradeSystem.price("eclp", t0) - 1.0))
+	check(swing > 0.03 and swing < 3.0, "prices swing visibly but stay sane (max %.0f%% in 2 h)" % (swing * 100.0))
+	SaveManager.data["wallet"]["chips"] = 300
+	var tb := TradeSystem.buy("aeth", 100, t0)
+	check(bool(tb["ok"]) and SaveManager.chips() == 200 and int(TradeSystem.position("aeth")["cost"]) == 100, "buying spends Chips and opens a position")
+	check(not bool(TradeSystem.buy("aeth", 5000, t0)["ok"]) and SaveManager.chips() == 200, "buying more than you own is refused and costs nothing")
+	check(not bool(TradeSystem.buy("nope", 10, t0)["ok"]), "unknown asset is refused")
+	TradeSystem.buy("aeth", 100, t0)
+	check(int(TradeSystem.position("aeth")["cost"]) == 200 and SaveManager.chips() == 100, "buying again adds to the same position")
+	var same := TradeSystem.sell("aeth", 1.0, t0)
+	check(bool(same["ok"]) and int(same["payout"]) == int(floor(200.0 * (1.0 - TradeSystem.FEE))) and int(same["net"]) == int(same["payout"]) - 200, "selling at the same price loses only the fee")
+	check(TradeSystem.position("aeth").is_empty() and SaveManager.chips() == 100 + int(same["payout"]), "a full sale closes the position and pays the Chips")
+	check(not bool(TradeSystem.sell("aeth", 1.0, t0)["ok"]), "nothing to sell is refused")
+	SaveManager.data["wallet"]["chips"] = 1000
+	TradeSystem.buy("sylv", 400, t0)
+	var half := TradeSystem.sell("sylv", 0.5, t0)
+	check(bool(half["ok"]) and int(TradeSystem.position("sylv")["cost"]) == 200 and int(half["cost"]) == 200, "selling half keeps half of the cost")
+	# a rising price pays a profit, a falling price a loss
+	var best_t := t0
+	var worst_t := t0
+	for i in range(0, 5400, 10):
+		var tt := t0 + float(i)
+		if TradeSystem.price("sylv", tt) > TradeSystem.price("sylv", best_t):
+			best_t = tt
+		if TradeSystem.price("sylv", tt) < TradeSystem.price("sylv", worst_t):
+			worst_t = tt
+	var up := TradeSystem.sell("sylv", 0.5, best_t)
+	check(TradeSystem.price("sylv", best_t) < TradeSystem.price("sylv", t0) * 1.03 or int(up["net"]) > 0, "selling near the top is a profit (net %d)" % int(up["net"]))
+	SaveManager.data["wallet"]["chips"] = 1000
+	TradeSystem.buy("drak", 500, best_t if TradeSystem.price("drak", best_t) > TradeSystem.price("drak", worst_t) else worst_t)
+	check(TradeSystem.realized() == int(half["net"]) + int(up["net"]) + int(same["net"]), "realized profit adds up every sale")
+	check(TradeSystem.portfolio_value(t0) >= 0, "portfolio value is readable")
+	var snap := (SaveManager.data["trading"] as Dictionary).duplicate(true)
+	SaveManager.data["trading"] = {}
+	check(TradeSystem.position("drak").is_empty() and TradeSystem.realized() == 0, "an old save without trading data is repaired")
+	SaveManager.data["trading"] = snap
 
 	SaveManager.data = saved
 	SaveManager.save_game()

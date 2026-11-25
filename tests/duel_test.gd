@@ -238,7 +238,7 @@ func _test_chaos_mode() -> void:
 	c.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 3, "seed": 5, "all_ai": true, "chaos": true})
 	var counts := BoardBuilder.count_types(c.tiles)
 	check(c.chaos and c.tiles.size() == 40 and BoardBuilder.tiles_total == 40, "Chaos Mode: the board has 40 tiles")
-	check(int(counts["Territory"]) == 16 and int(counts["Portal"]) == 4 and int(counts["Corner"]) == 4, "Chaos Mode: 16 territories, 4 portals (one per side), 4 corners")
+	check(int(counts["Territory"]) == 20 and int(counts.get("Portal", 0)) == 0 and int(counts["Corner"]) == 4, "Chaos Mode: 20 territories, no portals, 4 corners")
 	var per_region := [0, 0, 0, 0]
 	var portals := [0, 0, 0, 0]
 	for t in c.tiles:
@@ -246,7 +246,7 @@ func _test_chaos_mode() -> void:
 			per_region[t.region] += 1
 		elif t.type == BoardTile.Type.PORTAL:
 			portals[t.region] += 1
-	check(per_region == [4, 4, 4, 4] and portals == [1, 1, 1, 1], "Chaos Mode: 4 territories and 1 portal in every region")
+	check(per_region == [5, 5, 5, 5] and portals == [0, 0, 0, 0], "Chaos Mode: 5 territories and no portal in every region")
 	var seen := {}
 	var ring_ok := true
 	for i in range(40):
@@ -271,8 +271,9 @@ func _test_chaos_mode() -> void:
 		region_tiles[i].owner_id = 1
 	var rent3 := EconomySystem.rent_of(t0, c.tiles)
 	region_tiles[3].owner_id = 1
-	var rent4 := EconomySystem.rent_of(t0, c.tiles)
-	check(BoardBuilder.majority_needed() == 3 and rent3 > rent1 and rent4 > rent3, "Chaos Mode: majority at 3 of 4, Regional Dominion at 4 of 4")
+	region_tiles[4].owner_id = 1
+	var rent5 := EconomySystem.rent_of(t0, c.tiles)
+	check(BoardBuilder.majority_needed() == 3 and rent3 > rent1 and rent5 > rent3, "Chaos Mode: majority at 3 of 5, Regional Dominion at 5 of 5")
 	# movement wraps at 40 and the Gate pays on every lap
 	var p: PlayerState = c.players[0]
 	p.position = 38
@@ -280,6 +281,30 @@ func _test_chaos_mode() -> void:
 	var chaos_world_extra := WorldMods.start_bonus_extra  # static: the matches created below replace it
 	c._move_player(p, 5)
 	check(p.position == 3 and p.gold > gold, "Chaos Mode: walking past tile 39 wraps to the start and pays the Gate")
+	# hidden finds are thinned out so they do not cover half of the 20 territories
+	check(c.monsters.size() == int(GameData.b("arena_monster_count_multi")) and c.deposits.size() == int(GameData.b("chaos_deposit_count")), "Chaos Mode, 4 rulers: %d monsters + %d deposits" % [c.monsters.size(), c.deposits.size()])
+	var c1 := MatchController.new()
+	c1.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 5, "all_ai": true, "chaos": true})
+	var c2 := MatchController.new()
+	c2.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 3, "seed": 5, "all_ai": true, "chaos": true, "team_mode": true})
+	var a1 := MatchController.new()
+	a1.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 5, "all_ai": true})
+	var j1 := MatchController.new()
+	j1.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 5, "all_ai": true, "journey": true})
+	check(a1.monsters.size() == 2 and j1.monsters.size() == 4, "Arena 1v1: 2 monsters; Journey keeps 4")
+	check(c1.monsters.size() == int(GameData.b("arena_monster_count_duel")) and c2.monsters.size() == 4, "Chaos Mode: 2 monsters in 1v1, 4 in 2vs2")
+	var kinds := c.deposits.map(func(e): return String(GameData.get_deposit(String(e["id"])).get("kind", "")))
+	check(kinds.has("treasure") and kinds.has("mine"), "Chaos Mode: one treasure and one mine")
+	var mine_d: Dictionary = GameData.get_deposit("")
+	for e in c.deposits:
+		var dd := GameData.get_deposit(String(e["id"]))
+		if String(dd.get("kind", "")) == "mine":
+			mine_d = dd
+	check(DepositSystem.rounds_of(int(mine_d["rounds"])) < int(mine_d["rounds"]) and DepositSystem.gold_of(int(mine_d["income"])) > int(mine_d["income"]), "Chaos Mode: mines run fewer rounds and pay more per round")
+	var wp: PlayerState = c.players[1]
+	wp.position = 5
+	var wd := c._random_warp_dest(wp)
+	check(wd >= 0 and wd != 5 and c.tiles[wd].type != BoardTile.Type.CORNER, "Chaos Mode: no portals, so a warp goes to a random non-corner place")
 	check(c.first_seat == 0, "default matches still open with seat 0")
 	var rf := MatchController.new()
 	rf.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 3, "seed": 11, "all_ai": true, "random_first": true})

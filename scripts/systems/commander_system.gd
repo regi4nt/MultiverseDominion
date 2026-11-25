@@ -11,8 +11,16 @@ static func max_star() -> int:
 
 
 ## The mission that upgrades `p` to the next star; {} when the Commander is already at the top star.
+## The two missions of a champion's faction [Lv 1->2, Lv 2->3]; factions without their own use balance.json "commander_missions".
+static func missions_for(champion_id: String) -> Array:
+	var own: Variant = GameData.commander_missions.get(champion_id, null)
+	if own is Array and (own as Array).size() >= 2:
+		return own
+	return GameData.b("commander_missions")
+
+
 static func mission_of(p: PlayerState) -> Dictionary:
-	var list: Array = GameData.b("commander_missions")
+	var list: Array = missions_for(p.champion_id)
 	var i := p.commander_star - 1
 	if p.commander_star >= max_star() or i < 0 or i >= list.size():
 		return {}
@@ -66,3 +74,24 @@ static func add_progress(p: PlayerState, metric: String, amount: int = 1) -> boo
 		p.mission_progress = 0
 		return true
 	return false
+
+
+## Battle Chess version of the same mission (counted per round of a run): metric "bc_*", its own target.
+static func add_progress_battle(p: PlayerState, metric: String, amount: int = 1) -> bool:
+	var m := mission_of(p)
+	if m.is_empty() or String(m.get("bc_metric", "")) != metric or amount <= 0:
+		return false
+	p.mission_progress += amount
+	if p.mission_progress >= int(m.get("bc_target", 1)):
+		p.commander_star += 1
+		p.mission_progress = 0
+		return true
+	return false
+
+
+## "Win 2 rounds. (1/2)" for a Battle Chess run, or "Commander at max level".
+static func mission_text_battle(p: PlayerState) -> String:
+	var m := mission_of(p)
+	if m.is_empty():
+		return "Commander at max level"
+	return "%s (%d/%d)" % [m.get("bc_desc", ""), p.mission_progress, int(m.get("bc_target", 1))]

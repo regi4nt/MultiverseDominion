@@ -177,6 +177,31 @@ static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: in
 	return prep.to_side_cfg(p.champion_id, p.hand, p.commander_star, p.monster_id, p.monster_star)
 
 
+## Battle Chess enemy King: a King of the MAP continent (never the player's King). Every continent has 4 Kings.
+static func pick_continent_champion(rng: RandomNumberGenerator, continent_id: String, exclude: String = "") -> String:
+	var ids: Array = []
+	for cid in GameData.champions.keys():
+		if String(GameData.champions[cid].get("continent", "")) == continent_id and cid != exclude:
+			ids.append(cid)
+	return String(ids[rng.randi() % ids.size()]) if not ids.is_empty() else ""
+
+
+## Battle Chess enemy deck: built from the MAP continent like every AI deck (8 Pawns + the 7 pieces of its King's faction, 9 copies each),
+## not from the player's personal deck.
+static func continent_deck(continent_id: String, champion_id: String) -> Deck:
+	var d := Deck.create_default()
+	d.continent_id = continent_id
+	d.champion_id = champion_id
+	var faction := String(GameData.get_champion(champion_id).get("faction", ""))
+	var units: Array[String] = []
+	for u in CardDatabase.units_of_continent(continent_id):
+		if String(u.get("chess", "")) == "pawn" or String(u.get("faction", "")) == faction:
+			units.append(String(u["id"]))
+	if units.size() == Deck.UNIT_SLOTS:
+		d.unit_ids = units
+	return d
+
+
 static func pick_champion(rng: RandomNumberGenerator, exclude: String = "") -> String:
 	var ids: Array = GameData.champions.keys()
 	ids.erase(exclude)

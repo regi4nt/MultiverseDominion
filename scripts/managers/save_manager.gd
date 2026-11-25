@@ -31,7 +31,8 @@ func default_data() -> Dictionary:
 		"decks": {},  # TODO (Phase 3): Deck Configuration
 		"stats": {"matches_played": 0, "wins": 0, "losses": 0, "total_rounds": 0, "best_gold": 0},
 		"wallet": {"coins": 600, "fragments": 0, "tickets": 0, "crystals": 0, "chips": 0},  # Aether Coins, Card Fragments (Gacha duplicates), Gacha Tickets, Crystals (buy cards), Chips: persistent Shop currencies (see ShopSystem)
-		"shop": {"pity": 0, "pulls": 0, "unit_pity": 0, "unit_pulls": 0},
+		"shop": {"pity": 0, "pity_rare": 0, "pity_legendary": 0, "pulls": 0},
+		"trading": {"pos": {}, "realized": 0},  # Shop > Trading (see TradeSystem): open positions per asset + total realized profit in Chips
 		"chests": {"slots": [null, null, null, null], "opened": 0, "storage": [], "drops": 0, "limit_at": 0},  # Arena reward chests (see ChestSystem): 4 slots, each null or {grade, start, ready}
 		"events": {},  # Missions + Achievements (see EventHub)
 		"trophies": 0,  # Journey trophy road: a win raises it, a defeat lowers it; continents open at their unlock_trophies
@@ -249,8 +250,48 @@ func chips() -> int:
 func unlock_card(card_id: String) -> bool:
 	if owned_count(card_id) > 0:
 		return false
-	data["collection"][card_id] = 1 if CardDatabase.is_support(card_id) else int(GameData.b("unit_copies"))
+	data["collection"][card_id] = 1 if (CardDatabase.is_support(card_id) or CardDatabase.is_king(card_id)) else int(GameData.b("unit_copies"))
 	return true
+
+
+# ------------------------------------------------------------------ King cards (B1 / B2 / B3)
+# A King is a collectible card (Card Gacha / Buy Card). The number of copies owned is its B level (max 3):
+#   B1 = the King card itself (stats, battle passive, King buff)
+#   B2 = unlocks the active skill of Battle Chess (the manual "King skill")
+#   B3 = unlocks the territory skill (the passive of the Territory Board: Royal Treasury, Shadow Ledger ...)
+
+const KING_MAX_COPIES := 3
+
+
+func owns_king(champion_id: String) -> bool:
+	return owned_count(champion_id) > 0
+
+
+## 0 = not owned, 1..3 = B level (copies owned, capped at KING_MAX_COPIES).
+func king_b(champion_id: String) -> int:
+	return clampi(owned_count(champion_id), 0, KING_MAX_COPIES)
+
+
+func king_battle_skill_unlocked(champion_id: String) -> bool:
+	return king_b(champion_id) >= 2
+
+
+func king_territory_skill_unlocked(champion_id: String) -> bool:
+	return king_b(champion_id) >= 3
+
+
+## A King can be played when its faction is open AND the King card is owned.
+func can_use_king(champion_id: String) -> bool:
+	var ch := GameData.get_champion(champion_id)
+	return not ch.is_empty() and owns_king(champion_id) and can_use_faction(String(ch.get("faction", "")))
+
+
+## Adds one copy of a King card. Returns the new B level, or 0 when it is unknown or already at B3 (the caller turns it into fragments).
+func add_king_copy(champion_id: String) -> int:
+	if not CardDatabase.is_king(champion_id) or owned_count(champion_id) >= KING_MAX_COPIES:
+		return 0
+	data["collection"][champion_id] = owned_count(champion_id) + 1
+	return owned_count(champion_id)
 
 
 ## The unit cards a new player owns: the 8 Pawns and the 7 pieces of Solvaris (the default King), i.e. exactly the 15 types of
@@ -508,6 +549,8 @@ func ensure_collection() -> void:
 			if s.get("owned_default", false):
 				col[s["id"]] = 1
 		data["unit_cards_v"] = 2  # 2 = unit cards are locked (starter units only) and come from the Shop; a save without it owns every unit
+		col["champion_solvaris"] = 1  # Kings are cards too: only the default King is owned, the others come from the Shop
+		data["king_cards_v"] = 1
 		changed = true
 	elif int(data.get("unit_cards_v", 1)) < 2:
 		# older save (every unit owned): keep what the player has, add the unit cards of continents that did not exist yet
@@ -526,6 +569,15 @@ func ensure_collection() -> void:
 		changed = true
 	for cid in (data["unlocked_continents"] as Array).duplicate():
 		unlock_continent(cid)
+	if int(data.get("king_cards_v", 0)) < 1:
+		# older save: every King of an open faction was playable, so the player keeps it as a B1 card (skills now need duplicates)
+		for champ_id in GameData.champions:
+			var champ_fac := String(GameData.get_champion(String(champ_id)).get("faction", ""))
+			if not col.has(champ_id) and can_use_faction(champ_fac):
+				col[champ_id] = 1
+		col["champion_solvaris"] = maxi(int(col.get("champion_solvaris", 0)), 1)
+		data["king_cards_v"] = 1
+		changed = true
 	if changed:
 		save_game()
 
@@ -545,11 +597,11 @@ func player_champion_id() -> String:
 	var main: Dictionary = data["decks"].get("main", {})
 	var id := String(main.get("champion", "champion_solvaris"))
 	var ch := GameData.get_champion(id)
-	if not ch.is_empty() and can_use_faction(String(ch.get("faction", ""))):
+	if not ch.is_empty() and can_use_king(id):
 		return id
 	for c in GameData.continents:
 		for f in c.get("factions", []):
-			if can_use_faction(String(f["id"])):
+			if can_use_king(String(f.get("champion", ""))):
 				return String(f["champion"])
 	return "champion_solvaris"
 
@@ -565,8 +617,15 @@ func get_deck(continent_id: String = "") -> Deck:
 	var cid := continent_id if continent_id != "" else CardDatabase.active_continent
 	var main: Dictionary = data["decks"].get("main", {})
 	var ubc: Dictionary = main.get("units_by_continent", {})
+	var lbc: Dictionary = main.get("lineups_by_continent", {})
+	# A continent with no saved deck of its own uses the deck the player saved last in the Card Hub (so Battle Chess / Arena match it).
+	var src := cid
+	if (ubc.get(cid, []) as Array).is_empty():
+		var last := String(main.get("last_units_continent", ""))
+		if last != "" and not (ubc.get(last, []) as Array).is_empty():
+			src = last
 	var deck := Deck.from_dict({"champion": main.get("champion", "champion_solvaris"), "supports": main.get("supports", []),
-		"continent": cid, "units": ubc.get(cid, []), "lineup": (main.get("lineups_by_continent", {}) as Dictionary).get(cid, []),
+		"continent": cid, "units": ubc.get(src, []), "lineup": lbc.get(cid, lbc.get(src, [])),
 		"support_lineup": main.get("support_lineup", [])})
 	deck.owned_filter = data["collection"]
 	deck.sanitize_units()
@@ -577,11 +636,21 @@ func get_deck(continent_id: String = "") -> Deck:
 	return deck
 
 
+## Continent of the deck the player saved last in the Card Hub ("" = none saved yet). Battle Chess plays on it so it matches that deck.
+func last_deck_continent() -> String:
+	var main: Dictionary = data["decks"].get("main", {})
+	var last := String(main.get("last_units_continent", ""))
+	if last != "" and GameData.get_continent(last).get("playable", false):
+		return last
+	return ""
+
+
 func set_deck(deck: Deck) -> void:
 	var main: Dictionary = data["decks"].get("main", {})
 	var ubc: Dictionary = main.get("units_by_continent", {})
 	ubc[deck.deck_continent()] = deck.unit_ids.duplicate() if deck.unit_ids.size() == Deck.UNIT_SLOTS else []
 	data["decks"]["main"] = {"champion": deck.champion_id, "supports": deck.support_ids.duplicate(), "units_by_continent": ubc,
+		"last_units_continent": deck.deck_continent() if deck.unit_ids.size() == Deck.UNIT_SLOTS else String(main.get("last_units_continent", "")),
 		"lineups_by_continent": main.get("lineups_by_continent", {}),
 		"support_lineup": main.get("support_lineup", [])}  # the lineups are saved separately (set_lineup, set_support_lineup)
 	save_game()
@@ -606,6 +675,27 @@ func set_support_lineup(slots: Array) -> void:
 	main["support_lineup"] = slots.duplicate() if any else []
 	data["decks"]["main"] = main
 	save_game()
+
+
+# Camera-bezel watcher. Turning the phone 180 degrees (landscape <-> reverse landscape) keeps the window size, so the
+# root's size_changed never fires while the cutout jumps to the other edge; the safe area is also often reported a moment
+# late. Poll the display's safe area / cutouts / orientation and re-emit size_changed (what every inset follower listens
+# to, see UiTheme.follow_insets) as soon as any of them changes.
+var _inset_sig: String = ""
+var _inset_clock: float = 0.0
+
+
+func _process(delta: float) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	_inset_clock += delta
+	if _inset_clock < 0.1:
+		return
+	_inset_clock = 0.0
+	var sig := "%s|%s|%s|%s" % [DisplayServer.get_display_safe_area(), DisplayServer.get_display_cutouts(), DisplayServer.window_get_size(), DisplayServer.screen_get_orientation()]
+	if _inset_sig != "" and sig != _inset_sig:
+		get_tree().root.size_changed.emit()
+	_inset_sig = sig
 
 
 func _notification(what: int) -> void:

@@ -172,11 +172,25 @@ func _rebuild() -> void:
 	if _filter == "all" or _filter == "support":
 		for s in CardDatabase.all_supports():
 			entries.append([s, true])
-	# owned cards first, locked / not owned ones at the bottom (order inside each group is kept)
-	var owned_entries: Array = entries.filter(func(e): return _is_owned(e[0]))
-	var locked_entries: Array = entries.filter(func(e): return not _is_owned(e[0]))
+	# owned cards first, locked / not owned ones at the bottom; both groups use the same grade order (common -> legendary)
+	var owned_entries: Array = _grade_sorted(entries.filter(func(e): return _is_owned(e[0])), true)
+	var locked_entries: Array = _grade_sorted(entries.filter(func(e): return not _is_owned(e[0])), true)
 	for e in owned_entries + locked_entries:
 		_add_card(e[0], e[1])
+
+
+const GRADE_ORDER: Array[String] = ["common", "rare", "epic", "legendary"]
+
+
+## Stable sort by grade (rarity), common first; cards of the same grade keep their original order.
+## `wrapped`: items are [card, is_support] entries instead of bare card dictionaries.
+func _grade_sorted(items: Array, wrapped: bool = false) -> Array:
+	var keyed: Array = []
+	for i in items.size():
+		var c: Dictionary = items[i][0] if wrapped else items[i]
+		keyed.append([maxi(GRADE_ORDER.find(String(c.get("rarity", "common"))), 0), i, items[i]])
+	keyed.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	return keyed.map(func(k): return k[2])
 
 
 ## The active continent first, then the others in their normal order (the collection shows every continent).
@@ -201,7 +215,7 @@ func _faction_open(c: Dictionary) -> bool:
 func _is_owned(c: Dictionary) -> bool:
 	var id := String(c["id"])
 	if CardDatabase.is_king(id):
-		return _faction_open(c)
+		return _faction_open(c) and SaveManager.owns_king(id)
 	if not CardDatabase.is_support(id) and not _faction_open(c):
 		return false
 	return SaveManager.owned_count(id) > 0
@@ -274,19 +288,48 @@ func _king_buff_text(id: String) -> String:
 	var out := ""
 	var kp: Dictionary = GameData.king_passives.get(id, {})
 	if not kp.is_empty():
-		out += "\n[b]Battle Passive - %s:[/b] %s [color=#9aa0b5](every continent)[/color]" % [kp["name"], kp["desc"]]
+		out += "\n[b]Battle Passive - %s:[/b] %s [color=#9aa0b5](active from the start of every battle, on every continent)[/color]" % [kp["name"], kp["desc"]]
 	var kb := CardDatabase.king_buff(id, false)
 	if not kb.is_empty():
-		out += "\n[b]King Buff - %s:[/b] %s [color=#9aa0b5](home continent only)[/color]" % [kb["name"], kb["desc"]]
+		out += "\n[b]King Buff - %s:[/b] %s [color=#9aa0b5](attached to the King when it enters; only on its home continent)[/color]" % [kb["name"], kb["desc"]]
 	return out
 
 
 func _describe_king(id: String) -> String:
 	var ch := GameData.get_champion(id)
 	var fac := GameData.find_faction(String(ch.get("faction", "")))  # a King of any continent
-	return "[color=#d4af37][b]%s[/b][/color]\n%s - King - %s\nCapacity cost: %d (enters only in Last Stand)\nHP %d   ATK %d\n\n[b]%s:[/b] %s\n[b]%s:[/b] %s%s\n\nPiece 8 of 8 of the %s faction." % [
-		ch["name"], String(fac.get("name", ch.get("faction", ""))), String(ch.get("rarity", "legendary")).capitalize(), CardDatabase.capacity_cost("king"),
-		int(ch["hp"]), int(ch["atk"]), ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"], _king_buff_text(id), String(fac.get("name", ""))]
+	var b := SaveManager.king_b(id)
+	var on := "#59cd90"
+	var off := "#8d93ad"
+	var hp := int(ch["hp"])
+	var atk := int(ch["atk"])
+	var owned_txt := "not owned" if b == 0 else ("%d copy" % b if b == 1 else "%d copies" % b)
+	var out := "[color=#d4af37][b]%s[/b][/color]\n%s - King - %s   [b]B%d[/b] (%s)\nContinent: %s\n" % [
+		ch["name"], String(fac.get("name", ch.get("faction", ""))), String(ch.get("rarity", "legendary")).capitalize(), b, owned_txt, String(ch.get("continent", "")).capitalize()]
+	# Stats and levels
+	out += "\n[b]Stats[/b]\nHP %d   ATK %d   Range 1   Movement 2\nCapacity cost: %d\n" % [hp, atk, CardDatabase.capacity_cost("king")]
+	for st in range(1, CommanderSystem.max_star() + 1):
+		out += "Lv %d: HP %d  ATK %d%s\n" % [st, int(round(hp * CommanderSystem.hp_mult(st))), int(round(atk * CommanderSystem.atk_mult(st))), "" if st > 1 else "  (start of every match)"]
+	var missions: Array = CommanderSystem.missions_for(id)
+	if not missions.is_empty():
+		out += "\n[b]Level-up missions of this faction[/b]\n"
+		for i in range(missions.size()):
+			var mm: Dictionary = missions[i]
+			out += "Lv %d -> %d  %s\n  Territory match: %s\n  Battle Chess run: %s\n" % [i + 1, i + 2, String(mm.get("name", "")), String(mm.get("desc", "")), String(mm.get("bc_desc", ""))]
+		out += "[color=#9aa0b5]Each faction has its own pair. Missions are done in order, one at a time; progress counts only while that mission is active. In Battle Chess the level applies from the next round of a 10 Rounds / Survival run (a single battle stays Lv 1). Every level also boosts the Monster card you win.[/color]\n"
+	# How the King fights
+	out += "\n[b]How the King fights[/b]\nThe King does not deploy with the army. It enters the battle in [b]Last Stand[/b] (when every other unit of its side has fallen, or at once if there are none) and uses its skill on entry. You may also [b]Summon King[/b] early for %d energy. If the King falls, that side loses the battle.\n" % int(GameData.b("king_summon_energy"))
+	# Skills and effects
+	out += "\n[color=%s][b]Battle Chess skill (B2) - %s:[/b] %s%s[/color]\n[color=#9aa0b5]Manual, once per battle, costs %d energy, used from the King panel after the King has entered. In Battle Chess it is the King's active skill.[/color]\n" % [
+		on if b >= 2 else off, ch["active_name"], ch["active_desc"], "" if b >= 2 else "  (locked)", int(GameData.b("king_skill_energy"))]
+	out += "\n[color=%s][b]Territory skill (B3) - %s:[/b] %s%s[/color]\n[color=#9aa0b5]Works on the Territory Board for the whole match (Dominion Gold, rent, prices...). Only your own King; AI rulers always have it.[/color]\n" % [
+		on if b >= 3 else off, ch["passive_name"], ch["passive_desc"], "" if b >= 3 else "  (locked)"]
+	var eff := _king_buff_text(id)
+	if eff != "":
+		out += "\n[b]Battle effects (always unlocked)[/b]" + eff + "\n"
+	out += "\n[b]Copies (B level)[/b]\nB1 = the King card (stats, Battle Passive and King Buff). B2 = a second copy unlocks the Battle Chess skill. B3 = a third copy unlocks the Territory skill. Extra copies after B3 become Fragments. Copies come from Card Gacha and Buy Card.\n"
+	out += "\nPiece 8 of 8 of the %s faction." % String(fac.get("name", ""))
+	return out
 
 
 ## "Continent buff" paragraph of a unit card (every unit card has one buff on its continent).
@@ -836,7 +879,7 @@ func _pool_units() -> void:
 		_filter_chip(_pool_filter_row, String(f["name"]), _pool_faction == String(f["id"]), _on_pool_faction.bind(String(f["id"])), group)
 	var grid := _new_grid(_pool_box, 5)
 	var units: Array = CardDatabase.units_of_continent(src).filter(func(u): return _pool_faction == "all" or String(u["faction"]) == _pool_faction)
-	units = units.filter(func(u): return _is_owned(u)) + units.filter(func(u): return not _is_owned(u))  # owned first
+	units = _grade_sorted(units.filter(func(u): return _is_owned(u))) + _grade_sorted(units.filter(func(u): return not _is_owned(u)))  # owned first, each group by grade
 	for u in units:
 		var v := CardView.new()
 		v.setup_compact(u, false, SaveManager.owned_count(String(u["id"])), TILE_H)
@@ -864,7 +907,7 @@ func _pool_supports() -> void:
 		_filter_chip(_pool_filter_row, String(cat), _pool_cat == cat, _on_pool_cat.bind(String(cat)), group)
 	var grid := _new_grid(_pool_box, 5)
 	var sups: Array = CardDatabase.all_supports().filter(func(x): return String(x["category"]) == _pool_cat)
-	sups = sups.filter(func(x): return _is_owned(x)) + sups.filter(func(x): return not _is_owned(x))  # owned first
+	sups = _grade_sorted(sups.filter(func(x): return _is_owned(x))) + _grade_sorted(sups.filter(func(x): return not _is_owned(x)))  # owned first, each group by grade
 	for s in sups:
 		var v := CardView.new()
 		v.setup_compact(s, true, SaveManager.owned_count(String(s["id"])), TILE_H)
@@ -896,12 +939,15 @@ func _pool_kings() -> void:
 			var ch := GameData.get_champion(champ_id)
 			if ch.is_empty():
 				continue
-			var open := SaveManager.can_use_faction(String(f["id"]))
+			var open := SaveManager.can_use_king(champ_id)
 			var tile := {"id": champ_id, "name": String(f["name"]), "rarity": String(ch.get("rarity", "legendary")), "chess": "king", "faction": String(f["id"]),
-				"continent": String(cont["id"]), "color": String(f.get("color", "#555566")), "sub": String(ch["name"]), "badge": false}
+				"continent": String(cont["id"]), "color": String(f.get("color", "#555566")), "sub": ("%s  B%d" % [String(ch["name"]), SaveManager.king_b(champ_id)]) if open else String(ch["name"]), "badge": false}
 			var v := CardView.new()
 			v.setup_compact(tile, false, 1 if open else 0, TILE_H)
-			v.tooltip_text = ("%s: %s\n%s: %s" % [ch["passive_name"], ch["passive_desc"], ch["active_name"], ch["active_desc"]]) if open else "Locked - unlock %s in Journey" % cont["name"]
+			var locked_tip := "Locked - unlock %s in Journey" % cont["name"]
+			if SaveManager.can_use_faction(String(f["id"])) and not open:
+				locked_tip = "Not owned - get this King from Card Gacha or Buy Card in the Shop"
+			v.tooltip_text = ("B%d  |  B2 Battle skill - %s: %s\nB3 Territory skill - %s: %s" % [SaveManager.king_b(champ_id), ch["active_name"], ch["active_desc"], ch["passive_name"], ch["passive_desc"]]) if open else locked_tip
 			v.pressed.connect(_set_king)
 			grid.add_child(v)
 			_pool_buttons[champ_id] = v
@@ -1021,6 +1067,9 @@ func _set_king(id: String) -> void:
 		return
 	if not SaveManager.can_use_faction(String(GameData.get_champion(id).get("faction", ""))):
 		_say("That faction is locked. Win its continent in Journey to unlock it.")
+		return
+	if not SaveManager.owns_king(id):
+		_say("You do not own this King card yet. Get it from Card Gacha or Buy Card in the Shop.")
 		return
 	deck.champion_id = id
 	_note = ""
@@ -1180,7 +1229,7 @@ func _info_territory() -> String:
 	var rent_txt := ""
 	for i in range(1, up_rent.size()):
 		rent_txt += "%sx%s" % ["" if i == 1 else " / ", str(float(up_rent[i]))]
-	var base := "%s\nThe Territory Board is a loop of tiles around the continent. Everyone starts with Dominion Gold and Life by difficulty (Easy %d G / %d Life, Normal %d G / %d Life, Hard %d G / %d Life). Roll 2 dice and move that many tiles; a double (or a Time Surge event) gives another roll, up to %d bonus rolls. A Reroll Token lets you roll again before you move. Tap any tile to inspect it.\nChaos Mode (its own card in New Match > Offline): a 40-tile board with 4 territories per region (majority 3, Dominion 4), shorter matches and pricier land (see Chaos Mode below); everything else is the same.\n\n%s\n[b]Territory[/b]: if it is free you may [b]Buy[/b] it, or [b]Lease[/b] it for %d%% of its price for %d rounds (rent as usual, but no upgrades, no net worth, no region bonus; it is free again afterwards, and landing on it lets you buy it out for the rest of the price); if an opponent owns it you must pay Tax or face a Duel (below).\n[b]START[/b]: passing or landing gives %d G.   [b]Sanctuary[/b]: rest and receive %d G.\n[b]Rift[/b]: you skip your next turn.   [b]Crossroads[/b]: free warp to a random active portal.\n[b]Portal[/b]: each side has ONE portal (4 in total); it warps you to another portal.\n[b]Bank & Stocks[/b]: invest gold (100 / 250 / 500) in the stock market. The market moves every round (-20%% to +30%%); sell on any Bank tile. Stocks count toward net worth and are cashed out automatically to pay debts.   [b]Casino[/b]: place a 50 G bet to win x2, x4 or the whole pot.\n[b]Event[/b]: draws a random event card.   [b]Auction[/b]: a random free territory is auctioned to all living players, opening at %d%% of its price and rising %d%% per bid.\n[b]Tax[/b]: pay %d G to the bank.   [b]Special[/b]: a random gift, teleport or tribute.\n[b]Territory Shop[/b]: Reroll Token %d G, restore 1 Life %d G, Special Die %d G (carry up to %d, used before rolling).\n\n%s\nRent is %d%% of a territory's price. Own %d or more tiles of one region for x%s rent; own the whole region (Regional Dominion) for x%s rent. You can upgrade a territory %d times (cost %s of its price); each level raises its rent (%s). Selling a territory returns %d%% of its price.\n\n%s\nWhen you stop on an opponent's territory, its owner chooses Tax or Duel. Tax is just the rent. If the owner picks Duel you may Accept or Refuse; refusing costs the rent plus %d G.\nA Duel is an automatic battle between both players' permanent armies (the units you buy with Dominion Gold are kept between duels). The loser loses 1 Life.\nIf the attacker wins they choose Conquest (take the territory) or Victory Reward (%d%% of its price plus its upgrades in gold, the territory and its level stay); Conquest resets the territory to Level 0. If the attacker loses, the territory stays.\nIf you cannot pay, your territories are sold automatically; if that is still not enough you lose 1 Life and receive a %d G bailout. At 0 Life you are eliminated.\n\n%s\nThe last player alive wins, or when the round limit is reached the player with the highest net worth wins.\nRound limit - Journey: Easy %d / Normal %d / Hard %d.   Arena: Easy %d / Normal %d / Hard %d." % [
+	var base := "%s\nThe Territory Board is a loop of tiles around the continent. Everyone starts with Dominion Gold and Life by difficulty (Easy %d G / %d Life, Normal %d G / %d Life, Hard %d G / %d Life). Roll 2 dice and move that many tiles; a double (or a Time Surge event) gives another roll, up to %d bonus rolls. A Reroll Token lets you roll again before you move. Tap any tile to inspect it.\nChaos Mode (its own card in New Match > Offline): a 40-tile board with 4 territories per region (majority 3, Dominion 4), shorter matches and pricier land (see Chaos Mode below); everything else is the same.\n\n%s\n[b]Territory[/b]: if it is free you may [b]Buy[/b] it, or [b]Lease[/b] it for %d%% of its price for %d rounds (rent as usual, but no upgrades, no net worth, no region bonus; it is free again afterwards, and landing on it lets you buy it out for the rest of the price); if an opponent owns it you must pay Tax or face a Duel (below).\n[b]START[/b]: passing or landing gives %d G.   [b]Sanctuary[/b]: rest and receive %d G.\n[b]Rift[/b]: you skip your next turn.   [b]Crossroads[/b]: free warp to a random active portal.\n[b]Portal[/b]: each side has ONE portal (4 in total); it warps you to another portal.\n[b]Bank & Stocks[/b]: invest gold (100 / 250 / 500) in the stock market. The market moves every round (-20%% to +30%%); sell on any Bank tile. Stocks count toward net worth and are cashed out automatically to pay debts.   [b]Casino[/b]: a random Gamble game (Coin Flip, Dice or Slots) is drawn each visit, played with Dominion Gold, one round per visit (bets 50 / 100 / 250 / 500 G).\n[b]Event[/b]: draws a random event card.   [b]Auction[/b]: a random free territory is auctioned to all living players, opening at %d%% of its price and rising %d%% per bid.\n[b]Tax[/b]: pay %d G to the bank.   [b]Special[/b]: a random gift, teleport or tribute.\n[b]Territory Shop[/b]: Reroll Token %d G, restore 1 Life %d G, Special Die %d G (carry up to %d, used before rolling).\n\n%s\nRent is %d%% of a territory's price. Own %d or more tiles of one region for x%s rent; own the whole region (Regional Dominion) for x%s rent. You can upgrade a territory %d times (cost %s of its price); each level raises its rent (%s). Selling a territory returns %d%% of its price.\n\n%s\nWhen you stop on an opponent's territory, its owner chooses Tax or Duel. Tax is just the rent. If the owner picks Duel you may Accept or Refuse; refusing costs the rent plus %d G.\nA Duel is an automatic battle between both players' permanent armies (the units you buy with Dominion Gold are kept between duels). The loser loses 1 Life.\nIf the attacker wins they choose Conquest (take the territory) or Victory Reward (%d%% of its price plus its upgrades in gold, the territory and its level stay); Conquest resets the territory to Level 0. If the attacker loses, the territory stays.\nIf you cannot pay, your territories are sold automatically; if that is still not enough you lose 1 Life and receive a %d G bailout. At 0 Life you are eliminated.\n\n%s\nThe last player alive wins, or when the round limit is reached the player with the highest net worth wins.\nRound limit - Journey: Easy %d / Normal %d / Hard %d.   Arena: Easy %d / Normal %d / Hard %d." % [
 		_info_head("The board"), GameData.gold_for("easy"), GameData.life_for("easy"), GameData.gold_for("normal"), GameData.life_for("normal"), GameData.gold_for("hard"), GameData.life_for("hard"), int(GameData.b("max_bonus_rolls")),
 		_info_head("Tiles"), int(round(float(GameData.b("lease_cost_ratio")) * 100.0)), int(GameData.b("lease_rounds")), int(GameData.b("start_bonus")), int(GameData.b("sanctuary_bonus")),
 		_pct("auction_start_ratio"), _pct("auction_step_ratio"), int(GameData.b("tax_flat")),
@@ -1205,9 +1254,9 @@ func _info_territory_extra() -> String:
 	out += "[b]Monster[/b]: choose Fight or Flee. Winning gives a Monster card (one per player; a defeated monster is gone for everybody). It joins your King in a Last Stand and has its own skill. Losing costs %d G and the monster stays; fleeing is free. A wild monster is as strong as your King's level.\n" % int(GameData.b("monster_defeat_gold"))
 	out += "[b]Treasure[/b]: a one-time gold prize (sometimes a Reroll Token or a Special Die).   [b]Mine[/b]: becomes yours and pays gold at the end of every round for a number of rounds (some also give a Reroll Token now and then); it stops if you are eliminated."
 	var missions: Array[String] = []
-	for m in GameData.b("commander_missions"):
+	for m in CommanderSystem.missions_for(SaveManager.player_champion_id()):
 		missions.append(String(m.get("desc", "")))
-	out += "\n\n" + _info_head("King level") + "\nYour King starts at Lv 1 and reaches Lv 2 and Lv 3 by completing two missions in order (%s). Each level raises the King's HP and ATK (shown as stars). The Monster card keeps the level your King had when you won it." % ", then ".join(PackedStringArray(missions))
+	out += "\n\n" + _info_head("King level") + "\nYour King starts at Lv 1 and reaches Lv 2 and Lv 3 by completing the two missions of its faction, in order (yours: %s); every faction has different missions, and Battle Chess runs have their own version of each (see the King card). Each level raises the King's HP and ATK (shown as stars). The Monster card keeps the level your King had when you won it." % ", then ".join(PackedStringArray(missions))
 	out += "\n\n" + _info_head("Map and camera") + "\nThe Dominion Gate (START) is the bottom-right corner and the ring runs clockwise. The 100-tile board opens zoomed in, with tiles as big as on the 40-tile Chaos board, and the camera follows the pawn. Drag to pan, pinch or use the mouse wheel to zoom. Bottom-left: + / - zoom, Fit shows the whole board (then the button reads 1:1 and returns to the normal tile size), Speed sets how fast AI turns and pawns move."
 	return out
 

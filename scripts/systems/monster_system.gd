@@ -1,7 +1,7 @@
 class_name MonsterSystem
 extends RefCounted
 ## Hidden territory monsters.
-## Every continent has 4 monsters of its own (data/monsters.json), one per region, each lurking on a RANDOM territory
+## Every continent has 4 monsters of its own (data/monsters.json), one per region (Arena / Chaos 1v1 keep only `arena_monster_count_duel` of them), each lurking on a RANDOM territory
 ## tile of that region. They are never drawn on the map: a player only finds one by landing on its tile.
 ## Landing there starts a fight (the player may flee instead). Winning gives the player a Monster card (max ONE per
 ## player): when that player's King enters Last Stand in a Duel the monster fights beside the King
@@ -11,7 +11,7 @@ const FOE_CELL := Vector2i(3, 1)  # the wild monster stands in the enemy half, i
 
 
 ## One entry per monster: {"tile": territory index, "id": monster id, "taken": bool}. Consumes rng.
-static func place(tiles: Array[BoardTile], continent_id: String, rng: RandomNumberGenerator) -> Array:
+static func place(tiles: Array[BoardTile], continent_id: String, rng: RandomNumberGenerator, seats: int = 2, thin: bool = false) -> Array:
 	var out: Array = []
 	for m in GameData.get_monsters(continent_id):
 		var cands: Array[int] = []
@@ -21,6 +21,10 @@ static func place(tiles: Array[BoardTile], continent_id: String, rng: RandomNumb
 		if cands.is_empty():
 			continue
 		out.append({"tile": cands[rng.randi() % cands.size()], "id": String(m["id"]), "taken": false})
+	if thin:  # Arena and Chaos (not Journey): 2 lairs in 1v1 (`arena_monster_count_duel`), all 4 with 4 rulers (4 Player / 2vs2, `arena_monster_count_multi`)
+		var keep := int(GameData.b("arena_monster_count_multi", 4)) if seats > 2 else int(GameData.b("arena_monster_count_duel", 2))
+		while out.size() > keep:
+			out.remove_at(rng.randi() % out.size())
 	return out
 
 

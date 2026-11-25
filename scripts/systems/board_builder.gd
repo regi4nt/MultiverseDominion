@@ -5,15 +5,16 @@ extends RefCounted
 ## 2 Bank (gold investment / stock market), 1 Casino, 2 Shop, 3 Event, 1 Auction, 2 Tax, 2 Special.
 ## Plus 4 corners => 100 tiles.
 ## Totals: 40 Territory, 4 Portal, 8 Bank, 4 Casino, 8 Shop, 12 Event, 4 Auction, 8 Tax, 8 Special, 4 Corner.
+## Chaos totals: 20 Territory, 0 Portal, 4 Event, 2 each of Bank / Tax / Special / Shop / Casino / Auction, 4 Corner.
 
 ##
-## Chaos Mode: 40 tiles = 4 corners + 9 tiles per side, 4 Territories per region (see CHAOS_PATTERN_A / _B).
+## Chaos Mode: 40 tiles = 4 corners + 9 tiles per side, 5 Territories per region and NO Portal (see CHAOS_PATTERN_A / _B).
 ## The size lives in static vars so every script that walks the ring (BoardBuilder.tiles_total, .grid) follows the mode;
 ## MatchController sets it with configure() before it builds or loads a board.
 const NORMAL_SIDE := 25
 const CHAOS_SIDE := 10
 const NORMAL_REGION_SIZE := 10
-const CHAOS_REGION_SIZE := 4
+const CHAOS_REGION_SIZE := 5
 static var chaos: bool = false
 static var side_len: int = NORMAL_SIDE  # tiles from one corner to the next (the corner counts, so a side has side_len - 1 inner tiles)
 static var tiles_total: int = NORMAL_SIDE * 4
@@ -23,8 +24,8 @@ const SIDE_PATTERN: Array[String] = [
 	"T", "T", "B", "T", "E", "T", "SH", "T", "X", "P", "T", "SP",
 	"T", "E", "L", "T", "SH", "A", "T", "SP", "T", "X", "B", "E",
 ]
-const CHAOS_PATTERN_A: Array[String] = ["T", "E", "T", "B", "T", "P", "T", "X", "SP"]
-const CHAOS_PATTERN_B: Array[String] = ["T", "SH", "T", "L", "T", "P", "T", "A", "E"]
+const CHAOS_PATTERN_A: Array[String] = ["T", "E", "T", "B", "T", "T", "T", "X", "SP"]
+const CHAOS_PATTERN_B: Array[String] = ["T", "SH", "T", "L", "T", "T", "T", "A", "E"]
 const CORNERS: Array[String] = ["start", "sanctuary", "rift", "crossroads"]
 const CORNER_NAMES: Array[String] = ["Dominion Gate (START)", "Sanctuary", "The Rift", "Crossroads"]
 const DEFAULT_REGION_NAMES: Array[String] = ["North", "East", "South", "West"]
@@ -39,7 +40,7 @@ static func configure(is_chaos: bool) -> void:
 	region_size = CHAOS_REGION_SIZE if is_chaos else NORMAL_REGION_SIZE
 
 
-## Territories of one region needed for the region's majority rent bonus (6 of 10; 3 of 4 in Chaos Mode).
+## Territories of one region needed for the region's majority rent bonus (6 of 10; 3 of 5 in Chaos Mode).
 static func majority_needed() -> int:
 	var base := int(GameData.b("majority_threshold"))
 	if region_size == NORMAL_REGION_SIZE:

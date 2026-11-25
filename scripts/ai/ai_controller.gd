@@ -192,7 +192,7 @@ static func _bank_choice(c: MatchController, p: PlayerState) -> String:
 	return "leave"
 
 
-## Casino: the house has a small edge, so only a rich AI (never a hard one) plays for fun.
+## Casino: every game has a small house edge, so only a rich AI (never a hard one) plays for fun: one quick Coin Flip at the lowest bet.
 static func _casino_choice(c: MatchController, p: PlayerState) -> String:
 	if p.difficulty == "hard":
 		return "skip"

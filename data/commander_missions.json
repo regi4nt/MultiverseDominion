@@ -1,0 +1,621 @@
+{
+ "_doc": "Commander (King) level-up missions per champion: [Lv1->2, Lv2->3]. metric/target/desc = Territory match, bc_* = Battle Chess run (counted per round). Factions without an entry use balance.json commander_missions.",
+ "champions": {
+  "champion_solvaris": [
+   {
+    "id": "solvaris_1",
+    "name": "Proven in Battle",
+    "desc": "Win 2 Duels",
+    "metric": "duel_wins",
+    "target": 2,
+    "bc_desc": "Win 2 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 2
+   },
+   {
+    "id": "solvaris_2",
+    "name": "Monument of Power",
+    "desc": "Raise 1 Landmark",
+    "metric": "landmarks",
+    "target": 1,
+    "bc_desc": "Use the King skill in 3 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 3
+   }
+  ],
+  "champion_nocthyr": [
+   {
+    "id": "nocthyr_1",
+    "name": "Trial of Nocthyr I",
+    "desc": "Raise 1 Landmark",
+    "metric": "landmarks",
+    "target": 1,
+    "bc_desc": "Use the King skill in 2 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 2
+   },
+   {
+    "id": "nocthyr_2",
+    "name": "Trial of Nocthyr II",
+    "desc": "Win 2 Auction lots",
+    "metric": "auctions",
+    "target": 2,
+    "bc_desc": "Keep 8 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 8
+   }
+  ],
+  "champion_valdoria": [
+   {
+    "id": "valdoria_1",
+    "name": "Trial of Valdoria I",
+    "desc": "Upgrade your territories 3 times",
+    "metric": "upgrades",
+    "target": 3,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "valdoria_2",
+    "name": "Trial of Valdoria II",
+    "desc": "Conquer 2 territories in Duels",
+    "metric": "conquests",
+    "target": 2,
+    "bc_desc": "Win 3 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 3
+   }
+  ],
+  "champion_elarion": [
+   {
+    "id": "elarion_1",
+    "name": "Trial of Elarion I",
+    "desc": "Win 1 Auction lot",
+    "metric": "auctions",
+    "target": 1,
+    "bc_desc": "Keep 4 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 4
+   },
+   {
+    "id": "elarion_2",
+    "name": "Trial of Elarion II",
+    "desc": "Use 3 Special Dice",
+    "metric": "special_dice",
+    "target": 3,
+    "bc_desc": "Use the King skill in 3 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 3
+   }
+  ],
+  "champion_astralis": [
+   {
+    "id": "astralis_1",
+    "name": "Trial of Astralis I",
+    "desc": "Use 2 Special Dice",
+    "metric": "special_dice",
+    "target": 2,
+    "bc_desc": "Use the King skill in 2 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 2
+   },
+   {
+    "id": "astralis_2",
+    "name": "Trial of Astralis II",
+    "desc": "Invest in the stock market 3 times",
+    "metric": "bank_deposits",
+    "target": 3,
+    "bc_desc": "Keep 8 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 8
+   }
+  ],
+  "champion_ignivar": [
+   {
+    "id": "ignivar_1",
+    "name": "Trial of Ignivar I",
+    "desc": "Conquer 1 territory in a Duel",
+    "metric": "conquests",
+    "target": 1,
+    "bc_desc": "Win 2 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 2
+   },
+   {
+    "id": "ignivar_2",
+    "name": "Trial of Ignivar II",
+    "desc": "Lease 3 territories",
+    "metric": "leases",
+    "target": 3,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_cryndel": [
+   {
+    "id": "cryndel_1",
+    "name": "Trial of Cryndel I",
+    "desc": "Invest in the stock market 2 times",
+    "metric": "bank_deposits",
+    "target": 2,
+    "bc_desc": "Keep 4 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 4
+   },
+   {
+    "id": "cryndel_2",
+    "name": "Trial of Cryndel II",
+    "desc": "Play 3 Casino rounds",
+    "metric": "bets",
+    "target": 3,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_umbrael": [
+   {
+    "id": "umbrael_1",
+    "name": "Trial of Umbrael I",
+    "desc": "Play 2 Casino rounds",
+    "metric": "bets",
+    "target": 2,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "umbrael_2",
+    "name": "Trial of Umbrael II",
+    "desc": "Win 3 Duels",
+    "metric": "duel_wins",
+    "target": 3,
+    "bc_desc": "Win 3 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 3
+   }
+  ],
+  "champion_ferrum": [
+   {
+    "id": "ferrum_1",
+    "name": "Trial of Ferrum I",
+    "desc": "Lease 2 territories",
+    "metric": "leases",
+    "target": 2,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "ferrum_2",
+    "name": "Trial of Ferrum II",
+    "desc": "Upgrade your territories 4 times",
+    "metric": "upgrades",
+    "target": 4,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_voltrix": [
+   {
+    "id": "voltrix_1",
+    "name": "Trial of Voltrix I",
+    "desc": "Win 2 Duels",
+    "metric": "duel_wins",
+    "target": 2,
+    "bc_desc": "Win 2 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 2
+   },
+   {
+    "id": "voltrix_2",
+    "name": "Trial of Voltrix II",
+    "desc": "Win 2 Auction lots",
+    "metric": "auctions",
+    "target": 2,
+    "bc_desc": "Keep 8 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 8
+   }
+  ],
+  "champion_chronex": [
+   {
+    "id": "chronex_1",
+    "name": "Trial of Chronex I",
+    "desc": "Raise 1 Landmark",
+    "metric": "landmarks",
+    "target": 1,
+    "bc_desc": "Use the King skill in 2 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 2
+   },
+   {
+    "id": "chronex_2",
+    "name": "Trial of Chronex II",
+    "desc": "Conquer 2 territories in Duels",
+    "metric": "conquests",
+    "target": 2,
+    "bc_desc": "Win 3 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 3
+   }
+  ],
+  "champion_nexaris": [
+   {
+    "id": "nexaris_1",
+    "name": "Trial of Nexaris I",
+    "desc": "Upgrade your territories 3 times",
+    "metric": "upgrades",
+    "target": 3,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "nexaris_2",
+    "name": "Trial of Nexaris II",
+    "desc": "Play 3 Casino rounds",
+    "metric": "bets",
+    "target": 3,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_verdantia": [
+   {
+    "id": "verdantia_1",
+    "name": "Trial of Verdantia I",
+    "desc": "Win 1 Auction lot",
+    "metric": "auctions",
+    "target": 1,
+    "bc_desc": "Keep 4 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 4
+   },
+   {
+    "id": "verdantia_2",
+    "name": "Trial of Verdantia II",
+    "desc": "Invest in the stock market 3 times",
+    "metric": "bank_deposits",
+    "target": 3,
+    "bc_desc": "Keep 8 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 8
+   }
+  ],
+  "champion_besthara": [
+   {
+    "id": "besthara_1",
+    "name": "Trial of Besthara I",
+    "desc": "Use 2 Special Dice",
+    "metric": "special_dice",
+    "target": 2,
+    "bc_desc": "Use the King skill in 2 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 2
+   },
+   {
+    "id": "besthara_2",
+    "name": "Trial of Besthara II",
+    "desc": "Lease 3 territories",
+    "metric": "leases",
+    "target": 3,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_floralis": [
+   {
+    "id": "floralis_1",
+    "name": "Trial of Floralis I",
+    "desc": "Conquer 1 territory in a Duel",
+    "metric": "conquests",
+    "target": 1,
+    "bc_desc": "Win 2 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 2
+   },
+   {
+    "id": "floralis_2",
+    "name": "Trial of Floralis II",
+    "desc": "Raise 1 Landmark",
+    "metric": "landmarks",
+    "target": 1,
+    "bc_desc": "Use the King skill in 3 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 3
+   }
+  ],
+  "champion_terragorn": [
+   {
+    "id": "terragorn_1",
+    "name": "Trial of Terragorn I",
+    "desc": "Invest in the stock market 2 times",
+    "metric": "bank_deposits",
+    "target": 2,
+    "bc_desc": "Keep 4 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 4
+   },
+   {
+    "id": "terragorn_2",
+    "name": "Trial of Terragorn II",
+    "desc": "Win 3 Duels",
+    "metric": "duel_wins",
+    "target": 3,
+    "bc_desc": "Win 3 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 3
+   }
+  ],
+  "champion_drakhan": [
+   {
+    "id": "drakhan_1",
+    "name": "Trial of Drakhan I",
+    "desc": "Play 2 Casino rounds",
+    "metric": "bets",
+    "target": 2,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "drakhan_2",
+    "name": "Trial of Drakhan II",
+    "desc": "Upgrade your territories 4 times",
+    "metric": "upgrades",
+    "target": 4,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_inferna": [
+   {
+    "id": "inferna_1",
+    "name": "Trial of Inferna I",
+    "desc": "Lease 2 territories",
+    "metric": "leases",
+    "target": 2,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "inferna_2",
+    "name": "Trial of Inferna II",
+    "desc": "Use 3 Special Dice",
+    "metric": "special_dice",
+    "target": 3,
+    "bc_desc": "Use the King skill in 3 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 3
+   }
+  ],
+  "champion_bloodfang": [
+   {
+    "id": "bloodfang_1",
+    "name": "Trial of Bloodfang I",
+    "desc": "Win 2 Duels",
+    "metric": "duel_wins",
+    "target": 2,
+    "bc_desc": "Win 2 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 2
+   },
+   {
+    "id": "bloodfang_2",
+    "name": "Trial of Bloodfang II",
+    "desc": "Conquer 2 territories in Duels",
+    "metric": "conquests",
+    "target": 2,
+    "bc_desc": "Win 3 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 3
+   }
+  ],
+  "champion_warborn": [
+   {
+    "id": "warborn_1",
+    "name": "Trial of Warborn I",
+    "desc": "Raise 1 Landmark",
+    "metric": "landmarks",
+    "target": 1,
+    "bc_desc": "Use the King skill in 2 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 2
+   },
+   {
+    "id": "warborn_2",
+    "name": "Trial of Warborn II",
+    "desc": "Play 3 Casino rounds",
+    "metric": "bets",
+    "target": 3,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_abyssal": [
+   {
+    "id": "abyssal_1",
+    "name": "Trial of Abyssal I",
+    "desc": "Upgrade your territories 3 times",
+    "metric": "upgrades",
+    "target": 3,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "abyssal_2",
+    "name": "Trial of Abyssal II",
+    "desc": "Win 3 Duels",
+    "metric": "duel_wins",
+    "target": 3,
+    "bc_desc": "Win 3 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 3
+   }
+  ],
+  "champion_pelagia": [
+   {
+    "id": "pelagia_1",
+    "name": "Trial of Pelagia I",
+    "desc": "Win 1 Auction lot",
+    "metric": "auctions",
+    "target": 1,
+    "bc_desc": "Keep 4 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 4
+   },
+   {
+    "id": "pelagia_2",
+    "name": "Trial of Pelagia II",
+    "desc": "Lease 3 territories",
+    "metric": "leases",
+    "target": 3,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_tempestra": [
+   {
+    "id": "tempestra_1",
+    "name": "Trial of Tempestra I",
+    "desc": "Use 2 Special Dice",
+    "metric": "special_dice",
+    "target": 2,
+    "bc_desc": "Use the King skill in 2 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 2
+   },
+   {
+    "id": "tempestra_2",
+    "name": "Trial of Tempestra II",
+    "desc": "Raise 1 Landmark",
+    "metric": "landmarks",
+    "target": 1,
+    "bc_desc": "Use the King skill in 3 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 3
+   }
+  ],
+  "champion_corsaria": [
+   {
+    "id": "corsaria_1",
+    "name": "Trial of Corsaria I",
+    "desc": "Conquer 1 territory in a Duel",
+    "metric": "conquests",
+    "target": 1,
+    "bc_desc": "Win 2 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 2
+   },
+   {
+    "id": "corsaria_2",
+    "name": "Trial of Corsaria II",
+    "desc": "Win 2 Auction lots",
+    "metric": "auctions",
+    "target": 2,
+    "bc_desc": "Keep 8 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 8
+   }
+  ],
+  "champion_solstice": [
+   {
+    "id": "solstice_1",
+    "name": "Trial of Solstice I",
+    "desc": "Invest in the stock market 2 times",
+    "metric": "bank_deposits",
+    "target": 2,
+    "bc_desc": "Keep 4 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 4
+   },
+   {
+    "id": "solstice_2",
+    "name": "Trial of Solstice II",
+    "desc": "Upgrade your territories 4 times",
+    "metric": "upgrades",
+    "target": 4,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ],
+  "champion_paradox": [
+   {
+    "id": "paradox_1",
+    "name": "Trial of Paradox I",
+    "desc": "Play 2 Casino rounds",
+    "metric": "bets",
+    "target": 2,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "paradox_2",
+    "name": "Trial of Paradox II",
+    "desc": "Use 3 Special Dice",
+    "metric": "special_dice",
+    "target": 3,
+    "bc_desc": "Use the King skill in 3 rounds",
+    "bc_metric": "bc_king_skill",
+    "bc_target": 3
+   }
+  ],
+  "champion_eternis": [
+   {
+    "id": "eternis_1",
+    "name": "Trial of Eternis I",
+    "desc": "Lease 2 territories",
+    "metric": "leases",
+    "target": 2,
+    "bc_desc": "Destroy 10 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 10
+   },
+   {
+    "id": "eternis_2",
+    "name": "Trial of Eternis II",
+    "desc": "Invest in the stock market 3 times",
+    "metric": "bank_deposits",
+    "target": 3,
+    "bc_desc": "Keep 8 units alive at the end of won rounds (total)",
+    "bc_metric": "bc_survivors",
+    "bc_target": 8
+   }
+  ],
+  "champion_oblivion": [
+   {
+    "id": "oblivion_1",
+    "name": "Trial of Oblivion I",
+    "desc": "Win 2 Duels",
+    "metric": "duel_wins",
+    "target": 2,
+    "bc_desc": "Win 2 rounds",
+    "bc_metric": "bc_wins",
+    "bc_target": 2
+   },
+   {
+    "id": "oblivion_2",
+    "name": "Trial of Oblivion II",
+    "desc": "Play 3 Casino rounds",
+    "metric": "bets",
+    "target": 3,
+    "bc_desc": "Destroy 16 enemy units",
+    "bc_metric": "bc_kills",
+    "bc_target": 16
+   }
+  ]
+ }
+}

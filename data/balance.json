@@ -31,14 +31,20 @@
 			"name": "Proven in Battle",
 			"desc": "Win 2 Duels",
 			"metric": "duel_wins",
-			"target": 2
+			"target": 2,
+			"bc_desc": "Win 2 rounds",
+			"bc_metric": "bc_wins",
+			"bc_target": 2
 		},
 		{
 			"id": "monument_of_power",
 			"name": "Monument of Power",
 			"desc": "Raise a Landmark",
 			"metric": "landmarks",
-			"target": 1
+			"target": 1,
+			"bc_desc": "Use the King skill in 2 rounds",
+			"bc_metric": "bc_king_skill",
+			"bc_target": 2
 		}
 	],
 	"max_tile_level": 3,
@@ -78,6 +84,11 @@
 	"chaos_price_mult": 2.0,
 	"chaos_start_bonus": 80,
 	"chaos_reward_mult": 0.5,
+	"arena_monster_count_duel": 2,
+	"arena_monster_count_multi": 4,
+	"chaos_deposit_count": 2,
+	"chaos_deposit_gold_mult": 2.0,
+	"chaos_mine_rounds_mult": 0.5,
 	"max_bonus_rolls": 2,
 	"refuse_duel_penalty": 150,
 	"unit_copies": 9,
@@ -168,13 +179,12 @@
 	],
 	"stock_change_min": -0.2,
 	"stock_change_max": 0.3,
-	"casino_bet": 50,
-	"casino_pot_seed": 200,
-	"casino_small_chance": 0.2,
-	"casino_small_mult": 2,
-	"casino_big_chance": 0.1,
-	"casino_big_mult": 4,
-	"casino_jackpot_chance": 0.02,
+	"casino_bets": [
+		50,
+		100,
+		250,
+		500
+	],
 	"fate_values": [
 		-200,
 		-100,

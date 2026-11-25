@@ -6,6 +6,9 @@ var ctrl: MatchController
 var board_view: BoardView
 var _centre: PanelContainer
 var round_label: Label
+var _mission_lines: Array[String] = []  # result-screen lines about the mission reward
+var _mission_label: Label  # Continent Mission line (Arena / Chaos), hidden otherwise
+var _mission_panel: PanelContainer
 var turn_label: Label
 var player_box: VBoxContainer
 var action_box: HFlowContainer
@@ -15,6 +18,9 @@ var _leave_dialog: UiDialog
 var _wager_paid: int = 0  # coins paid out by the Arena wager at the end of the match
 var _stats_saved := false
 var _duel_node: Control = null
+const GamblePanel := preload("res://scripts/ui/gamble_panel.gd")
+
+var _casino_node: Control = null  # the Casino overlay (the Gamble games played with gold) while a human is at a Casino tile
 var _hub_node: Control = null  # the Card Hub overlay (Collection / Deck / Info) while it is open
 var _hub_prev_continent: String = ""
 var _guide: TutorialGuide = null
@@ -120,6 +126,13 @@ func _build_ui() -> void:
 	menu.custom_minimum_size.x = 96
 	menu.pressed.connect(func(): _leave_dialog.popup_centered(Vector2i(460, 160)))
 	head.add_child(menu)
+	_mission_panel = PanelContainer.new()  # Arena / Chaos: the continent's one special mission and its progress
+	_mission_panel.visible = false
+	_mission_panel.add_theme_stylebox_override("panel", UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 2, 10))
+	right.add_child(_mission_panel)
+	_mission_label = UiTheme.make_label("", 15, UiTheme.COL_GOLD)
+	_mission_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_mission_panel.add_child(_mission_label)
 	var hub_btn := UiTheme.make_button(GameSession.CARD_HUB_NAME, 48)  # Collection / Deck / Info without leaving the match
 	hub_btn.pressed.connect(_open_hub)
 	left.add_child(hub_btn)
@@ -308,6 +321,7 @@ func _on_state_changed() -> void:
 	_refresh_players()
 	_rebuild_actions()
 	board_view.queue_redraw()
+	_sync_casino()
 	_maybe_open_duel()
 	if ctrl.state == MatchController.State.AWAIT_ROLL:
 		var key := "%d:%d" % [ctrl.round_number, ctrl.current]
@@ -318,7 +332,21 @@ func _on_state_changed() -> void:
 		_autosave()  # start of the human turn: a stable moment
 
 
+## Continent Mission box: name, goal, progress and reward (green once complete).
+func _refresh_mission() -> void:
+	if _mission_panel == null or ctrl == null:
+		return
+	_mission_panel.visible = ctrl.has_mission()
+	if not ctrl.has_mission():
+		return
+	var done := ctrl.mission_done
+	_mission_label.text = "%s MISSION  %s\n%s\nProgress %d / %d   Reward: %s" % [
+		"\u2713" if done else "\u2605", "(complete)" if done else "", ctrl.mission_text(), ctrl.mission_progress, ctrl.mission_target, ctrl.mission_reward_text()]
+	_mission_label.add_theme_color_override("font_color", Color("59cd90") if done else UiTheme.COL_GOLD)
+
+
 func _refresh_players() -> void:
+	_refresh_mission()
 	for c in player_box.get_children():
 		player_box.remove_child(c)
 		c.queue_free()
@@ -449,6 +477,48 @@ func _autosave() -> void:
 		SaveManager.save_match(ctrl)
 
 
+## The Casino: while a human stands on a Casino tile the same games as the Shop > Gamble tab open in an overlay, played with Dominion Gold.
+## The overlay closes when the player leaves (the pending decision ends) or the match moves on.
+func _sync_casino() -> void:
+	var want := ctrl.state == MatchController.State.AWAIT_DECISION and String(ctrl.pending.get("type", "")) == "casino" and not ctrl.decision_actor().is_ai
+	if not want:
+		if _casino_node != null:
+			_casino_node.queue_free()
+			_casino_node = null
+		return
+	if _casino_node != null or _hub_node != null:
+		return
+	var actor := ctrl.decision_actor()
+	var wrap := PanelContainer.new()
+	wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	wrap.add_theme_stylebox_override("panel", UiTheme.make_box(Color(0.03, 0.04, 0.08, 0.94), Color(0, 0, 0, 0), 0, 0))
+	add_child(wrap)
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 24)
+	wrap.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	margin.add_child(box)
+	var panel := GamblePanel.new(ctrl.rng, {
+		"unit": "G", "bets": ctrl.casino_bets(), "games": [String(ctrl.pending.get("game", "coin"))], "title": "CASINO",
+		"hint": "The Casino drew a random Gamble game for this visit (Coin Flip, Dice or Slots), played with your Dominion Gold. One round per visit, then you leave the Casino.",
+		"balance": func() -> int: return actor.gold,
+		"play": func(g: String, c: String, b: int) -> Dictionary: return ctrl.casino_play(g, c, b)})
+	var leave := UiTheme.make_primary("Leave casino", 64)
+	panel.round_done.connect(func(r: Dictionary):
+		ctrl.casino_report(actor, r)
+		panel.lock()  # one round per visit
+		leave.text = "Continue")
+	box.add_child(panel)
+	leave.pressed.connect(func():
+		if not panel.busy:  # wait for the animation so the round is always reported
+			ctrl.decide("leave"))
+	box.add_child(leave)
+	_casino_node = wrap
+
+
 ## Card Hub as an overlay: the match is not saved or reloaded, it just pauses. The hub may switch the active continent
 ## (Deck tab), so the continent of the match is restored when it closes. A deck saved there applies to the next match.
 func _open_hub() -> void:
@@ -500,6 +570,10 @@ func _on_game_over(_winner: int) -> void:
 		_new_card = SaveManager.record_match(human_won, ctrl.round_number, ctrl.players[0].gold, cid, ctrl.journey, String(ctrl.players[0].faction_id),
 			ShopSystem.random_bonus(cid) if ctrl.random_map and not ctrl.journey else {}, ctrl.match_difficulty,
 			float(GameData.b("chaos_reward_mult", 1.0)) if ctrl.chaos else 1.0)
+		if ctrl.mission_done:  # the reward was already paid in the match, when the mission completed
+			_mission_lines.append("Mission complete: %s (%s)" % [String(ctrl.mission.get("name", "")), ctrl.mission_reward_text()])
+		elif ctrl.has_mission():
+			_mission_lines.append("Mission failed: %s (%d / %d)" % [String(ctrl.mission.get("name", "")), ctrl.mission_progress, ctrl.mission_target])
 		if human_won and not ctrl.journey:  # Arena victory: a reward chest (Bronze / Silver / Gold) for the Chests screen
 			_chest = ChestSystem.award(_chest_difficulty(ctrl))
 		if ctrl.journey:
@@ -531,6 +605,8 @@ func _on_game_over(_winner: int) -> void:
 		v.add_child(UiTheme.make_label("%s%s - net worth %d G%s" % [p.display_name, tag, ctrl.networth(p), "  (OUT)" if not p.alive else ""], 20, p.color))
 	for line in _journey_lines:
 		v.add_child(UiTheme.make_label(line, 20, UiTheme.COL_GOLD))
+	for line in _mission_lines:
+		v.add_child(UiTheme.make_label(line, 20, UiTheme.COL_MUTED if line.begins_with("Mission failed") else Color("59cd90")))
 	if _new_card != "":
 		v.add_child(UiTheme.make_label("New card unlocked: %s" % CardDatabase.get_support(_new_card)["name"], 20, UiTheme.COL_GOLD))
 	if not _chest.is_empty():
@@ -573,7 +649,7 @@ func _maybe_open_duel() -> void:
 		var parts := ctrl.duel_participants()
 		node.duel_context = {
 			"human": parts["human"], "opponent": parts["opponent"],
-			"human_attacks": parts["human_attacks"], "tutorial": ctrl.tutorial, "tile": ctrl.tiles[int(ctrl.pending["tile"])].name}
+			"human_attacks": parts["human_attacks"], "tutorial": ctrl.tutorial, "difficulty": ctrl.match_difficulty, "tile": ctrl.tiles[int(ctrl.pending["tile"])].name}
 	node.battle_finished.connect(_on_duel_finished)
 	_duel_node = node
 	add_child(node)
