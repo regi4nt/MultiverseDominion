@@ -61,6 +61,8 @@ Isi preset (`export_presets.cfg`): arm64-v8a + armeabi-v7a, GL Compatibility, la
 
 ## 4. Daftar uji di perangkat (tidak bisa diuji di sandbox)
 - [ ] Terbuka landscape, tidak ada elemen terpotong (notch/punch-hole; `screen/immersive_mode` aktif).
+- [ ] Notch / punch-hole di KIRI dan di KANAN: kartu profil menu utama, tombol zoom dan panel aksi Territory, dialog, tidak ada yang tertutup; coba slider Notch margin di Settings bila masih ada.
+- [ ] Papan Territory: START di pojok kanan bawah, papan 100 petak dibuka dengan petak sebesar papan 40 petak, tombol Fit berganti ke 1:1 dan kembali.
 - [ ] Tombol nyaman disentuh; papan wilayah: ketuk petak kecil (~3 mm) untuk info; bila sulit, beri tahu saya.
 - [ ] **Back**: menu utama bertanya sebelum keluar; di match muncul konfirmasi; di duel tidak bisa keluar.
 - [ ] Home saat bermain lalu buka lagi; matikan paksa lalu **CONTINUE** memulihkan match (autosave tiap awal giliranmu dan saat pause).

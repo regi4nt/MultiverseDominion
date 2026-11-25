@@ -91,6 +91,8 @@ static func build(continent: Dictionary) -> Array[BoardTile]:
 					prefix = prefixes[order % prefixes.size()]
 				t.name = "%s %s" % [prefix, suffix]
 				t.price = int(GameData.b("territory_base_price")) + int(GameData.b("territory_price_step")) * order
+				if chaos:  # 40 tiles: fewer, pricier lots so rent stays meaningful next to the Gate bonus
+					t.price = int(round(float(t.price) * float(GameData.b("chaos_price_mult", 1.0))))
 			"P":
 				t.type = BoardTile.Type.PORTAL
 				portal_counter[side] += 1
@@ -125,8 +127,14 @@ static func side_of(idx: int) -> int:
 	return int(floor(float(idx - 1) / float(side_len)))
 
 
-## Position of a tile on the ring (grid x grid). Index 0 = top-left corner, clockwise.
+## Position of a tile on the ring (grid x grid). Index 0 (START) = bottom-right corner, clockwise
+## (the ring is laid out from the top-left, then rotated 180 degrees so the Dominion Gate sits bottom-right).
 static func grid_pos(idx: int) -> Vector2i:
+	var p := _ring_pos(idx)
+	return Vector2i(side_len - p.x, side_len - p.y)
+
+
+static func _ring_pos(idx: int) -> Vector2i:
 	var n := side_len
 	if idx <= n:
 		return Vector2i(idx, 0)

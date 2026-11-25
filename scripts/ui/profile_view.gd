@@ -8,7 +8,7 @@ const COL_WIN := Color("6fcf8f")
 const COL_LOSS := Color("e0705f")
 
 
-static func build() -> Control:
+static func build(on_rename: Callable = Callable()) -> Control:
 	var p: Dictionary = SaveManager.data["profile"]
 	var s: Dictionary = SaveManager.data["stats"]
 	var matches := int(s.get("matches_played", 0))
@@ -31,6 +31,11 @@ static func build() -> Control:
 	who.alignment = BoxContainer.ALIGNMENT_CENTER
 	who.add_theme_constant_override("separation", 8)
 	head.add_child(who)
+	if on_rename.is_valid():
+		var rb := UiTheme.make_button("Rename", 52)
+		rb.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		rb.pressed.connect(func(): on_rename.call())
+		head.add_child(rb)
 	var name_lbl := UiTheme.make_label(pname, 36, UiTheme.COL_GOLD)
 	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -216,3 +221,37 @@ static func build_card(on_open: Callable) -> Control:
 	var matches := int(s.get("matches_played", 0))
 	col.add_child(UiTheme.make_label("%d matches  |  %d W  |  %d L" % [matches, int(s.get("wins", 0)), int(s.get("losses", 0))], 14, UiTheme.COL_MUTED))
 	return card
+
+
+## "Change name" dialog: a text field (max SaveManager.NAME_MAX characters). `on_closed(changed: bool)` runs when it closes.
+static func open_rename(host: Node, on_closed: Callable) -> void:
+	var dlg := UiDialog.new()
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 14)
+	body.add_child(UiTheme.make_label("Change name", 30, UiTheme.COL_GOLD))
+	var le := LineEdit.new()
+	le.text = String(SaveManager.data["profile"].get("name", "Player"))
+	le.max_length = SaveManager.NAME_MAX
+	le.placeholder_text = "Your name"
+	le.select_all_on_focus = true
+	le.custom_minimum_size = Vector2(0, 68)
+	le.add_theme_font_size_override("font_size", 28)
+	body.add_child(le)
+	body.add_child(UiTheme.make_label("1 to %d characters." % SaveManager.NAME_MAX, 16, UiTheme.COL_MUTED))
+	dlg.body_node = body
+	dlg.ok_button_text = "Save"
+	dlg.cancel_button_text = "Cancel"
+	var changed := [false]
+	dlg.confirmed.connect(func():
+		changed[0] = SaveManager.set_profile_name(le.text)
+		dlg.queue_free()
+		if on_closed.is_valid():
+			on_closed.call(changed[0]))
+	dlg.canceled.connect(func():
+		dlg.queue_free()
+		if on_closed.is_valid():
+			on_closed.call(false))
+	le.text_submitted.connect(func(_t: String): dlg._confirm())
+	host.add_child(dlg)
+	dlg.popup_centered(Vector2i(560, 0))
+	le.grab_focus.call_deferred()

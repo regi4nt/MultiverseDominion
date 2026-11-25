@@ -28,6 +28,7 @@ var message_label: Label
 var shop_box: VBoxContainer
 var lineup_legend: Label  # "[Recommended]" key, shown only when the Support slots of the Lineup tab are filled
 var bench_grid: GridContainer
+var bench_gap: Control  # holds the bench row's height while the bench is hidden in battle, so the board keeps its size
 var sel_label: Label
 var sell_btn: Button
 var reroll_btn: Button
@@ -226,6 +227,9 @@ func _build_ui() -> void:
 	bench_grid.add_theme_constant_override("v_separation", 3)
 	bench_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	center.add_child(bench_grid)
+	bench_gap = Control.new()
+	bench_gap.visible = false
+	center.add_child(bench_gap)
 	grid.resized.connect(func(): bench_grid.custom_minimum_size.x = grid.size.x)  # bench row is exactly as wide as the board
 	var push := Control.new()  # pushes Auto Deploy + Level Up to the bottom
 	push.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -290,7 +294,7 @@ func _build_ui() -> void:
 		b.button_pressed = (s[1] == 1.0)
 		b.pressed.connect(func(): _set_speed(s[1]))
 		speeds.add_child(b)
-	battle_panel.add_child(UiTheme.make_label("King  %s" % CommanderSystem.star_text(commander_star), 16, UiTheme.COL_GOLD))
+	battle_panel.add_child(UiTheme.make_label("King  %s" % CommanderSystem.star_info(commander_star), 16, UiTheme.COL_GOLD))
 	king_box = VBoxContainer.new()
 	king_box.add_theme_constant_override("separation", 4)
 	battle_panel.add_child(king_box)
@@ -509,56 +513,133 @@ func _refresh_prep() -> void:
 	grid.queue_redraw()
 
 
-## Top-left panel: faction synergy (same tiers as BattleEngine._synergy: 2 = +5%, 4 = +15%, 6 = +30% HP and ATK)
-## and role synergy (BattleEngine.role_bonus: 2 = +8%, 4 = +20%, 6 = +35% of the role's stat) of the deployed units.
+## Top-left panel: the named combos of the deployed units (ComboSystem): Faction Tier (unnamed tiers at 2 / 4 / 6 units: banner bonus + the faction's own trait in one row),
+## role traits (Iron Wall, Guardian Aura, ...) and duo combos (Frontline Shield, Glass Cannon, ...; 6 units of each of the two roles). Tap-and-hold a row for its effect.
 func _refresh_synergy() -> void:
 	for c in synergy_box.get_children():
 		synergy_box.remove_child(c)
 		c.queue_free()
-	synergy_box.add_child(UiTheme.make_label("SYNERGY", 14, UiTheme.COL_GOLD))
+	synergy_box.add_child(UiTheme.make_label("COMBOS", 14, UiTheme.COL_GOLD))
 	var deployed := prep.deployed_units()
 	if deployed.is_empty():
 		synergy_box.add_child(UiTheme.make_label("Deploy units to see combos.", 12, UiTheme.COL_MUTED))
 		return
 	var fac_counts := {}
+	var bond_fac_counts := {}  # units per faction, any faction (Continent Bond: 2 units of one faction in every continent)
 	var role_counts := {}
+	var unit_facs: Array = []  # home faction of every deployed unit ("" = none): ULTRA needs them all to be the same
 	for u in deployed:
 		var card := CardDatabase.get_unit(u.card_id)
 		var fac := CardDatabase.effective_faction(card, _own_faction)
-		if fac != "" and GameData.is_home_faction(fac, CardDatabase.active_continent):
+		if fac != "":
+			bond_fac_counts[fac] = int(bond_fac_counts.get(fac, 0)) + 1
+		var home := fac != "" and (fac == _own_faction or GameData.is_home_faction(fac, CardDatabase.active_continent) or (_own_faction != "" and GameData.is_home_faction(fac, GameData.continent_of_faction(_own_faction))))  # the King's own faction counts anywhere; so do the factions of the King's continent (Grand Army (Faction))
+		unit_facs.append(fac if (fac != "" and fac == _own_faction) else "")  # Faction Tier / Ultra: only the King's own faction counts
+		if home:
 			fac_counts[fac] = int(fac_counts.get(fac, 0)) + 1
 		var role := String(card.get("role", ""))
 		if role != "":
 			role_counts[role] = int(role_counts.get(role, 0)) + 1
+	var ultra_fac := ComboSystem.faction_ultra(unit_facs)
 	var inactive: Array[String] = []  # groups without a bonus yet share one muted line (keeps the panel short)
 	var facs: Array = fac_counts.keys()
 	facs.sort_custom(func(x, y): return int(fac_counts[x]) > int(fac_counts[y]))
 	for fac in facs:
+		if String(fac) != _own_faction:
+			continue  # a faction different from the King's gets no Faction Tier (its units still count for Grand Army (Faction))
 		var n: int = fac_counts[fac]
 		var fname := String(GameData.get_faction(CardDatabase.active_continent, fac).get("name", String(fac).capitalize()))
-		var bonus := 30 if n >= 6 else (15 if n >= 4 else (5 if n >= 2 else 0))
-		if bonus == 0:
+		var is_ultra := String(fac) == ultra_fac
+		var tier := ComboSystem.faction_tier_name(n, is_ultra)
+		if tier == "":
 			inactive.append("%s x%d" % [fname, n])
 			continue
-		var nxt := "" if n >= 6 else "  (next at %d)" % (6 if n >= 4 else 4)
-		_synergy_row("%s x%d  +%d%% HP/ATK%s" % [fname, n, bonus, nxt])
-	var roles: Array = role_counts.keys()
-	roles.sort_custom(func(x, y): return int(role_counts[x]) > int(role_counts[y]))
-	for r in roles:
-		var n: int = role_counts[r]
-		var rb := BattleEngine.role_bonus(String(r), n)
-		var pct := int(round(maxf(float(rb["hp"]), float(rb["atk"])) * 100.0))
-		if pct == 0:
-			inactive.append("%s x%d" % [r, n])
+		var ftier := ComboSystem.faction_tier(String(fac), n, is_ultra)  # Faction Tier: banner bonus + faction trait in ONE row
+		var nxt := int(ftier["next"])
+		var fl := _synergy_row("%s%s x%d  %s%s" % ["Ultra: " if is_ultra else "", fname, n, ComboSystem.faction_tier_text(ftier), ("  (next at %d)" % nxt) if nxt > 0 and not is_ultra else ""])
+		fl.tooltip_text = "Faction Tier: the faction trait for the whole faction, stronger at 2 / 4 / 6 units. %s%s" % [String(ftier["trait_blurb"]), "  ULTRA: every unit is of this faction, the faction trait is x%s, special %s: %s" % [str(ComboSystem.ULTRA_SCALE), ComboSystem.ULTRA_FACTION_SPECIAL["name"], ComboSystem.ULTRA_FACTION_SPECIAL["blurb"]] if is_ultra else "  ULTRA: field %d+ units that are ALL of this faction." % ComboSystem.ULTRA_MIN]
+		fl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		fl.clip_text = false
+	var army_conts: Array = []  # Grand Army (Faction): the King's continent OR the played one (the closer one is shown)
+	var king_cont := GameData.continent_of_faction(_own_faction) if _own_faction != "" else ""
+	for ac in [king_cont, CardDatabase.active_continent]:
+		if String(ac) != "" and not army_conts.has(ac):
+			army_conts.append(ac)
+	var cont_facs: Array = []
+	for ac in army_conts:
+		var ids: Array = []
+		for cn in GameData.continents:
+			if String(cn.get("id", "")) == String(ac):
+				for cf in cn.get("factions", []):
+					ids.append(String(cf["id"]))
+		if cont_facs.is_empty() or ComboSystem.faction_army_lacking(fac_counts, ids) < ComboSystem.faction_army_lacking(fac_counts, cont_facs):
+			cont_facs = ids
+	var army_lack := ComboSystem.faction_army_missing(fac_counts, cont_facs)
+	if ComboSystem.faction_army_active(fac_counts, cont_facs):
+		var al := _synergy_row("%s  %s" % [ComboSystem.FACTION_ARMY["name"], ComboSystem.effects_text(ComboSystem.FACTION_ARMY["effects"])])
+		al.tooltip_text = String(ComboSystem.FACTION_ARMY["blurb"])
+	var bond_best := {}  # per continent: units of its best-staffed faction (Continent Bond)
+	for bf in bond_fac_counts:
+		var bcid := GameData.continent_of_faction(String(bf))
+		if bcid != "":
+			bond_best[bcid] = maxi(int(bond_best.get(bcid, 0)), int(bond_fac_counts[bf]))
+	var bond_king := GameData.continent_of_faction(_own_faction) if _own_faction != "" else ""
+	var bond := ComboSystem.bonds_for(bond_best, bond_king)  # Continent Bond: 2 units of one faction in EVERY continent, the effect of the King's continent
+	if not bond.is_empty():
+		var bl := _synergy_row("Continent Bond: %s  %s" % [", ".join(PackedStringArray(bond["names"])), ComboSystem.effects_text(bond["effects"])])
+		bl.tooltip_text = String(bond.get("names", [""])[0]) + ": " + String(ComboSystem.continent_bond(bond_king).get("blurb", ""))
+	else:
+		var have := ComboSystem.CONTINENT_BONDS.size() - ComboSystem.bond_missing(bond_best).size()
+		if have >= 2:
+			var pl := _synergy_row("%s: %d / %d continents" % [ComboSystem.BOND_NAME, have, ComboSystem.CONTINENT_BONDS.size()], false)
+			pl.tooltip_text = "Continent Bond: field %d units of one faction in EVERY continent. Every unit then gains the bond effect of your King's continent." % ComboSystem.BOND_FACTION_UNITS
+	for c in ComboSystem.ROLE_TRAITS:
+		var rn := int(role_counts.get(c["role"], 0))
+		if rn <= 0:
 			continue
-		var focus := String(BattleEngine.ROLE_FOCUS.get(r, "both"))
-		var stat := "HP" if focus == "hp" else ("ATK" if focus == "atk" else "HP/ATK")
-		var nt := BattleEngine.role_next_tier(n)
-		_synergy_row("%s x%d  +%d%% %s%s" % [r, n, pct, stat, ("  (next at %d)" % nt) if nt > 0 else ""])
+		var ti := ComboSystem.role_tier_index(c, rn)
+		if ti < 0:
+			inactive.append("%s x%d" % [c["name"], rn])
+			continue
+		var nt := ComboSystem.role_next_tier(c, rn)
+		var is_role_ultra := ComboSystem.role_ultra(role_counts) == String(c["role"])
+		var rl := _synergy_row("%s%s x%d  %s%s" % [c["name"], " ULTRA" if is_role_ultra else "", rn, ComboSystem.effects_text(ComboSystem.role_effects(c, rn, role_counts)), ("  (next at %d)" % nt) if nt > 0 else ""])
+		var sp := ComboSystem.role_ultra_special(String(c["role"]))
+		rl.tooltip_text = String(c["blurb"]) + (("  ULTRA special - %s: %s" % [sp.get("name", ""), sp.get("blurb", "")]) if is_role_ultra else "  ULTRA: field %d+ units that ALL have this role (special: %s)." % [ComboSystem.ULTRA_MIN, sp.get("name", "")])
+	var near: Array = []  # duo combos that lack at most 3 units: [units lacking, text]
+	for c in ComboSystem.DUO_COMBOS:
+		var lack := ComboSystem.missing_units(c, role_counts)
+		if lack.is_empty():
+			var dl := _synergy_row("%s  %s" % [c["name"], ComboSystem.effects_text(c["effects"])])
+			dl.tooltip_text = String(c["blurb"])
+			continue
+		var total := 0
+		var parts: Array[String] = []
+		for r in lack:
+			total += int(lack[r])
+			parts.append("%d %s" % [int(lack[r]), r])
+		if total <= 3:
+			near.append([total, "%s (add %s)" % [c["name"], ", ".join(parts)]])
+	var army_total := ComboSystem.faction_army_lacking(fac_counts, cont_facs)  # Grand Army (Faction) close to active: at most 3 units lacking and one faction fielded
+	var army_parts: Array[String] = []
+	for af in army_lack:
+		army_parts.append("%d %s" % [int(army_lack[af]), String(GameData.get_faction(CardDatabase.active_continent, String(af)).get("name", String(af).capitalize()))])
+	if army_parts.is_empty():
+		army_parts.append("%d of any faction" % army_total)
+	if army_total > 0 and army_total <= 3 and not fac_counts.is_empty():
+		near.append([army_total, "%s (add %s)" % [ComboSystem.FACTION_ARMY["name"], ", ".join(army_parts)]])
+	near.sort_custom(func(x, y): return int(x[0]) < int(y[0]))
+	var near_text: Array[String] = []
+	for nr in near:
+		near_text.append(String(nr[1]))
 	if not inactive.is_empty():
-		var il := _synergy_row("No bonus yet: " + ", ".join(inactive), false)
+		var il := _synergy_row("Needs 2 units: " + ", ".join(inactive), false)
 		il.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		il.clip_text = false
+	if not near_text.is_empty():
+		var nl := _synergy_row("Close: " + ", ".join(near_text.slice(0, 3)), false)
+		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		nl.clip_text = false
 
 
 func _synergy_row(text: String, active: bool = true) -> Label:
@@ -698,6 +779,8 @@ func _on_start_battle() -> void:
 	_set_tip(TutorialGuide.BATTLE["fight"])
 	prep_panel.visible = false
 	prep_left.visible = false
+	bench_gap.custom_minimum_size.y = bench_grid.get_combined_minimum_size().y  # keep the bench row's space: the board must not grow ("zoom") when the fight starts
+	bench_gap.visible = true
 	bench_grid.visible = false
 	prep_actions.visible = false
 	battle_panel.visible = true
@@ -1096,6 +1179,7 @@ func _next_round() -> void:
 	battle_left.visible = false
 	prep_panel.visible = true
 	prep_left.visible = true
+	bench_gap.visible = false
 	bench_grid.visible = true
 	prep_actions.visible = true
 	grid.show_prep(prep)

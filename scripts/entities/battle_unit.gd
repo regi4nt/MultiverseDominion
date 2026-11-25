@@ -25,6 +25,7 @@ var active_used: bool = false
 var params: Dictionary = {}  # per-continent skill numbers (data: skill.params); empty = base values
 var extra: String = ""  # the card's continent buff: effect type (data/card_buffs.json), see CardDatabase.BUFF_TYPES
 var extra_value: float = 0.0  # strength of the buff (a count for evade / stun_proc / chill)
+var fx: Dictionary = {}  # special effects from synergies (ComboSystem FX_TYPES -> value), on top of the card buff `extra`
 var kills: int = 0
 var burn_until: int = 0
 var burn_amount: int = 0

@@ -32,6 +32,18 @@ static func star_text(star: int) -> String:
 	return "Lv %d" % clampi(star, 1, max_star())
 
 
+## Star marks of a King, written like a unit's ("**" for 2, "***" for 3, nothing at 1 star).
+static func stars_marks(star: int) -> String:
+	var s := clampi(star, 1, max_star())
+	return "*".repeat(s) if s > 1 else ""
+
+
+## Full King star line, like a unit's info: "Lv 2 ** | HP x1.35 ATK x1.25".
+static func star_info(star: int) -> String:
+	var marks := stars_marks(star)
+	return "%s%s | HP x%s ATK x%s" % [star_text(star), (" " + marks) if marks != "" else "", str(snappedf(hp_mult(star), 0.01)), str(snappedf(atk_mult(star), 0.01))]
+
+
 static func hp_mult(star: int) -> float:
 	var a: Array = GameData.b("commander_star_hp_mult")
 	return float(a[clampi(star - 1, 0, a.size() - 1)])

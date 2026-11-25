@@ -82,6 +82,32 @@ func _merge(base: Dictionary, incoming: Dictionary) -> void:
 			base[k] = incoming[k]
 
 
+const NAME_MAX := 16
+
+
+## Profile name rules: no line breaks / control characters, runs of spaces collapse, 1..NAME_MAX characters. "" = not usable.
+static func clean_name(raw: String) -> String:
+	var out := ""
+	for i in range(raw.length()):
+		var ch := raw.substr(i, 1)
+		if ch.unicode_at(0) < 32 or ch.unicode_at(0) == 127:
+			ch = " "
+		out += ch
+	var parts := out.split(" ", false)
+	return " ".join(parts).left(NAME_MAX).strip_edges()
+
+
+## Renames the player's profile (shown on the Main Menu card, in the profile dialog and as the name in matches started afterwards).
+## Returns false (nothing changed) when the cleaned name is empty.
+func set_profile_name(raw: String) -> bool:
+	var n := clean_name(raw)
+	if n == "":
+		return false
+	data["profile"]["name"] = n
+	save_game()
+	return true
+
+
 func get_setting(key: String) -> Variant:
 	return data["settings"].get(key)
 
@@ -96,16 +122,36 @@ func set_setting(key: String, value: Variant, persist: bool = true) -> void:
 func apply_settings() -> void:
 	var v: float = clampf(float(data["settings"].get("master_volume", 0.8)), 0.0, 1.0)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(v, 0.0001)))
-	_apply_fullscreen(bool(data["settings"].get("fullscreen", false)))
+	_apply_fullscreen(fullscreen_wanted())
 
 
-## Default OFF. Skipped in headless runs (tests).
-func _apply_fullscreen(on: bool) -> void:
+## Whether the game should be full screen: the Fullscreen setting, except on Android where immersive mode (hidden status / navigation
+## bars) is the default until the player turns the toggle off themselves ("fullscreen_set").
+func fullscreen_wanted() -> bool:
+	var s: Dictionary = data["settings"]
+	if OS.get_name() == "Android" and not bool(s.get("fullscreen_set", false)):
+		return true
+	return bool(s.get("fullscreen", false))
+
+
+## Default OFF on desktop, ON on Android. Skipped in headless runs (tests).
+## `force` re-applies the mode even when it already matches: Android shows the system bars again after the keyboard, a system dialog
+## or a switch of apps, and only a fresh request hides them.
+func _apply_fullscreen(on: bool, force: bool = false) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	var want := DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED
-	if DisplayServer.window_get_mode() != want:
+	if force or DisplayServer.window_get_mode() != want:
 		DisplayServer.window_set_mode(want)
+
+
+## Android: bring the immersive mode back when the app returns to the front (after a frame, once the window has focus).
+func _reapply_immersive() -> void:
+	if OS.get_name() != "Android" or not fullscreen_wanted():
+		return
+	await get_tree().process_frame
+	await get_tree().create_timer(0.3).timeout  # some devices only hide the bars after the window is focused
+	_apply_fullscreen(true, true)
 
 
 func is_continent_unlocked(id: String) -> bool:
@@ -237,6 +283,24 @@ func trophy_floor() -> int:
 	return best
 
 
+## Journey has no difficulty choice: the AI gets harder as the trophies grow (balance.json "journey_difficulty_by_trophies":
+## the difficulty whose trophy threshold is the highest one reached; Easy from 0, Normal from 400, Hard from 1100).
+static func difficulty_for_trophies(t: int) -> String:
+	var table: Dictionary = GameData.b("journey_difficulty_by_trophies", {"easy": 0})
+	var best := "easy"
+	var best_at := -1
+	for d in table:
+		var at := int(table[d])
+		if t >= at and at > best_at:
+			best = String(d)
+			best_at = at
+	return best
+
+
+func journey_difficulty() -> String:
+	return difficulty_for_trophies(trophies())
+
+
 ## Trophy change of a Journey result: the harder the AI, the more a win gives and the less a defeat takes.
 static func trophy_delta(won: bool, difficulty: String) -> int:
 	var table: Dictionary = GameData.b("trophy_win", {}) if won else GameData.b("trophy_loss", {})
@@ -285,7 +349,7 @@ func unlock_next_card() -> String:
 
 
 ## Always returns "" (kept for the caller's signature): a match result no longer unlocks a Support card.
-func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "", reward_bonus: Dictionary = {}, difficulty: String = "normal") -> String:
+func record_match(won: bool, rounds: int, final_gold: int, continent_id: String = "", journey: bool = true, faction_id: String = "", reward_bonus: Dictionary = {}, difficulty: String = "normal", reward_mult: float = 1.0) -> String:
 	var s: Dictionary = data["stats"]
 	s["matches_played"] += 1
 	s["total_rounds"] += rounds
@@ -314,8 +378,9 @@ func record_match(won: bool, rounds: int, final_gold: int, continent_id: String 
 		last_reward += int(round(ShopSystem.win_reward(difficulty) * float(reward_bonus.get("coins_pct", 0)) / 100.0)) + int(reward_bonus.get("coins_flat", 0))
 		bonus_xp = int(reward_bonus.get("xp", 0))
 		last_bonus_text = String(reward_bonus.get("text", ""))
+	last_reward = int(round(float(last_reward) * reward_mult))  # Chaos pays less (balance.json chaos_reward_mult)
 	add_coins(last_reward)
-	_award_xp(XpSystem.match_xp(won, rounds, difficulty) + bonus_xp)  # one award, so the level-up line covers the bonus XP too
+	_award_xp(int(round(float(XpSystem.match_xp(won, rounds, difficulty) + bonus_xp) * reward_mult)))  # one award, so the level-up line covers the bonus XP too
 	save_game()
 	return ""  # no Support card is unlocked by a match result anymore (only Gold chests / the Shop give cards)
 
@@ -547,6 +612,8 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		save_game()
 		app_paused.emit()
+	elif what == NOTIFICATION_APPLICATION_RESUMED or what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
+		_reapply_immersive()
 
 
 # ------------------------------------------------------------------ match save (resume after the OS kills the app)

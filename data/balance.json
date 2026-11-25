@@ -5,6 +5,7 @@
 	"life_by_difficulty": {"easy": 5, "normal": 3, "hard": 1},
 	"trophy_win": {"easy": 20, "normal": 30, "hard": 40},
 	"trophy_loss": {"easy": -30, "normal": -20, "hard": -10},
+	"journey_difficulty_by_trophies": {"easy": 0, "normal": 400, "hard": 1100},
 	"start_level": 3,
 	"capacity_per_level": 3,
 	"max_level": 10,
@@ -71,8 +72,12 @@
 	"lease_rounds": 4,
 	"round_limit_by_mode": {
 		"journey": {"easy": 20, "normal": 30, "hard": 40},
-		"arena": {"easy": 30, "normal": 40, "hard": 50}
+		"arena": {"easy": 30, "normal": 40, "hard": 50},
+		"chaos": {"easy": 12, "normal": 16, "hard": 20}
 	},
+	"chaos_price_mult": 2.0,
+	"chaos_start_bonus": 80,
+	"chaos_reward_mult": 0.5,
 	"max_bonus_rolls": 2,
 	"refuse_duel_penalty": 150,
 	"unit_copies": 9,

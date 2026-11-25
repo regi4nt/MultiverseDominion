@@ -25,6 +25,7 @@ const HOP_HEIGHT := 0.6  # hop apex, in tile sizes
 const ZOOM_MIN := 1.0
 const ZOOM_MAX := 4.0
 static var zoom: float = 1.0  # kept between scenes (static) so a duel does not reset it
+static var _zoom_for_grid: int = 0  # board size the current zoom was last defaulted for (see bind())
 var _focus: Vector2 = Vector2(0.5, 0.5)  # board-space point (0..1) shown at the view centre
 var _press_pos: Vector2 = Vector2.ZERO
 var _pressing: bool = false
@@ -142,8 +143,13 @@ func _on_zoom_button(factor: float) -> void:
 	_kill_camera_tweens()
 	if factor == 0.0:
 		_user_cam = false
-		zoom = ZOOM_MIN
-		_focus = Vector2(0.5, 0.5)
+		if _fit_shows_default():  # at Fit on a big board: the same button goes back to the normal tile size, on the pawn
+			zoom = default_zoom()
+			var cur := ctrl.current_player() if ctrl != null else null
+			_focus = Vector2(0.5, 0.5) if cur == null else (Vector2(BoardBuilder.grid_pos(cur.position)) + Vector2(0.5, 0.5)) / float(BoardBuilder.grid)
+		else:
+			zoom = ZOOM_MIN
+			_focus = Vector2(0.5, 0.5)
 		queue_redraw()
 	else:
 		_user_cam = true
@@ -180,8 +186,19 @@ func _set_focus(v: Vector2) -> void:
 	queue_redraw()
 
 
+## Zoom at which a tile is as big as on the 40-tile Chaos board (1.0 = Fit on that board).
+static func default_zoom() -> float:
+	return clampf(float(BoardBuilder.grid) / float(BoardBuilder.CHAOS_SIDE + 1), ZOOM_MIN, ZOOM_MAX)
+
+
 func bind(c: MatchController) -> void:
 	ctrl = c
+	# The 100-tile board starts zoomed so a tile is as big as on the 40-tile Chaos board (the camera follows the pawn;
+	# "Fit" still shows the whole ring). Only re-defaulted when the board size changes, so a duel or the Card Hub
+	# does not reset the player's own zoom.
+	if _zoom_for_grid != BoardBuilder.grid:
+		_zoom_for_grid = BoardBuilder.grid
+		zoom = default_zoom()
 	for p in ctrl.players:
 		_visual_pos[p.id] = float(p.position)
 	ctrl.tiles_changed.connect(queue_redraw)
@@ -260,7 +277,17 @@ func _anim_done(pid: int, to_i: int) -> void:
 	queue_redraw()
 
 
+## True when the Fit button would now return to the normal tile size ("1:1"): the whole board is shown and a larger
+## default exists (the 100-tile board; on the 40-tile board Fit already is the normal size).
+func _fit_shows_default() -> bool:
+	return zoom <= ZOOM_MIN + 0.01 and default_zoom() > ZOOM_MIN + 0.01
+
+
 func _layout() -> void:
+	if _zoom_btns.size() > 2:
+		var want := "1:1" if _fit_shows_default() else "Fit"
+		if _zoom_btns[2].text != want:
+			_zoom_btns[2].text = want
 	var s := minf(size.x, size.y) * zoom
 	_cell = s / float(BoardBuilder.grid)
 	var o := size * 0.5 - _focus * s

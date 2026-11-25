@@ -180,6 +180,10 @@ func _build_ui() -> void:
 	_centre.offset_bottom = -12
 	_centre.offset_right = -12
 	_centre.offset_top = -12
+	var centre := _centre  # bottom-right corner: clear of the camera bezel / system bar on the right edge
+	UiTheme.follow_insets(centre, func(ins: Vector2) -> void:
+		centre.offset_left = -12.0 - ins.y
+		centre.offset_right = -12.0 - ins.y)
 	var cv := VBoxContainer.new()
 	cv.add_theme_constant_override("separation", 6)
 	_centre.add_child(cv)
@@ -207,6 +211,9 @@ func _build_ui() -> void:
 	map_controls.offset_bottom = -12
 	map_controls.offset_right = 12
 	map_controls.offset_top = -12
+	UiTheme.follow_insets(map_controls, func(ins: Vector2) -> void:  # bottom-left corner: clear of the bezel on the left edge
+		map_controls.offset_left = 12.0 + ins.x
+		map_controls.offset_right = 12.0 + ins.x)
 
 
 # ------------------------------------------------------------------ signals
@@ -343,7 +350,7 @@ func _refresh_players() -> void:
 		if ctrl.team_mode:
 			nm += "  [%s]" % ctrl.team_label(p)
 		if p.alive:
-			nm += "  " + CommanderSystem.star_text(p.commander_star)  # Commander level only ("Lv 1".."Lv 3"), no "Cmdr" text
+			nm += "  " + CommanderSystem.star_text(p.commander_star) + ((" " + CommanderSystem.stars_marks(p.commander_star)) if p.commander_star > 1 else "")  # Commander level only ("Lv 1".."Lv 3"), no "Cmdr" text
 		var name_l := UiTheme.make_label(nm, 17, UiTheme.COL_TEXT if p.alive else UiTheme.COL_MUTED)
 		name_l.clip_text = true
 		col.add_child(name_l)
@@ -491,9 +498,10 @@ func _on_game_over(_winner: int) -> void:
 			ctrl.wager_settled = true
 			_wager_paid = SaveManager.settle_wager(ctrl.wager, "win" if human_won else "loss", ctrl.wager_odds)
 		_new_card = SaveManager.record_match(human_won, ctrl.round_number, ctrl.players[0].gold, cid, ctrl.journey, String(ctrl.players[0].faction_id),
-			ShopSystem.random_bonus(cid) if ctrl.random_map and not ctrl.journey else {}, ctrl.match_difficulty)
+			ShopSystem.random_bonus(cid) if ctrl.random_map and not ctrl.journey else {}, ctrl.match_difficulty,
+			float(GameData.b("chaos_reward_mult", 1.0)) if ctrl.chaos else 1.0)
 		if human_won and not ctrl.journey:  # Arena victory: a reward chest (Bronze / Silver / Gold) for the Chests screen
-			_chest = ChestSystem.award(ctrl.match_difficulty)
+			_chest = ChestSystem.award(_chest_difficulty(ctrl))
 		if ctrl.journey:
 			_journey_lines.append("Trophies %s%d  (total %d)" % ["+" if SaveManager.last_trophy_delta >= 0 else "", SaveManager.last_trophy_delta, SaveManager.trophies()])
 			for oid in SaveManager.last_opened_continents:
@@ -579,3 +587,10 @@ func _on_duel_finished(result: Dictionary) -> void:
 		ctrl.finish_monster_battle(result)
 	else:
 		ctrl.finish_duel(result)
+
+
+## Chaos is a short match: its chest comes from one difficulty tier lower (hard -> normal -> easy).
+func _chest_difficulty(c: MatchController) -> String:
+	if not c.chaos:
+		return c.match_difficulty
+	return {"hard": "normal", "normal": "easy", "easy": "easy"}.get(c.match_difficulty, "easy")

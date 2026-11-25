@@ -109,10 +109,17 @@ const WAGER_MAX := 1000  # highest stake (0 = no wager)
 const WAGER_DIFFICULTY_MULT := {"easy": 0.75, "normal": 1.0, "hard": 1.5}
 
 
-## Win multiplier: 1 vs 1 / 2 vs 2 / Battle Chess x2, the 4 Player free-for-all x3, scaled by the AI difficulty.
-static func wager_odds(kind: String, mode: String, _ai_count: int, difficulty: String) -> float:
-	var base := 3.0 if (kind == "arena" and mode == "ffa_ai") else 2.0
-	return base * float(WAGER_DIFFICULTY_MULT.get(difficulty, 1.0))
+const FFA_ODDS := 2.5  # 4 players: an even chance is 25% (x4), but a player beats the AI more often than that, so x2.5 breaks even at 40%
+const CHAOS_ODDS_MULT := 0.75  # Chaos matches are short: smaller win multiplier than Arena
+
+
+## Win multiplier: 1 vs 1 / 2 vs 2 / Battle Chess x2, the 4 Player free-for-all x2.5, scaled by the AI difficulty (x0.75 in Chaos).
+static func wager_odds(kind: String, mode: String, _ai_count: int, difficulty: String, chaos: bool = false) -> float:
+	var base := FFA_ODDS if (kind == "arena" and mode == "ffa_ai") else 2.0
+	var odds := base * float(WAGER_DIFFICULTY_MULT.get(difficulty, 1.0))
+	if chaos and kind == "arena":
+		odds *= CHAOS_ODDS_MULT
+	return snappedf(odds, 0.05)
 
 
 ## Arena "Random map": a win on the drawn continent pays that continent's own bonus (data/continents.json "random_bonus":

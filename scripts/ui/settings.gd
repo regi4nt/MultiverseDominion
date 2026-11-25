@@ -45,8 +45,10 @@ func _ready() -> void:
 			Sfx.play("coin"))
 	rows.add_child(_row("Sound effects", sfx))
 
-	var fs := _make_toggle(SaveManager.get_setting("fullscreen") == true)  # default OFF
-	fs.toggled.connect(func(on: bool): SaveManager.set_setting("fullscreen", on))
+	var fs := _make_toggle(SaveManager.fullscreen_wanted())  # default OFF on desktop, ON on Android (immersive)
+	fs.toggled.connect(func(on: bool):
+		SaveManager.set_setting("fullscreen_set", true, false)  # from now on the player's choice wins, also on Android
+		SaveManager.set_setting("fullscreen", on))
 	rows.add_child(_row("Fullscreen", fs))
 
 	rows.add_child(_thin_line())

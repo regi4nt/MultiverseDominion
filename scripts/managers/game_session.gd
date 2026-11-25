@@ -36,16 +36,17 @@ func to_match_config() -> Dictionary:
 		"mode": mode,
 		"continent_id": continent_id,
 		"faction_id": faction_id,
-		"difficulty": difficulty,
+		"difficulty": difficulty,  # Journey: match_setup sets it from the trophies (SaveManager.journey_difficulty)
 		"ai_count": ai_count,
 		"team_mode": mode == "team_2v2",
 		"journey": category == "journey",
-		"wager": wager if category == "arena" else 0,
+		"wager": wager if (category == "arena" or category == "journey") else 0,
 		"wager_odds": wager_odds,
 		"random_map": random_bonus_active and category == "arena",
 		"chaos": chaos_mode and category == "arena",
+		"random_first": true,  # Journey / Arena / Chaos: a random seat opens the match (the tutorial returns above)
 		"any_continent_enemies": category == "arena",  # Arena: the AI rulers come from factions of every continent, not only the map's
 		"player_name": SaveManager.data["profile"]["name"],
 		"seed": 0,
-		"round_limit": GameData.round_limit_for(category, difficulty),  # differs per mode (Journey / Arena) and difficulty
+		"round_limit": GameData.round_limit_for("chaos" if (chaos_mode and category == "arena") else category, difficulty),  # differs per mode (Journey / Arena / Chaos) and difficulty
 	}

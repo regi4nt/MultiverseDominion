@@ -1,13 +1,13 @@
 class_name WagerPanel
 extends VBoxContainer
-## Wager picker for Arena and Battle Chess: choose a stake of Aether Coins (slider, multiples of 10) before the match.
+## Wager picker for Journey, Arena and Battle Chess: choose a stake of Aether Coins (slider, multiples of 10) before the match.
 ## The stake is paid when the match starts; a win pays stake x odds (the stake included), a loss loses it,
 ## Battle Chess returns it on a draw. Odds depend on the mode and the difficulty (ShopSystem.wager_odds).
 ## Writes GameSession.wager; the host reads `odds()` when it starts the match.
 
 signal changed
 
-var kind: String = "arena"  # "arena" | "battle_chess"
+var kind: String = "arena"  # "journey" | "arena" | "battle_chess"
 var with_difficulty: bool = false  # Battle Chess has no setup screen: the panel shows the difficulty too
 
 var _slider: HSlider
@@ -97,7 +97,7 @@ func _ready() -> void:
 
 
 func odds() -> float:
-	return ShopSystem.wager_odds(kind, GameSession.mode, GameSession.ai_count, GameSession.difficulty)
+	return ShopSystem.wager_odds(kind, GameSession.mode, GameSession.ai_count, GameSession.difficulty, GameSession.chaos_mode)
 
 
 ## Highest stake the player can pay now: the balance rounded down to a multiple of WAGER_STEP, capped at WAGER_MAX.

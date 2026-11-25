@@ -164,6 +164,37 @@ func _test_faction_rules() -> void:
 	var eng := BattleEngine.new()
 	eng.king_data = ["champion_astralis", "champion_solvaris"]
 	check(not eng._home_bonus(0) and eng._home_bonus(1), "unit buffs are off for a foreign King and on for a home King")
+	# Faction Tier works for a foreign King's faction too (its shared pieces count for it) and for the continent's own factions
+	var shared_ids: Array = []
+	for su in CardDatabase.all_units():
+		if CardDatabase.is_shared(su):
+			shared_ids.append(String(su["id"]))
+	if shared_ids.size() >= 2:
+		var syn_counts := {}
+		var syn := eng._synergy([{"card_id": shared_ids[0]}, {"card_id": shared_ids[1]}], "astralis", syn_counts)
+		check(int(syn_counts.get("astralis", 0)) == 2 and syn.is_empty(), "Faction Tier counts a foreign King's faction (2 shared pieces = tier 1, no flat banner bonus)")
+	# Faction Tier needs King and unit of the SAME faction: Solvaris units under a Nocthyr King get nothing
+	var sol := CardDatabase.faction_pieces("solvaris")
+	if sol.size() >= 2:
+		var same_c := {}
+		var other_c := {}
+		var l2: Array = [{"card_id": sol[0]["id"]}, {"card_id": sol[1]["id"]}]
+		check(eng._synergy(l2, "solvaris", same_c).is_empty() and int(same_c.get("solvaris", 0)) == 2 and eng._synergy(l2, "nocthyr", other_c).is_empty() and other_c.is_empty(), "Faction Tier: King and units of the same faction = Rally; units of another faction than the King get none")
+		check(eng._continent_counts(l2, "nocthyr").get("solvaris", 0) == 2, "Grand Army (Faction) still counts every faction of the continent")
+	# Grand Army (Faction) is judged against the KING's continent, so a foreign King can have it on another continent
+	var play_facs: Array = eng._continent_faction_ids("astralis", CardDatabase.active_continent)
+	var play_list: Array = []
+	for pf in play_facs:
+		var pp := CardDatabase.faction_pieces(String(pf))
+		if pp.size() >= 2:
+			play_list.append({"card_id": pp[0]["id"]})
+			play_list.append({"card_id": pp[1]["id"]})
+	if not play_facs.is_empty() and play_list.size() == play_facs.size() * 2:
+		check(not eng._home_bonus(0) and eng._army_active(play_list, "astralis"), "Grand Army (Faction): a foreign King (Astralis on Aetherion) gets it when every faction of the played continent has 2 units")
+	check(GameData.continent_of_faction("astralis") == "arcanum" and eng._continent_faction_ids("astralis").has("astralis") and not eng._continent_faction_ids("astralis").has("solvaris"), "Grand Army (Faction): judged against the King's continent (Astralis = Arcanum), not the played one")
+	if shared_ids.size() >= 2:
+		var shared_two: Array = [{"card_id": shared_ids[0]}, {"card_id": shared_ids[1]}]
+		check(eng._continent_counts(shared_two, "astralis").get("astralis", 0) == 2, "Grand Army (Faction): a foreign King's shared pieces count for his own faction")
 	check(CardDatabase.king_buff("champion_astralis").is_empty(), "the King buff is off outside the King's home continent")
 	CardDatabase.set_continent("arcanum")
 	check(not CardDatabase.king_buff("champion_astralis").is_empty(), "the King buff is on at the King's home continent")
@@ -262,6 +293,20 @@ func _test_ui() -> void:
 	check(_find_button(n, "1.  AETHERION").text.find("Open") >= 0, "an open continent row says Open")
 	check(_find_button(n, "1 vs 1") == null, "Journey has no player-count choice")
 	check(n._journey_hint.text.find("Solvaris") >= 0 and n._journey_hint.text.find("AETHERION") >= 0, "Journey hint names the faction that must win")
+	check(_find_button(n, "Easy") == null and _find_button(n, "Hard") == null, "Journey has no difficulty choice")
+	check(GameSession.difficulty == "easy" and SaveManager.journey_difficulty() == "easy", "Journey starts on Easy (0 trophies)")
+	check(SaveManager.difficulty_for_trophies(399) == "easy" and SaveManager.difficulty_for_trophies(400) == "normal" and SaveManager.difficulty_for_trophies(1099) == "normal" and SaveManager.difficulty_for_trophies(1100) == "hard" and SaveManager.difficulty_for_trophies(5000) == "hard", "Journey difficulty follows the trophies: Easy < 400, Normal < 1100, Hard from 1100")
+	check(n._wager_panel != null and n._wager_panel.kind == "journey", "Journey shows the wager panel")
+	SaveManager.data["wallet"]["coins"] = 600
+	n._wager_panel._on_pick(100)
+	check(GameSession.wager == 100 and is_equal_approx(n._wager_panel.odds(), 1.5), "a Journey wager of 100 coins pays x1.5 on Easy (the odds follow the AI level)")
+	check(GameSession.to_match_config()["wager"] == 100 and GameSession.to_match_config()["difficulty"] == "easy", "the Journey match config carries the wager and the trophy difficulty")
+	SaveManager.data["trophies"] = 500
+	n._show_setup("journey")
+	check(GameSession.difficulty == "normal" and GameSession.to_match_config()["difficulty"] == "normal", "at 500 trophies Journey is on Normal")
+	SaveManager.data["trophies"] = 0
+	n._show_setup("journey")
+	GameSession.wager = 0
 	# climb the trophy road: the continent opens by itself
 	for i in range(5):
 		SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "normal")

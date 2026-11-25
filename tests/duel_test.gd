@@ -279,6 +279,29 @@ func _test_chaos_mode() -> void:
 	var gold := p.gold
 	c._move_player(p, 5)
 	check(p.position == 3 and p.gold > gold, "Chaos Mode: walking past tile 39 wraps to the start and pays the Gate")
+	check(c.first_seat == 0, "default matches still open with seat 0")
+	var rf := MatchController.new()
+	rf.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 3, "seed": 11, "all_ai": true, "random_first": true})
+	var turns := [0, 0, 0, 0]
+	var r0 := rf.round_number
+	for _i in range(4):
+		turns[rf.current] += 1
+		rf._advance_turn()
+	check(rf.current == rf.first_seat and rf.round_number == r0 + 1 and turns == [1, 1, 1, 1], "random first seat: a round is 4 turns, one per seat, and ends back at the opening seat")
+	var seen_first := {}
+	for sd in range(1, 25):
+		var tm := MatchController.new()
+		tm.setup({"continent_id": "aetherion", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 3, "seed": sd, "all_ai": true, "team_mode": true, "random_first": true})
+		seen_first[tm.first_seat] = true
+		var t_ok := tm.current == tm.first_seat
+		for i in range(4):
+			t_ok = t_ok and tm.players[i].team == i % 2
+		check(t_ok, "2v2 random first seat (seed %d): teams still alternate A, B, A, B" % sd)
+	check(seen_first.size() > 1, "2v2: the opening seat varies between matches")
+	check(p.gold - gold == int(GameData.b("chaos_start_bonus")) + WorldMods.start_bonus_extra, "Chaos Mode: the Gate pays the reduced Chaos bonus")
+	var first_lot: BoardTile = c.tiles[1]
+	check(first_lot.type == BoardTile.Type.TERRITORY and first_lot.price == int(round(float(int(GameData.b("territory_base_price"))) * float(GameData.b("chaos_price_mult")))), "Chaos Mode: Territory prices are scaled up")
+	check(GameData.round_limit_for("chaos", "normal") < GameData.round_limit_for("arena", "normal"), "Chaos Mode: the round limit is shorter than Arena's")
 	# save / resume keeps the mode
 	c.state = MatchController.State.AWAIT_ROLL
 	c.pending = {}

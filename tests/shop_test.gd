@@ -28,6 +28,15 @@ func _ready() -> void:
 		if cont.get("playable", false) and ShopSystem.random_bonus(String(cont["id"])).is_empty():
 			all_have = false
 	check(all_have, "every playable continent has a random-map bonus")
+	check(is_equal_approx(ShopSystem.wager_odds("arena", "ffa_ai", 3, "normal"), 2.5) and is_equal_approx(ShopSystem.wager_odds("arena", "team_2v2", 3, "normal"), 2.0), "wager odds: 4-player x2.5, 2v2 x2")
+	check(ShopSystem.wager_odds("arena", "ffa_ai", 3, "normal", true) < ShopSystem.wager_odds("arena", "ffa_ai", 3, "normal"), "Chaos wager odds are lower than Arena's")
+	check(SaveManager.clean_name("  Ari   Wijaya\n ") == "Ari Wijaya" and SaveManager.clean_name("\n\t ") == "" and SaveManager.clean_name("A".repeat(40)).length() == SaveManager.NAME_MAX, "profile name: trimmed, single spaces, no control chars, max length")
+	var old_name := String(SaveManager.data["profile"]["name"])
+	check(SaveManager.set_profile_name("Raja Baru") and String(SaveManager.data["profile"]["name"]) == "Raja Baru" and not SaveManager.set_profile_name("   ") and String(SaveManager.data["profile"]["name"]) == "Raja Baru", "set_profile_name renames, and an empty name changes nothing")
+	SaveManager.set_profile_name(old_name)
+	var rc0 := SaveManager.coins()
+	SaveManager.record_match(true, 10, 1000, "aetherion", false, "solvaris", {}, "normal", 0.5)
+	check(SaveManager.last_reward == int(round(ShopSystem.win_reward("normal") * 0.5)) and SaveManager.coins() == rc0 + SaveManager.last_reward, "reward_mult 0.5 halves the coin reward (Chaos)")
 	var c0 := SaveManager.coins()
 	var f0 := SaveManager.fragments()
 	var xp0 := SaveManager.profile_xp()

@@ -4,7 +4,7 @@ extends RefCounted
 ## Side 0 starts on rows 4-7, side 1 on rows 0-3. No manual unit control.
 ##
 ## Unit behaviour: target priority by role, attack range (Chebyshev distance), movement
-## (BFS, up to `move` cells per tick), skills, faction + role synergy bonuses, Support cards.
+## (BFS, up to `move` cells per tick), skills, faction + role synergy special effects, Support cards.
 ## The Champion (King) enters when every regular unit of its side has fallen (Last Stand), or earlier if the side pays `king_summon_energy`,
 ## casting its active skill on entry. A side loses when its Champion falls.
 
@@ -23,12 +23,6 @@ const IMPLEMENTED_SUPPORTS: Array[String] = [
 	"temp_capacity", "free_reroll"]
 ## Support effects that act during preparation (see BattlePrep.apply_hand); marked as used at setup.
 const PREP_SUPPORTS: Array[String] = ["temp_capacity", "free_reroll"]
-## Role Synergy: 2+ units of one role = +8%, 4+ = +20%, 6+ = +35% of the stat that role is about (only for units of that role).
-## Tank / Support: HP. Assassin / Mage / Marksman: ATK. Fighter / Controller: HP and ATK at ROLE_BOTH_FACTOR of the tier.
-const ROLE_TIERS: Array = [[6, 0.35], [4, 0.20], [2, 0.08]]
-const ROLE_FOCUS := {"Tank": "hp", "Support": "hp", "Assassin": "atk", "Mage": "atk", "Marksman": "atk", "Fighter": "both", "Controller": "both"}
-const ROLE_BOTH_FACTOR := 0.6
-
 var rng := RandomNumberGenerator.new()
 var tick: int = 0
 var units: Array[BattleUnit] = []
@@ -104,19 +98,27 @@ func setup(cfg: Dictionary) -> void:
 			if PREP_SUPPORTS.has(String(CardDatabase.get_support(String(sid)).get("effect", ""))):
 				(used_supports[side] as Array).append(sid)  # already applied in preparation
 		var side_fac := _side_faction(side)
-		var synergy := _synergy(sc["units"], side_fac)
-		for fac in synergy:
-			_log("Side %d faction synergy: %s +%d%%" % [side, String(fac).capitalize(), int(float(synergy[fac]) * 100.0)])
+		var synergy_counts := {}
+		var synergy := _synergy(sc["units"], side_fac, synergy_counts)
+		var ultra_fac := _ultra_faction(sc["units"], side_fac)
+		for fac in synergy_counts:  # Faction Tier: banner bonus + faction trait in ONE log line per faction
+			var ftier := ComboSystem.faction_tier(String(fac), int(synergy_counts[fac]), String(fac) == ultra_fac)
+			if not ftier.is_empty():
+				_log("Side %d Faction Tier: %s%s x%d (%s)" % [side, String(fac).capitalize(), " ULTRA" if bool(ftier["ultra"]) else "", int(ftier["count"]), ComboSystem.faction_tier_text(ftier)])
+		var fac_army := _army_active(sc["units"], side_fac)  # Grand Army (Faction): the King's continent OR the played one, so a foreign King can have it too
+		if fac_army:
+			_log("Side %d combo: %s (%s)" % [side, ComboSystem.FACTION_ARMY["name"], ComboSystem.effects_text(ComboSystem.FACTION_ARMY["effects"])])
+		# Continent Bond: a faction group of 2 units in EVERY continent gives every unit the bond effect of the continent of its King
+		var bond := ComboSystem.bonds_for(_continent_best_faction(sc["units"], side_fac), GameData.continent_of_faction(side_fac) if side_fac != "" else "")
+		if not bond.is_empty():
+			_log("Side %d combo: Continent Bond - %s (%s)" % [side, ", ".join(PackedStringArray(bond["names"])), ComboSystem.effects_text(bond["effects"])])
 		var roles := role_counts(sc["units"])
-		for r in roles:
-			var rb := role_bonus(String(r), int(roles[r]))
-			if float(rb["tier"]) > 0.0:
-				_log("Side %d role synergy: %s x%d +%d%% %s" % [side, r, roles[r], int(round(maxf(float(rb["hp"]), float(rb["atk"])) * 100.0)), {"hp": "HP", "atk": "ATK", "both": "HP/ATK"}[String(ROLE_FOCUS.get(r, "both"))]])
+		for a in ComboSystem.active(roles):
+			_log("Side %d combo: %s%s (%s)" % [side, a["name"], ((" x%d" % int(a["count"])) if String(a["kind"]) == "role" else "") + (" ULTRA" if bool(a.get("ultra", false)) else ""), ComboSystem.effects_text(a["effects"])])
 		for e in sc["units"]:
 			var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
 			var role := String(CardDatabase.get_unit(e["card_id"]).get("role", ""))
-			var rbn := role_bonus(role, int(roles.get(role, 0)))
-			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), float(rbn["hp"]), float(rbn["atk"]))
+			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), ComboSystem.unit_mods(role, roles, String(fac), int(synergy_counts.get(fac, 0)), String(fac) == ultra_fac, fac_army, bond))
 	for side in range(2):  # wild monsters ("foes"): they are the regular units of a side that has no King (monster hunt)
 		var foes: Array = cfg["sides"][side].get("foes", [])
 		for i in range(foes.size()):
@@ -130,27 +132,6 @@ func setup(cfg: Dictionary) -> void:
 				a.shield += int(round(a.max_hp * u.extra_value))
 	_log("Battle begins!")
 	_check_king_entries()
-
-
-## Role Synergy bonus for `count` units of `role`: {"hp": fraction, "atk": fraction, "tier": fraction} (all 0.0 below 2 units).
-static func role_bonus(role: String, count: int) -> Dictionary:
-	var v := 0.0
-	for t in ROLE_TIERS:
-		if count >= int(t[0]):
-			v = float(t[1])
-			break
-	var focus := String(ROLE_FOCUS.get(role, "both"))
-	var f := ROLE_BOTH_FACTOR if focus == "both" else 1.0
-	return {"hp": v * f if focus != "atk" else 0.0, "atk": v * f if focus != "hp" else 0.0, "tier": v}
-
-
-## Units needed for the next Role Synergy tier (0 = already at the top tier).
-static func role_next_tier(count: int) -> int:
-	var nxt := 0
-	for t in ROLE_TIERS:
-		if count < int(t[0]):
-			nxt = int(t[0])
-	return nxt
 
 
 ## Number of regular units per role in a side's unit list.
@@ -168,6 +149,23 @@ func _side_faction(side: int) -> String:
 	return String(GameData.get_champion(String(king_data[side])).get("faction", ""))
 
 
+## The continent Grand Army (Faction) is judged against: the continent of the side's King (the played continent when it has no King).
+static func _army_continent(side_fac: String) -> String:
+	var cid := GameData.continent_of_faction(side_fac) if side_fac != "" else ""
+	return cid if cid != "" else CardDatabase.active_continent
+
+
+## Faction ids of the King's continent (Grand Army (Faction) needs units of EVERY one of them).
+func _continent_faction_ids(side_fac: String = "", cont: String = "") -> Array:
+	var out: Array = []
+	var army_cont := cont if cont != "" else _army_continent(side_fac)
+	for c in GameData.continents:
+		if String(c.get("id", "")) == army_cont:
+			for f in c.get("factions", []):
+				out.append(String(f["id"]))
+	return out
+
+
 ## Home-continent rule: card buffs (and Faction Synergy) apply only if the side's faction belongs to the continent
 ## being played. A side without a Champion keeps them (no faction to be foreign).
 func _home_bonus(side: int) -> bool:
@@ -175,28 +173,80 @@ func _home_bonus(side: int) -> bool:
 	return fac == "" or GameData.is_home_faction(fac, CardDatabase.active_continent)
 
 
-## Faction Synergy: 2+ units of one faction = +5%, 4+ = +15%, 6+ = +30% HP and ATK.
+## Does a unit of faction `fac` count for the Faction Tier? Only when it is the SAME faction as the side's King (units of other factions get
+## no Faction Tier), wherever it plays: a foreign faction is active together with its King (its shared pieces count for it).
+static func _faction_counts(fac: String, side_fac: String) -> bool:
+	return fac != "" and fac == side_fac
+
+
+## Per continent the units of its best-staffed faction on the side (a Pawn / shared piece counts for the King's faction): what the Continent Bond needs
+## (2 units of one faction in EVERY continent). Units without a faction count for nobody.
+func _continent_best_faction(list: Array, side_fac: String = "") -> Dictionary:
+	var per_fac := {}
+	for e in list:
+		var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
+		if fac != "":
+			per_fac[fac] = int(per_fac.get(fac, 0)) + 1
+	var best := {}
+	for fac in per_fac:
+		var cid := GameData.continent_of_faction(String(fac))
+		if cid != "":
+			best[cid] = maxi(int(best.get(cid, 0)), int(per_fac[fac]))
+	return best
+
+
+## Grand Army (Faction): every faction of the King's continent OR of the continent being played fields 2+ units (a foreign King qualifies through the played continent).
+func _army_active(list: Array, side_fac: String) -> bool:
+	for cont in [_army_continent(side_fac), CardDatabase.active_continent]:
+		if ComboSystem.faction_army_active(_continent_counts(list, side_fac, String(cont)), _continent_faction_ids(side_fac, String(cont))):
+			return true
+	return false
+
+
+## Units per faction of the King's continent (any faction of it, the King's or not; shared pieces count for the King's faction): the count Grand Army (Faction) needs.
+func _continent_counts(list: Array, side_fac: String = "", cont: String = "") -> Dictionary:
+	var counts := {}
+	var army_cont := cont if cont != "" else _army_continent(side_fac)
+	for e in list:
+		var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
+		if fac != "" and GameData.is_home_faction(fac, army_cont):
+			counts[fac] = int(counts.get(fac, 0)) + 1
+	return counts
+
+
+## Faction Tier, banner part (Faction Synergy): tiers at 2 / 4 / 6 units; the flat HP/ATK banner bonus is 0 now, so this only returns counts (ComboSystem).
 ## Shared pieces (Rook, Knight, Bishop, Queen) count for the side's own faction; a side without a Champion has none.
-func _synergy(list: Array, side_fac: String = "") -> Dictionary:
+func _synergy(list: Array, side_fac: String = "", out_counts: Dictionary = {}) -> Dictionary:
 	var counts := {}
 	for e in list:
 		var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
-		if fac == "" or not GameData.is_home_faction(fac, CardDatabase.active_continent):
-			continue  # a faction playing outside its home continent gets no Faction Synergy
+		if not _faction_counts(fac, side_fac):
+			continue
 		counts[fac] = int(counts.get(fac, 0)) + 1
 	var out := {}
+	var ultra := _ultra_faction(list, side_fac)
 	for fac in counts:
 		var n: int = counts[fac]
-		if n >= 6:
-			out[fac] = 0.30
-		elif n >= 4:
-			out[fac] = 0.15
-		elif n >= 2:
-			out[fac] = 0.05
+		out_counts[fac] = n
+		var bonus := ComboSystem.faction_bonus(n, String(fac) == ultra)
+		if bonus > 0.0:
+			out[fac] = bonus
 	return out
 
 
-func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: float, role_hp: float = 0.0, role_atk: float = 0.0) -> BattleUnit:
+## ULTRA Faction Tier: the faction when EVERY unit of the list is the King's own faction (8+ units), otherwise "" (ComboSystem.faction_ultra).
+func _ultra_faction(list: Array, side_fac: String = "") -> String:
+	var facs: Array = []
+	for e in list:
+		var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
+		facs.append(fac if _faction_counts(fac, side_fac) else "")
+	return ComboSystem.faction_ultra(facs)
+
+
+## `mods` = ComboSystem.unit_mods of the unit: {"hp", "atk", "move", "shield", "range", "fx"}; the synergies only fill "fx" (special effects, see ComboSystem.FX_TYPES).
+func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: float, mods: Dictionary = {}) -> BattleUnit:
+	var role_hp := float(mods.get("hp", 0.0))
+	var role_atk := float(mods.get("atk", 0.0))
 	var card := CardDatabase.get_unit(card_id)
 	var st := CardDatabase.unit_stats(card_id, stars)
 	var u := BattleUnit.new()
@@ -217,16 +267,19 @@ func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: 
 	if sp.get("type", "") == "team_shield":
 		u.shield += int(round(u.max_hp * float(sp["value"])))
 	u.base_atk = int(round(float(st["atk"]) * (1.0 + bonus) * (1.0 + role_atk) * (1.0 + sp_atk) * WorldMods.atk_mult))
-	u.atk_range = int(card["range"])
-	u.move = int(card["move"])
+	u.atk_range = int(card["range"]) + int(mods.get("range", 0))
+	u.move = int(card["move"]) + int(mods.get("move", 0))
+	if float(mods.get("shield", 0.0)) > 0.0:
+		u.shield += int(round(u.max_hp * float(mods["shield"])))  # combo / faction-trait opening shield (Frontline Shield, Guardian Aura, Arcane Ward, Dawn Ward, ...)
 	u.skill_id = CardDatabase.skill_mechanic(card)  # themed continent skills map to a base mechanic
 	u.cell = cell
 	u.params = card["skill"].get("params", {})  # per-continent numbers of the skill (defaults = the Aetherion values)
 	var bf := CardDatabase.get_buff(card_id)  # the card's buff of its continent (data/card_buffs.json)
-	if not _home_bonus(side):
-		bf = {}  # a foreign faction on this continent fights without the continent card buffs
+	if not _home_bonus(side) or (String(card.get("continent", "")) != "" and String(card.get("continent", "")) != CardDatabase.active_continent):
+		bf = {}  # a foreign faction (or a piece of another continent) fights without the continent card buffs of this map
 	u.extra = String(bf.get("type", ""))
 	u.extra_value = float(bf.get("value", 0.0))
+	u.fx = (mods.get("fx", {}) as Dictionary).duplicate()  # special effects of the synergies (ComboSystem.unit_mods)
 	u.next_skill_tick = _skill_interval(u)
 	_init_buff(u)
 	units.append(u)
@@ -250,7 +303,7 @@ func _spawn_monster(side: int, monster_id: String, cell: Vector2i, star: int = 1
 	u.chess = String(m.get("chess", "knight"))
 	u.role = "Fighter"
 	u.faction = ""
-	u.stars = 1
+	u.stars = clampi(star, 1, CommanderSystem.max_star())  # the King level it fights at, shown like a unit's stars
 	u.max_hp = int(st["hp"])
 	u.hp = u.max_hp
 	u.base_atk = int(round(float(st["atk"]) * WorldMods.atk_mult))
@@ -275,17 +328,30 @@ func _p(u: BattleUnit, key: String, default: Variant) -> Variant:
 	return u.params.get(key, default)
 
 
+## Strength of a special effect on a unit: its card buff (`extra`) and the synergy effects (`fx`) combined. 0 = the unit has none.
+## Counts (evade, stun_proc) take the lowest N, chill the longest, second_life the biggest share, everything else adds up.
+func _x(u: BattleUnit, type: String) -> float:
+	var a := u.extra_value if u.extra == type else 0.0
+	var b := float(u.fx.get(type, 0.0))
+	if a == 0.0 or b == 0.0:
+		return maxf(a, b)
+	if ComboSystem.FX_COUNT.has(type):
+		return minf(a, b)
+	if ComboSystem.FX_TICKS.has(type) or type == "second_life":
+		return maxf(a, b)
+	return a + b
+
+
 ## Buff effects that change the unit when it is created.
 func _init_buff(u: BattleUnit) -> void:
-	match u.extra:
-		"swift":
-			u.move += int(u.extra_value)
-		"opener":
-			u.strike_bonus = u.extra_value
-		"ward":
-			u.shield += int(round(u.max_hp * u.extra_value))
-		"regen", "mend_self":
-			u.buff_next_tick = BUFF_INTERVAL
+	if u.extra == "swift":
+		u.move += int(u.extra_value)
+	if u.extra == "ward":
+		u.shield += int(round(u.max_hp * u.extra_value))
+	if _x(u, "opener") > 0.0:
+		u.strike_bonus = _x(u, "opener")
+	if u.extra == "regen" or _x(u, "mend_self") > 0.0:
+		u.buff_next_tick = BUFF_INTERVAL
 
 
 ## Periodic buff effects (their own timer, independent of the unit's skill).
@@ -293,12 +359,11 @@ func _buff_periodic(u: BattleUnit) -> void:
 	if u.buff_next_tick == 0 or tick < u.buff_next_tick:
 		return
 	u.buff_next_tick = tick + BUFF_INTERVAL
-	match u.extra:
-		"regen":
-			for a in units_of(u.side):
-				_heal(a, int(round(a.max_hp * u.extra_value)))
-		"mend_self":
-			_heal(u, int(round(u.max_hp * u.extra_value)))
+	if u.extra == "regen":
+		for a in units_of(u.side):
+			_heal(a, int(round(a.max_hp * u.extra_value)))
+	if _x(u, "mend_self") > 0.0:
+		_heal(u, int(round(u.max_hp * _x(u, "mend_self"))))
 
 
 func _skill_interval(u: BattleUnit) -> int:
@@ -356,14 +421,14 @@ func atk_now(u: BattleUnit) -> int:
 		m *= u.buff_mult
 	if u.brace_active:
 		m *= 1.3
-	if u.extra == "rage" and u.hp * 2 < u.max_hp:
-		m *= 1.0 + u.extra_value
-	elif u.extra == "frenzy":
-		m *= 1.0 + u.extra_value * mini(u.kills, 5)
+	if u.hp * 2 < u.max_hp and _x(u, "rage") > 0.0:
+		m *= 1.0 + _x(u, "rage")
+	if _x(u, "frenzy") > 0.0:
+		m *= 1.0 + _x(u, "frenzy") * mini(u.kills, 5)
 	var aura := 0.0
 	for a in units:
-		if a != u and a.side == u.side and a.alive and a.extra == "aura_atk" and _dist(a.cell, u.cell) <= 1:
-			aura = maxf(aura, a.extra_value)
+		if a != u and a.side == u.side and a.alive and _dist(a.cell, u.cell) <= 1 and _x(a, "aura_atk") > 0.0:
+			aura = maxf(aura, _x(a, "aura_atk"))
 	m *= 1.0 + aura
 	return int(round(float(u.base_atk) * m))
 
@@ -534,8 +599,8 @@ func _attack(u: BattleUnit, t: BattleUnit) -> void:
 	if u.strike_bonus > 0.0:  # Knight (Assassin): the first attack after the teleport hits harder
 		dmg *= 1.0 + u.strike_bonus
 		u.strike_bonus = 0.0
-	if u.extra == "execute" and t.hp * 10 < t.max_hp * 3:
-		dmg *= 1.0 + u.extra_value
+	if _x(u, "execute") > 0.0 and t.hp * 10 < t.max_hp * 3:
+		dmg *= 1.0 + _x(u, "execute")
 	match u.skill_id:
 		"radiant_strike":
 			if u.attacks_made % 3 == 0:
@@ -564,25 +629,24 @@ func _attack(u: BattleUnit, t: BattleUnit) -> void:
 			if e != t and _dist(e.cell, tcell) <= 2:
 				_damage(e, int(round(amount * float(_p(u, "splash_pct", 0.5)))))
 		_log("%s unleashes Arcane Barrage!" % u.display_name)
-	match u.extra:  # Queen: continent-specific additional effect
-		"splash":
-			for e in units_of(1 - u.side):
-				if e != t and _dist(e.cell, tcell) <= 1:
-					_damage(e, int(round(amount * u.extra_value)))
-		"lifesteal":
-			_heal(u, int(round(dealt * u.extra_value)))
-		"chill":
-			t.slow_until = tick + int(u.extra_value)
-		"burn":
-			if t.alive:
-				t.burn_until = tick + 12
-				t.burn_amount = maxi(1, int(round(u.base_atk * u.extra_value)))
-		"stun_proc":
-			if t.alive and u.attacks_made % int(u.extra_value) == 0:
-				t.stun_until = tick + 2
-	if t.extra == "thorns" and t.alive and u.alive and dealt > 0 and not _reflecting:
+	# Special effects: the continent card buff (Queen etc.) and the synergies (ComboSystem) share one code path via _x()
+	if _x(u, "splash") > 0.0:
+		for e in units_of(1 - u.side):
+			if e != t and _dist(e.cell, tcell) <= 1:
+				_damage(e, int(round(amount * _x(u, "splash"))))
+	if _x(u, "lifesteal") > 0.0:
+		_heal(u, int(round(dealt * _x(u, "lifesteal"))))
+	if _x(u, "chill") > 0.0:
+		t.slow_until = maxi(t.slow_until, tick + int(_x(u, "chill")))
+	if _x(u, "burn") > 0.0 and t.alive:
+		var burning := t.burn_until > tick  # a stronger burn replaces a weaker one, never the other way round
+		t.burn_until = tick + 12
+		t.burn_amount = maxi(t.burn_amount if burning else 0, maxi(1, int(round(u.base_atk * _x(u, "burn")))))
+	if _x(u, "stun_proc") > 0.0 and t.alive and u.attacks_made % int(_x(u, "stun_proc")) == 0:
+		t.stun_until = maxi(t.stun_until, tick + 2)
+	if _x(t, "thorns") > 0.0 and t.alive and u.alive and dealt > 0 and not _reflecting:
 		_reflecting = true
-		_damage(u, maxi(1, int(round(dealt * t.extra_value))))
+		_damage(u, maxi(1, int(round(dealt * _x(t, "thorns")))))
 		_reflecting = false
 
 
@@ -596,21 +660,24 @@ func _attack_interval(u: BattleUnit) -> int:
 func _damage(t: BattleUnit, amount: int) -> int:
 	if not t.alive:
 		return 0
-	if t.extra == "evade" and (t.hits_taken + 1) % int(t.extra_value) == 0:
+	var evade_n := int(_x(t, "evade"))
+	if evade_n > 0 and (t.hits_taken + 1) % evade_n == 0:
 		t.hits_taken += 1  # every Nth hit is avoided
 		return 0
 	var dmg := float(amount)
-	if t.extra == "armor":
-		dmg *= 1.0 - t.extra_value
+	if _x(t, "armor") > 0.0:
+		dmg *= 1.0 - minf(_x(t, "armor"), float(ComboSystem.FX_CAP["armor"]))
 	if t.skill_id == "shield_wall":
 		for a in units_of(t.side):
 			if a != t and _dist(a.cell, t.cell) <= 1:
 				dmg *= 0.8
 				break
-	for a in units:  # Queen of Aetherion: allies within 2 cells (and she herself) take less damage
-		if a.side == t.side and a.alive and a.extra == "guard" and _dist(a.cell, t.cell) <= 2:
-			dmg *= 1.0 - a.extra_value
-			break
+	var guard := 0.0  # Queen of Aetherion / guard synergies: allies within 2 cells (and the guard herself) take less damage (the best guard counts)
+	for a in units:
+		if a.side == t.side and a.alive and _dist(a.cell, t.cell) <= 2:
+			guard = maxf(guard, _x(a, "guard"))
+	if guard > 0.0:
+		dmg *= 1.0 - minf(guard, float(ComboSystem.FX_CAP["guard"]))
 	var tp: Dictionary = side_passive[t.side]
 	if tp.get("type", "") == "team_armor":
 		dmg *= 1.0 - float(tp["value"])  # King passive of the target's side
@@ -638,9 +705,9 @@ func _kill(t: BattleUnit) -> void:
 		events.append({"type": "fx", "cells": [t.cell]})
 		_log("%s is revived by a Guardian Angel!" % t.display_name)
 		return
-	if t.extra == "second_life" and not t.second_life_used and not t.is_king:
-		t.second_life_used = true  # Queen of Eclipsia: returns once at a share of her max HP
-		t.hp = maxi(1, int(t.max_hp * t.extra_value))
+	if _x(t, "second_life") > 0.0 and not t.second_life_used and not t.is_king:
+		t.second_life_used = true  # Queen of Eclipsia / second-life synergies: returns once at a share of max HP
+		t.hp = maxi(1, int(t.max_hp * _x(t, "second_life")))
 		t.shield = 0
 		events.append({"type": "fx", "cells": [t.cell]})
 		_log("%s returns for a second life!" % t.display_name)
@@ -650,15 +717,14 @@ func _kill(t: BattleUnit) -> void:
 	grid.erase(t.cell)
 	events.append({"type": "death", "cell": t.cell})
 	_log("%s (side %d) falls." % [t.display_name, t.side])
-	match t.extra:
-		"last_rites":
-			for a in units_of(t.side):
-				if _dist(a.cell, t.cell) <= 1:
-					_heal(a, int(round(a.max_hp * t.extra_value)))
-		"death_burst":
-			for e in units_of(1 - t.side):
-				if _dist(e.cell, t.cell) <= 1:
-					_damage(e, int(round(t.base_atk * t.extra_value)))
+	if _x(t, "last_rites") > 0.0:
+		for a in units_of(t.side):
+			if _dist(a.cell, t.cell) <= 1:
+				_heal(a, int(round(a.max_hp * _x(t, "last_rites"))))
+	if _x(t, "death_burst") > 0.0:
+		for e in units_of(1 - t.side):
+			if _dist(e.cell, t.cell) <= 1:
+				_damage(e, int(round(t.base_atk * _x(t, "death_burst"))))
 
 
 func _heal(t: BattleUnit, amount: int) -> void:
@@ -809,6 +875,7 @@ func _enter_king(side: int) -> void:
 	u.side = side
 	u.card_id = king_data[side]
 	u.is_king = true
+	u.stars = clampi(int(king_star[side]), 1, CommanderSystem.max_star())  # Commander stars show on the token like a unit's
 	u.display_name = String(ch["name"])
 	u.chess = "king"
 	u.role = "Fighter"

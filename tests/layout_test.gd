@@ -38,11 +38,14 @@ func _ready() -> void:
 				DirAccess.make_dir_recursive_absolute("/tmp/shots")
 				vp.get_texture().get_image().save_png("/tmp/shots/%s_%s.png" % [sc.get_file(), label.split(" ")[0].replace(":", "x")])
 			if sc.get_file() == "battle_board":  # second pass: the fight phase (supports panel, log)
+				var prep_rect: Rect2 = node.grid.get_global_rect()
 				node._on_auto()
 				node._on_start_battle()
 				node.timer.stop()
 				for i in range(3):
 					await get_tree().process_frame
+				if not node.grid.get_global_rect().is_equal_approx(prep_rect):  # the board must not grow / move when the fight starts
+					overflow.append("battle_board @ %s: the board changed from %s to %s when the fight started" % [label, str(prep_rect), str(node.grid.get_global_rect())])
 				_audit(node, Rect2(Vector2.ZERO, Vector2(sz)), "battle_board(fight) @ %s" % label, "battle_board(fight)")
 				if "shots" in OS.get_cmdline_user_args() and label == "16:9 1920x1080":
 					for i in range(9):

@@ -579,6 +579,7 @@ const SLOT_H := 70.0   # tile height in the deck grid
 const TILE_H := 92.0   # tile height in the collection grid
 
 var _deck_continent: String = ""
+var _pool_source: String = ""  # continent whose unit cards the pool shows ("" = the deck continent); a deck may mix continents (Seven Realms bond)
 var _pool_tab: String = "units"  # units | supports | king
 var _pool_faction: String = "all"
 var _pool_cat: String = "Creation"
@@ -720,8 +721,15 @@ func _deck_errors() -> Array[String]:
 	return errors
 
 
+func _source_continent() -> String:
+	return _pool_source if _pool_source != "" else _deck_continent
+
+
 func _faction_name(faction_id: String) -> String:
-	return String(GameData.get_faction(_deck_continent, faction_id).get("name", faction_id.capitalize()))
+	var f: Dictionary = GameData.get_faction(_source_continent(), faction_id)
+	if f.is_empty():
+		f = GameData.get_faction(_deck_continent, faction_id)
+	return String(f.get("name", faction_id.capitalize()))
 
 
 ## The card list of the current section (units or supports).
@@ -745,6 +753,7 @@ func _on_deck_continent(cid: String) -> void:
 	if deck.unit_ids.is_empty():
 		deck.unit_ids = deck.effective_unit_ids()
 	_pool_faction = "all"
+	_pool_source = ""
 	_selected_id = ""
 	_pending = ""
 	_note = ""
@@ -815,12 +824,18 @@ func _pool_continents() -> void:
 
 
 func _pool_units() -> void:
+	var src := _source_continent()
+	var open: Array = GameData.continents.filter(func(c): return c.get("playable", false) and SaveManager.is_continent_unlocked(c["id"]))
+	if open.size() >= 2:  # a deck may take units from any open continent: pick which continent's cards the pool shows
+		var sgroup := ButtonGroup.new()
+		for c in open:
+			_filter_chip(_pool_filter_row, "Cards: " + String(c["name"]), String(c["id"]) == src, _on_pool_source.bind(String(c["id"])), sgroup)
 	var group := ButtonGroup.new()
 	_filter_chip(_pool_filter_row, "All", _pool_faction == "all", _on_pool_faction.bind("all"), group)
-	for f in GameData.get_continent(_deck_continent).get("factions", []):
+	for f in GameData.get_continent(src).get("factions", []):
 		_filter_chip(_pool_filter_row, String(f["name"]), _pool_faction == String(f["id"]), _on_pool_faction.bind(String(f["id"])), group)
 	var grid := _new_grid(_pool_box, 5)
-	var units: Array = CardDatabase.all_units().filter(func(u): return _pool_faction == "all" or String(u["faction"]) == _pool_faction)
+	var units: Array = CardDatabase.units_of_continent(src).filter(func(u): return _pool_faction == "all" or String(u["faction"]) == _pool_faction)
 	units = units.filter(func(u): return _is_owned(u)) + units.filter(func(u): return not _is_owned(u))  # owned first
 	for u in units:
 		var v := CardView.new()
@@ -829,6 +844,13 @@ func _pool_units() -> void:
 		v.pressed.connect(_toggle_unit)
 		grid.add_child(v)
 		_pool_buttons[String(u["id"])] = v
+
+
+## The pool shows the unit cards of another continent; the deck keeps what it holds.
+func _on_pool_source(cid: String) -> void:
+	_pool_source = cid
+	_pool_faction = "all"
+	_rebuild_pool()
 
 
 func _on_pool_faction(fid: String) -> void:
@@ -1138,7 +1160,7 @@ func _info_overview() -> String:
 	var cost := ""
 	for chess in CardDatabase.CHESS_ORDER + ["king"]:
 		cost += "%s %d   " % [String(chess).capitalize(), CardDatabase.capacity_cost(chess)]
-	return "%s\nA battle deck holds %d unit types x %d copies = %d unit cards, 1 King and %d Support cards (%d in total). The units come from one continent; its factions can be mixed freely, the King and the Support cards are not tied to a continent.\n\n%s\n1-star = %d card, 2-star = %d copies merged, 3-star = %d copies merged. Stars multiply HP and ATK.\n\n%s\nEvery piece costs Capacity when you deploy it: %s\n\n%s\n[b]Lineup[/b] places your units on the deployment grid and sets the order of your Support cards (see the Lineup section). [b]Deck[/b] is where you build the deck and pick your faction; Save needs exactly 15 unit types and 15 Support cards. [b]Collection[/b] lists every card with its stats and skill. [b]Info[/b] is this guide." % [
+	return "%s\nA battle deck holds %d unit types x %d copies = %d unit cards, 1 King and %d Support cards (%d in total). The units may come from any continent and faction (2 units of one faction in every continent switch on the Continent Bond); the King and the Support cards are not tied to a continent.\n\n%s\n1-star = %d card, 2-star = %d copies merged, 3-star = %d copies merged. Stars multiply HP and ATK.\n\n%s\nEvery piece costs Capacity when you deploy it: %s\n\n%s\n[b]Lineup[/b] places your units on the deployment grid and sets the order of your Support cards (see the Lineup section). [b]Deck[/b] is where you build the deck and pick your faction; Save needs exactly 15 unit types and 15 Support cards. [b]Collection[/b] lists every card with its stats and skill. [b]Info[/b] is this guide." % [
 		_info_head("Deck rules"), 15, int(GameData.b("unit_copies")), 15 * int(GameData.b("unit_copies")), 15, 15 * int(GameData.b("unit_copies")) + 1 + 15,
 		_info_head("Stars"), int(copies[0]), int(copies[1]), int(copies[2]),
 		_info_head("Capacity"), cost.strip_edges(),
@@ -1158,7 +1180,7 @@ func _info_territory() -> String:
 	var rent_txt := ""
 	for i in range(1, up_rent.size()):
 		rent_txt += "%sx%s" % ["" if i == 1 else " / ", str(float(up_rent[i]))]
-	return "%s\nThe Territory Board is a loop of tiles around the continent. Everyone starts with Dominion Gold and Life by difficulty (Easy %d G / %d Life, Normal %d G / %d Life, Hard %d G / %d Life). Roll 2 dice and move that many tiles; a double (or a Time Surge event) gives another roll, up to %d bonus rolls. A Reroll Token lets you roll again before you move. Tap any tile to inspect it.\nChaos Mode (Arena option): a 40-tile board with 4 territories per region (majority 3, Dominion 4); everything else is the same.\n\n%s\n[b]Territory[/b]: if it is free you may [b]Buy[/b] it, or [b]Lease[/b] it for %d%% of its price for %d rounds (rent as usual, but no upgrades, no net worth, no region bonus; it is free again afterwards, and landing on it lets you buy it out for the rest of the price); if an opponent owns it you must pay Tax or face a Duel (below).\n[b]START[/b]: passing or landing gives %d G.   [b]Sanctuary[/b]: rest and receive %d G.\n[b]Rift[/b]: you skip your next turn.   [b]Crossroads[/b]: free warp to a random active portal.\n[b]Portal[/b]: each side has ONE portal (4 in total); it warps you to another portal.\n[b]Bank & Stocks[/b]: invest gold (100 / 250 / 500) in the stock market. The market moves every round (-20%% to +30%%); sell on any Bank tile. Stocks count toward net worth and are cashed out automatically to pay debts.   [b]Casino[/b]: place a 50 G bet to win x2, x4 or the whole pot.\n[b]Event[/b]: draws a random event card.   [b]Auction[/b]: a random free territory is auctioned to all living players, opening at %d%% of its price and rising %d%% per bid.\n[b]Tax[/b]: pay %d G to the bank.   [b]Special[/b]: a random gift, teleport or tribute.\n[b]Territory Shop[/b]: Reroll Token %d G, restore 1 Life %d G, Special Die %d G (carry up to %d, used before rolling).\n\n%s\nRent is %d%% of a territory's price. Own %d or more tiles of one region for x%s rent; own the whole region (Regional Dominion) for x%s rent. You can upgrade a territory %d times (cost %s of its price); each level raises its rent (%s). Selling a territory returns %d%% of its price.\n\n%s\nWhen you stop on an opponent's territory, its owner chooses Tax or Duel. Tax is just the rent. If the owner picks Duel you may Accept or Refuse; refusing costs the rent plus %d G.\nA Duel is an automatic battle between both players' permanent armies (the units you buy with Dominion Gold are kept between duels). The loser loses 1 Life.\nIf the attacker wins they choose Conquest (take the territory) or Victory Reward (%d%% of its price plus its upgrades in gold, the territory and its level stay); Conquest resets the territory to Level 0. If the attacker loses, the territory stays.\nIf you cannot pay, your territories are sold automatically; if that is still not enough you lose 1 Life and receive a %d G bailout. At 0 Life you are eliminated.\n\n%s\nThe last player alive wins, or when the round limit is reached the player with the highest net worth wins.\nRound limit - Journey: Easy %d / Normal %d / Hard %d.   Arena: Easy %d / Normal %d / Hard %d." % [
+	var base := "%s\nThe Territory Board is a loop of tiles around the continent. Everyone starts with Dominion Gold and Life by difficulty (Easy %d G / %d Life, Normal %d G / %d Life, Hard %d G / %d Life). Roll 2 dice and move that many tiles; a double (or a Time Surge event) gives another roll, up to %d bonus rolls. A Reroll Token lets you roll again before you move. Tap any tile to inspect it.\nChaos Mode (its own card in New Match > Offline): a 40-tile board with 4 territories per region (majority 3, Dominion 4), shorter matches and pricier land (see Chaos Mode below); everything else is the same.\n\n%s\n[b]Territory[/b]: if it is free you may [b]Buy[/b] it, or [b]Lease[/b] it for %d%% of its price for %d rounds (rent as usual, but no upgrades, no net worth, no region bonus; it is free again afterwards, and landing on it lets you buy it out for the rest of the price); if an opponent owns it you must pay Tax or face a Duel (below).\n[b]START[/b]: passing or landing gives %d G.   [b]Sanctuary[/b]: rest and receive %d G.\n[b]Rift[/b]: you skip your next turn.   [b]Crossroads[/b]: free warp to a random active portal.\n[b]Portal[/b]: each side has ONE portal (4 in total); it warps you to another portal.\n[b]Bank & Stocks[/b]: invest gold (100 / 250 / 500) in the stock market. The market moves every round (-20%% to +30%%); sell on any Bank tile. Stocks count toward net worth and are cashed out automatically to pay debts.   [b]Casino[/b]: place a 50 G bet to win x2, x4 or the whole pot.\n[b]Event[/b]: draws a random event card.   [b]Auction[/b]: a random free territory is auctioned to all living players, opening at %d%% of its price and rising %d%% per bid.\n[b]Tax[/b]: pay %d G to the bank.   [b]Special[/b]: a random gift, teleport or tribute.\n[b]Territory Shop[/b]: Reroll Token %d G, restore 1 Life %d G, Special Die %d G (carry up to %d, used before rolling).\n\n%s\nRent is %d%% of a territory's price. Own %d or more tiles of one region for x%s rent; own the whole region (Regional Dominion) for x%s rent. You can upgrade a territory %d times (cost %s of its price); each level raises its rent (%s). Selling a territory returns %d%% of its price.\n\n%s\nWhen you stop on an opponent's territory, its owner chooses Tax or Duel. Tax is just the rent. If the owner picks Duel you may Accept or Refuse; refusing costs the rent plus %d G.\nA Duel is an automatic battle between both players' permanent armies (the units you buy with Dominion Gold are kept between duels). The loser loses 1 Life.\nIf the attacker wins they choose Conquest (take the territory) or Victory Reward (%d%% of its price plus its upgrades in gold, the territory and its level stay); Conquest resets the territory to Level 0. If the attacker loses, the territory stays.\nIf you cannot pay, your territories are sold automatically; if that is still not enough you lose 1 Life and receive a %d G bailout. At 0 Life you are eliminated.\n\n%s\nThe last player alive wins, or when the round limit is reached the player with the highest net worth wins.\nRound limit - Journey: Easy %d / Normal %d / Hard %d.   Arena: Easy %d / Normal %d / Hard %d." % [
 		_info_head("The board"), GameData.gold_for("easy"), GameData.life_for("easy"), GameData.gold_for("normal"), GameData.life_for("normal"), GameData.gold_for("hard"), GameData.life_for("hard"), int(GameData.b("max_bonus_rolls")),
 		_info_head("Tiles"), int(round(float(GameData.b("lease_cost_ratio")) * 100.0)), int(GameData.b("lease_rounds")), int(GameData.b("start_bonus")), int(GameData.b("sanctuary_bonus")),
 		_pct("auction_start_ratio"), _pct("auction_step_ratio"), int(GameData.b("tax_flat")),
@@ -1169,6 +1191,25 @@ func _info_territory() -> String:
 		_info_head("How to win"),
 		GameData.round_limit_for("journey", "easy"), GameData.round_limit_for("journey", "normal"), GameData.round_limit_for("journey", "hard"),
 		GameData.round_limit_for("arena", "easy"), GameData.round_limit_for("arena", "normal"), GameData.round_limit_for("arena", "hard")]
+	return base + _info_territory_extra()
+
+
+## Territory topics that are not tile rules: Chaos Mode numbers, hidden finds, King levels and the map camera.
+func _info_territory_extra() -> String:
+	var lvl_max := int(GameData.b("max_tile_level"))
+	var out := "\n\n" + _info_head("Landmark") + "\nA territory can be upgraded up to level %d; the last level is a Landmark (a gold diamond on the tile) and pays the highest rent." % lvl_max
+	out += "\n\n" + _info_head("Chaos Mode") + "\nRound limit: Easy %d / Normal %d / Hard %d. Territory prices are x%s, the Dominion Gate pays %d G, and match rewards are x%s." % [
+		GameData.round_limit_for("chaos", "easy"), GameData.round_limit_for("chaos", "normal"), GameData.round_limit_for("chaos", "hard"),
+		str(float(GameData.b("chaos_price_mult"))), int(GameData.b("chaos_start_bonus")), str(float(GameData.b("chaos_reward_mult")))]
+	out += "\n\n" + _info_head("Hidden finds") + "\nEvery continent hides 4 wild monsters (one per region) and 4 deposits (2 treasures and 2 mines) on territory tiles. Nothing is marked on the map: you only find one by LANDING on its tile (the Tutorial has none).\n"
+	out += "[b]Monster[/b]: choose Fight or Flee. Winning gives a Monster card (one per player; a defeated monster is gone for everybody). It joins your King in a Last Stand and has its own skill. Losing costs %d G and the monster stays; fleeing is free. A wild monster is as strong as your King's level.\n" % int(GameData.b("monster_defeat_gold"))
+	out += "[b]Treasure[/b]: a one-time gold prize (sometimes a Reroll Token or a Special Die).   [b]Mine[/b]: becomes yours and pays gold at the end of every round for a number of rounds (some also give a Reroll Token now and then); it stops if you are eliminated."
+	var missions: Array[String] = []
+	for m in GameData.b("commander_missions"):
+		missions.append(String(m.get("desc", "")))
+	out += "\n\n" + _info_head("King level") + "\nYour King starts at Lv 1 and reaches Lv 2 and Lv 3 by completing two missions in order (%s). Each level raises the King's HP and ATK (shown as stars). The Monster card keeps the level your King had when you won it." % ", then ".join(PackedStringArray(missions))
+	out += "\n\n" + _info_head("Map and camera") + "\nThe Dominion Gate (START) is the bottom-right corner and the ring runs clockwise. The 100-tile board opens zoomed in, with tiles as big as on the 40-tile Chaos board, and the camera follows the pawn. Drag to pan, pinch or use the mouse wheel to zoom. Bottom-left: + / - zoom, Fit shows the whole board (then the button reads 1:1 and returns to the normal tile size), Speed sets how fast AI turns and pawns move."
+	return out
 
 
 func _info_roles() -> String:
@@ -1188,18 +1229,44 @@ func _info_lineup() -> String:
 		_info_head("Unit grid"), _info_head("Support slots"), slots, _info_head("Recommendations in the Battle Shop"), _info_head("Saving")]
 
 
+func _ultra_role_specials_text() -> String:
+	var parts: Array[String] = []
+	for r in ComboSystem.ROLES:
+		var sp := ComboSystem.role_ultra_special(r)
+		parts.append("%s - %s (%s)" % [r, sp.get("name", ""), sp.get("blurb", "")])
+	return "; ".join(parts)
+
+
 func _info_synergy() -> String:
-	var out := _info_head("Faction Synergy") + "\nUnits of the same faction on the field: 2 = +5%, 4 = +15%, 6 = +30% HP and ATK. It only works for a faction on its home continent.\n\n"
-	out += _info_head("Role Synergy") + "\nUnits of the same role on the field give that role a bonus:\n"
-	var tiers: Array = BattleEngine.ROLE_TIERS.duplicate()
-	tiers.reverse()
-	for t in tiers:
-		out += "%d units = +%d%%\n" % [int(t[0]), int(round(float(t[1]) * 100.0))]
-	out += "\nWhat it boosts:\n"
-	for role in BattleEngine.ROLE_FOCUS:
-		var focus := String(BattleEngine.ROLE_FOCUS[role])
-		var what := "HP" if focus == "hp" else ("ATK" if focus == "atk" else "HP and ATK (%d%% of the bonus)" % int(round(BattleEngine.ROLE_BOTH_FACTOR * 100.0)))
-		out += "%s: %s\n" % [role, what]
+	var out := _info_head("Special effects") + "\nEvery synergy below is a SPECIAL EFFECT, never a flat HP / ATK / move / range bonus: armor (takes less damage), evade (dodges every Nth hit), thorns (reflects damage), execute (hits wounded foes harder), frenzy (ATK per kill), rage (ATK under half HP), neighbour ATK aura, burn, stun (every Nth attack), splash, lifesteal, chill (slows the target), opener (harder first strike), last rites (heals neighbours on death), death burst (explodes on death), mend (heals itself over time), guard (allies nearby take less damage) and second life (returns once after falling). Effects of every active synergy add up.\n\n" + _info_head("Faction Tier") + "\nUnits of the same faction on the field: tiers at 2, 4 and 6 units. Each tier strengthens the faction's own special effect for the whole faction (no flat HP / ATK bonus), in one row. It works only for units of the SAME faction as your King (units of other factions get no Faction Tier), on any continent. Some extra effects of a trait appear only at the 6-unit tier:\n"
+	for cont in GameData.continents:
+		out += "\n%s\n" % String(cont.get("name", ""))
+		for f in cont.get("factions", []):
+			var ft := ComboSystem.faction_trait(String(f["id"]))
+			if ft.is_empty():
+				continue
+			out += "  %s - %s: %s\n" % [String(f["name"]), String(ft["name"]), String(ft["blurb"])]
+			for ti in range(3):
+				out += "     %d units: %s\n" % [[2, 4, 6][ti], ComboSystem.faction_tier_text(ComboSystem.faction_tier(String(f["id"]), [2, 4, 6][ti]))]
+			out += "     Ultra: %s\n" % ComboSystem.faction_tier_text(ComboSystem.faction_tier(String(f["id"]), ComboSystem.ULTRA_MIN, true))
+	out += "\n"
+	out += _info_head("Ultra") + "\nThe tier above the 6-unit tier. It switches on when EVERY unit of your line-up (%d or more) uses the same synergy: all of your King's faction, or all of one role. The faction trait is x%s stronger; a role trait works at x%s its 6-unit strength (percentages and slow time grow, every-Nth counts get lower, never below %d).\n\nUltra also unlocks a SPECIAL effect no lower tier has. Faction: %s (%s) Roles: %s\n\n" % [ComboSystem.ULTRA_MIN, str(ComboSystem.ULTRA_SCALE), str(ComboSystem.ULTRA_SCALE), int(ComboSystem.FX_COUNT_MIN), ComboSystem.ULTRA_FACTION_SPECIAL["name"], ComboSystem.ULTRA_FACTION_SPECIAL["blurb"], _ultra_role_specials_text()]
+	out += _info_head("Role traits") + "\nUnits of the same role on the field (2 / 4 / 6 units). Each combo is named for what it does:\n"
+	for c in ComboSystem.ROLE_TRAITS:
+		out += "\n%s (%s): %s\n" % [c["name"], c["role"], c["blurb"]]
+		for t in c["tiers"]:
+			out += "  %d units: %s\n" % [int(t[0]), ComboSystem.effects_text(t[1])]
+	out += "\n" + _info_head("Grand Army (Faction)") + "\nThe faction version of Grand Army: when EVERY faction of the continent fields at least %d units (every Faction Tier active) and the faction units on the field total %d (the same size as the role version, 7 x 2), every unit gains a special effect (%s). Like the Faction Tier it works for a foreign King too: every faction of your King's continent OR of the continent being played needs the units. It stacks with everything else, but not with Ultra (one faction only).\n" % [ComboSystem.FACTION_ARMY_MIN, ComboSystem.FACTION_ARMY_TOTAL, ComboSystem.effects_text(ComboSystem.FACTION_ARMY["effects"])]
+	var bond_lines := ""
+	for bid in ComboSystem.CONTINENT_BONDS:
+		bond_lines += "\n- %s: %s (%s)" % [String(bid).capitalize(), ComboSystem.CONTINENT_BONDS[bid]["name"], ComboSystem.effects_text(ComboSystem.CONTINENT_BONDS[bid]["effects"])]
+	out += "\n" + _info_head("Continent Bond") + "\nField %d units of ONE faction in EVERY continent (7 continents x %d = 14 units; the faction can be any faction of the continent). A deck may hold unit cards of several continents; a Pawn and the shared pieces count for your King's faction. Every unit then gains the bond effect of the continent your KING comes from (and only that one). It stacks with everything else:" % [ComboSystem.BOND_FACTION_UNITS, ComboSystem.BOND_FACTION_UNITS] + bond_lines + "\n"
+	out += "\n" + _info_head("Duo combos") + "\nTwo roles side by side: a pair combo needs %d units of EACH of its two roles (Grand Army, with all 7 roles, needs 2 units of each = 14 units). They stack with everything above:" % ComboSystem.DUO_UNITS + "\n"
+	for c in ComboSystem.DUO_COMBOS:
+		var needs: Array[String] = []
+		for r in c["needs"]:
+			needs.append(String(r))
+		out += "\n%s (%s): %s\n" % [c["name"], " + ".join(PackedStringArray(needs)) if needs.size() < 7 else "all 7 roles", c["blurb"]]
 	return out
 
 

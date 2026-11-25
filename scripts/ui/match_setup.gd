@@ -44,6 +44,7 @@ var _journey_hint: Label
 var _trophy_note: Label
 var _wager_panel: WagerPanel
 var _difficulty_note: Label
+var _arena_difficulty: String = ""  # Journey has no difficulty choice (always Normal): the Arena choice is kept here meanwhile
 var _start_btn: Button
 var _home_note: Label
 
@@ -403,7 +404,14 @@ func _show_setup(kind: String) -> void:
 	_view = "setup"
 	_kind = kind
 	GameSession.category = kind
-	GameSession.wager = 0 if kind != "arena" else mini(GameSession.wager, SaveManager.coins())  # Journey has no wager
+	GameSession.wager = mini(GameSession.wager, SaveManager.coins())  # Journey and Arena both take a wager
+	if kind == "journey":  # Journey has no difficulty choice: it follows the trophies, and the player wagers instead
+		if _arena_difficulty == "":
+			_arena_difficulty = String(GameSession.difficulty)
+		GameSession.difficulty = SaveManager.journey_difficulty()
+	elif _arena_difficulty != "":
+		GameSession.difficulty = _arena_difficulty
+		_arena_difficulty = ""
 	GameSession.faction_id = SaveManager.player_faction_id()  # from the Deck, never chosen here
 	if kind == "journey":
 		GameSession.mode = "custom_ai"  # Journey is always 1 vs 1
@@ -462,15 +470,13 @@ func _show_setup(kind: String) -> void:
 func _on_start() -> void:
 	if not _can_start():
 		return
-	if _kind == "arena" and GameSession.wager > 0:
+	if GameSession.wager > 0:  # Journey and Arena
 		GameSession.wager_odds = _wager_panel.odds() if _wager_panel != null else 2.0
 		if not SaveManager.place_wager(GameSession.wager):  # the stake is paid now; not enough coins -> no wager
 			GameSession.wager = 0
 			if _wager_panel != null:
 				_wager_panel.refresh()
 			return
-	elif _kind != "arena":
-		GameSession.wager = 0
 	GameSession.random_bonus_active = false
 	if _kind == "arena" and GameSession.continent_random and _open_continents().size() >= 2:
 		var pool := _open_continents()
@@ -541,34 +547,47 @@ func _build_match_column(parent: Control) -> void:
 		_journey_hint = UiTheme.make_label("", 16, UiTheme.COL_GOLD)
 		_journey_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		c.add_child(_journey_hint)
-	c.add_child(UiTheme.make_label("Difficulty", 20, UiTheme.COL_TEXT))
-	var drow := HBoxContainer.new()
-	drow.add_theme_constant_override("separation", 8)
-	c.add_child(drow)
-	var dgroup := ButtonGroup.new()
-	for d in ["easy", "normal", "hard"]:
-		var b := UiTheme.make_toggle(d.capitalize(), dgroup, 52)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.button_pressed = (GameSession.difficulty == d)
-		b.pressed.connect(func():
-			GameSession.difficulty = d
-			_refresh_difficulty_note()
-			_refresh_trophy_note()
-			_refresh_journey_hint()
-			if _wager_panel != null:
-				_wager_panel.refresh())  # the odds depend on the difficulty
-		UiTheme.scroll_passthrough(b)
-		drow.add_child(b)
+	_wager_panel = null
+	if _kind == "arena":
+		c.add_child(UiTheme.make_label("Difficulty", 20, UiTheme.COL_TEXT))
+		var drow := HBoxContainer.new()
+		drow.add_theme_constant_override("separation", 8)
+		c.add_child(drow)
+		var dgroup := ButtonGroup.new()
+		for d in ["easy", "normal", "hard"]:
+			var b := UiTheme.make_toggle(d.capitalize(), dgroup, 52)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.button_pressed = (GameSession.difficulty == d)
+			b.pressed.connect(func():
+				GameSession.difficulty = d
+				_refresh_difficulty_note()
+				_refresh_trophy_note()
+				_refresh_journey_hint()
+				if _wager_panel != null:
+					_wager_panel.refresh())  # the odds depend on the difficulty
+			UiTheme.scroll_passthrough(b)
+			drow.add_child(b)
 	var life_note := UiTheme.make_label("", 15, UiTheme.COL_MUTED)
 	life_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	c.add_child(life_note)
 	_difficulty_note = life_note
 	_refresh_difficulty_note()
-	_wager_panel = null
-	if _kind == "arena":
-		_wager_panel = WagerPanel.new("arena", false)
-		c.add_child(UiTheme.make_divider())
-		c.add_child(_wager_panel)
+	_wager_panel = WagerPanel.new(_kind, false)  # "arena" | "journey"
+	c.add_child(UiTheme.make_divider())
+	c.add_child(_wager_panel)
+
+
+## "Easy 0+, Normal 400+, Hard 1100+": the trophy ladder of the Journey AI level.
+func _difficulty_ladder() -> String:
+	var table: Dictionary = GameData.b("journey_difficulty_by_trophies", {})
+	var rows: Array = []
+	for d in table:
+		rows.append([int(table[d]), String(d).capitalize()])
+	rows.sort_custom(func(x, y): return x[0] < y[0])
+	var parts: Array[String] = []
+	for r in rows:
+		parts.append("%s %d+" % [r[1], r[0]])
+	return ", ".join(parts)
 
 
 ## Life and coin reward of the chosen difficulty (easy 5 Life / normal 3 / hard 1).
@@ -576,6 +595,10 @@ func _refresh_difficulty_note() -> void:
 	if _difficulty_note == null:
 		return
 	var d := String(GameSession.difficulty)
+	if _kind == "journey":  # no difficulty to pick: just state the fixed rules
+		_difficulty_note.text = "AI level: %s - it follows your trophies (%s).\nEveryone starts with %d Life (a lost duel or bankruptcy costs 1). Reward: win +%d, loss +%d Aether Coins." % [
+			d.capitalize(), _difficulty_ladder(), GameData.life_for(d), ShopSystem.win_reward(d), ShopSystem.loss_reward(d)]
+		return
 	_difficulty_note.text = "%s: everyone starts with %d Life (a lost duel or bankruptcy costs 1).\nReward: win +%d, loss +%d Aether Coins." % [
 		d.capitalize(), GameData.life_for(d), ShopSystem.win_reward(d), ShopSystem.loss_reward(d)]
 
@@ -740,7 +763,7 @@ func _refresh_home_note() -> void:
 		_home_note.text = "Journey needs a faction of %s. Change faction in your Deck." % cname
 		_home_note.add_theme_color_override("font_color", UiTheme.COL_MUTED)
 	else:
-		_home_note.text = "%s is foreign to %s: playable, but without its King Buff, unit buffs and Faction Synergy (the Battle Passive still works)." % [fname, cname]
+		_home_note.text = "%s is foreign to %s: playable, but without its King Buff and unit buffs (the Battle Passive, Faction Tier and Grand Army (Faction) still work)." % [fname, cname]
 		_home_note.add_theme_color_override("font_color", UiTheme.COL_MUTED)
 
 

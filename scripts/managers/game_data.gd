@@ -132,6 +132,15 @@ func find_faction(faction_id: String) -> Dictionary:
 	return {}
 
 
+## Id of the continent a faction belongs to ("" = unknown).
+func continent_of_faction(faction_id: String) -> String:
+	for c in continents:
+		for f in c.get("factions", []):
+			if f["id"] == faction_id:
+				return String(c.get("id", ""))
+	return ""
+
+
 ## Activates the event deck and the Special Dice of a continent (data/continent_flavor.json). Every continent has its OWN
 ## 12 event cards and 6 Special Dice (different names, effects and values). An unknown / empty id gives the neutral base sets.
 func apply_flavor(continent_id: String) -> void:

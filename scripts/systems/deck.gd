@@ -1,8 +1,8 @@
 class_name Deck
 extends RefCounted
 ## Battle Deck configuration: 15 unit types x 9 copies + 1 Champion (King) + 15 chosen Support cards.
-## The 15 unit types are chosen by the player from the unit cards of ONE continent (8 Pawns + the pieces of all 4 of its
-## factions, factions can be mixed freely); the King and the Support cards are not tied to a continent.
+## The 15 unit types are chosen by the player from the unit cards of ANY continent (the 8 Pawns + the pieces of all 28 factions,
+## continents and factions can be mixed freely; a line-up with units of all 7 continents switches on the Continent Bond); the King and the Support cards are not tied to a continent.
 ## Without a custom list (`unit_ids` empty) the unit types are the default of the King's faction:
 ## the 8 Pawns of the continent + the 7 own pieces (2 Rook, 2 Knight, 2 Bishop, Queen).
 
@@ -10,7 +10,7 @@ const UNIT_SLOTS := 15
 
 var champion_id: String = "champion_solvaris"
 var support_ids: Array[String] = []
-var continent_id: String = ""  # continent whose unit cards `unit_ids` come from ("" = the active continent)
+var continent_id: String = ""  # continent this deck belongs to (save key, Pawn faction slots); `unit_ids` may hold cards of any continent ("" = the active continent)
 var unit_ids: Array[String] = []  # the 15 chosen unit types; empty = default of the King's faction
 ## Custom lineup (Lineup tab): where each unit type stands on the deployment area; Auto Deploy follows it.
 ## Entries: {"id": unit card id, "x": column 0..7, "y": row 4..7}. Empty = the default AI formation.
@@ -38,9 +38,9 @@ func deck_continent() -> String:
 ## (e.g. the default deck of a menu) falls back to the first faction of the active continent.
 func faction_id() -> String:
 	var ch := GameData.get_champion(champion_id)
-	if String(ch.get("continent", "")) == CardDatabase.active_continent:
+	if String(ch.get("continent", "")) == deck_continent():
 		return String(ch.get("faction", ""))
-	var facs: Array = GameData.get_continent(CardDatabase.active_continent).get("factions", [])
+	var facs: Array = GameData.get_continent(deck_continent()).get("factions", [])
 	return String(facs[0]["id"]) if not facs.is_empty() else String(ch.get("faction", ""))
 
 
@@ -79,11 +79,11 @@ func card_list() -> Array[String]:
 	return out
 
 
-## Drops unit cards that do not belong to the deck's continent; a list that no longer has exactly 15 types goes back to the default.
+## Drops unknown unit cards (cards of any continent are fine); a list that no longer has exactly 15 types goes back to the default.
 func sanitize_units() -> void:
 	if unit_ids.is_empty():
 		return
-	var valid := CardDatabase.continent_unit_ids(deck_continent())
+	var valid := CardDatabase.any_unit_ids()
 	var clean: Array[String] = []
 	for id in unit_ids:
 		if valid.has(id) and not clean.has(id):
@@ -111,14 +111,14 @@ func validate(collection: Dictionary = {}) -> Array[String]:
 	if not unit_ids.is_empty():
 		if unit_ids.size() != UNIT_SLOTS:
 			errors.append("Unit cards: %d / %d." % [unit_ids.size(), UNIT_SLOTS])
-		var valid := CardDatabase.continent_unit_ids(deck_continent())
+		var valid := CardDatabase.any_unit_ids()
 		var seen_u := {}
 		for id in unit_ids:
 			if seen_u.has(id):
 				errors.append("Duplicate unit card: " + id)
 			seen_u[id] = true
 			if not valid.has(id):
-				errors.append("Unit card from another continent: " + id)
+				errors.append("Unknown unit card: " + id)
 			elif not collection.is_empty() and int(collection.get(id, 0)) < 1:
 				errors.append("Unit card not owned: " + id)
 	if card_list().size() != int(GameData.b("deck_total")):

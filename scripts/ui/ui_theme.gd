@@ -250,26 +250,38 @@ static func safe_insets() -> Vector2:
 	return Vector2(minf(left / scale, 160.0) + extra, minf(right / scale, 160.0) + extra)
 
 
+## Calls `cb(insets: Vector2)` now and again whenever the camera-bezel insets may have changed: window changes
+## (rotation, fold, resize, the Settings "Notch margin" slider, which emits size_changed) and two short re-checks
+## after start, because Android often reports the cutout / safe area a moment AFTER the first frame (immersive mode).
+## Disconnects itself when `node` leaves the tree. Use it for anything anchored to the screen edge outside a
+## `make_margin` container (floating cards, corner buttons).
+static func follow_insets(node: Node, cb: Callable) -> void:
+	cb.call(safe_insets())
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var apply := func() -> void:
+		if is_instance_valid(node):
+			cb.call(safe_insets())
+	tree.root.size_changed.connect(apply)
+	node.tree_exited.connect(func() -> void:
+		if tree.root.size_changed.is_connected(apply):
+			tree.root.size_changed.disconnect(apply))
+	for delay in [0.35, 1.5]:
+		tree.create_timer(delay).timeout.connect(apply)
+
+
 ## Full-rect margin container. Left / right margins grow by the display's safe-area insets and follow
-## window changes (rotation, fold, resize).
-static func make_margin(px: int) -> MarginContainer:
+## window changes (rotation, fold, resize). `vertical` is the top / bottom margin (defaults to `px`).
+static func make_margin(px: int, vertical: int = -1) -> MarginContainer:
 	var m := MarginContainer.new()
 	m.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	m.add_theme_constant_override("margin_top", px)
-	m.add_theme_constant_override("margin_bottom", px)
-	var apply := func() -> void:
-		if not is_instance_valid(m):
-			return
-		var ins := safe_insets()
+	var v := px if vertical < 0 else vertical
+	m.add_theme_constant_override("margin_top", v)
+	m.add_theme_constant_override("margin_bottom", v)
+	follow_insets(m, func(ins: Vector2) -> void:
 		m.add_theme_constant_override("margin_left", px + int(ceil(ins.x)))
-		m.add_theme_constant_override("margin_right", px + int(ceil(ins.y)))
-	apply.call()
-	var tree := Engine.get_main_loop() as SceneTree
-	if tree != null:
-		tree.root.size_changed.connect(apply)
-		m.tree_exited.connect(func() -> void:
-			if tree.root.size_changed.is_connected(apply):
-				tree.root.size_changed.disconnect(apply))
+		m.add_theme_constant_override("margin_right", px + int(ceil(ins.y))))
 	return m
 
 

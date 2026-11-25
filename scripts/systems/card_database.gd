@@ -128,8 +128,16 @@ static func is_shared(card: Dictionary) -> bool:
 
 
 ## The faction a unit fights for: a Pawn its own, a shared piece the faction of its side (the Champion's faction).
+## A Pawn takes the faction of its slot in the King's continent (Pawn ids exist on every continent), so a foreign King's Pawns are of HIS continent.
 static func effective_faction(card: Dictionary, side_faction: String) -> String:
-	return side_faction if is_shared(card) else String(card.get("faction", ""))
+	if is_shared(card):
+		return side_faction
+	if side_faction != "" and String(card.get("chess", "")) == "pawn" and int(card.get("slot", -1)) >= 0:
+		var kfacs: Array = GameData.get_continent(GameData.continent_of_faction(side_faction)).get("factions", [])
+		var slot := int(card.get("slot", -1))
+		if slot < kfacs.size():
+			return String(kfacs[slot]["id"])
+	return String(card.get("faction", ""))
 
 
 static func all_units() -> Array:
@@ -183,6 +191,11 @@ static func faction_units(faction_id: String) -> Array:
 ## Every unit card of one continent (8 Pawns + the 28 pieces of its 4 factions), whatever the active continent is.
 static func units_of_continent(continent_id: String) -> Array:
 	return _resolved(continent_id)["list"]
+
+
+## Every unit card id a deck may hold: the pieces of ALL continents plus the Pawns (a deck may mix continents, see Deck).
+static func any_unit_ids() -> Array[String]:
+	return all_unit_ids_any_continent()
 
 
 static func continent_unit_ids(continent_id: String) -> Array[String]:

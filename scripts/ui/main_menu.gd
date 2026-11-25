@@ -3,6 +3,7 @@ extends Control
 
 
 var _quit_dialog: UiDialog
+var _profile_card: Control
 
 
 ## Android Back button: ask before leaving the game.
@@ -21,7 +22,8 @@ func _ready() -> void:
 
 	var left := VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.alignment = BoxContainer.ALIGNMENT_CENTER
+	left.alignment = BoxContainer.ALIGNMENT_END  # title block sits at the bottom-left (the profile card has the top-left corner)
+	left.add_theme_constant_override("separation", 6)
 	hbox.add_child(left)
 	left.add_child(UiTheme.make_label("MULTIVERSE", 72, UiTheme.COL_GOLD))
 	left.add_child(UiTheme.make_label("DOMINION", 72))
@@ -30,9 +32,7 @@ func _ready() -> void:
 	tag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(tag)
 	# Profile (name, title, level, EXP) sits in the top-left corner of the home screen; tap it for details.
-	var card := ProfileView.build_card(_show_profile)
-	card.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 16)
-	add_child(card)
+	_add_profile_card()
 
 	var right := VBoxContainer.new()
 	right.custom_minimum_size = Vector2(380, 0)
@@ -90,9 +90,30 @@ func _ready() -> void:
 		uc.check()
 
 
+func _add_profile_card() -> void:
+	if _profile_card != null and is_instance_valid(_profile_card):
+		_profile_card.queue_free()
+	_profile_card = ProfileView.build_card(_show_profile)
+	_profile_card.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 16)
+	add_child(_profile_card)
+	var card := _profile_card  # floats at the screen corner outside the margin container: keep it clear of the camera bezel
+	UiTheme.follow_insets(card, func(ins: Vector2) -> void:
+		card.position.x = 16.0 + ins.x)
+
+
+## Rename flow: the profile dialog closes, the name dialog opens, then the card is rebuilt and the profile dialog comes back.
+func _rename_profile(profile_dlg: UiDialog) -> void:
+	profile_dlg.hide()
+	profile_dlg.queue_free()
+	ProfileView.open_rename(self, func(changed: bool):
+		if changed:
+			_add_profile_card()
+		_show_profile())
+
+
 func _show_profile() -> void:
 	var dlg := UiDialog.new()
-	dlg.body_node = ProfileView.build()
+	dlg.body_node = ProfileView.build(func(): _rename_profile(dlg))
 	dlg.show_cancel = false
 	dlg.ok_button_text = "Close"
 	dlg.confirmed.connect(dlg.queue_free)

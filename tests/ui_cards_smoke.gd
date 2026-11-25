@@ -59,7 +59,7 @@ func _ready() -> void:
 		fails += 1
 		push_error("the Territory section should show live numbers from balance.json")
 	coll._show_info("synergy")
-	if not coll._info_text.text.contains("+35%") or not coll._info_text.text.contains("+30%"):
+	if not coll._info_text.text.contains("reflect 20% damage") or not coll._info_text.text.contains("Dawn Ward"):
 		fails += 1
 		push_error("the Synergy section should list the faction and role tiers")
 	if GameSession.CARD_HUB_NAME == "Collection & Deck":

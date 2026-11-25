@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_commander()
 	_test_bank_casino()
 	_test_continent_flavor()
+	_test_combos()
 	_test_games()
 	print("RULES TEST RESULT: ", "PASS" if failures == 0 else "FAIL (%d)" % failures)
 	get_tree().quit(failures)
@@ -457,6 +458,12 @@ func _test_commander() -> void:
 		var k: BattleUnit = e.kings[0]
 		hp.append(k.max_hp)
 		atk.append(k.base_atk)
+		check(k.stars == star, "the King token carries its Commander stars like a unit (%d)" % star)
+	var me := BattleEngine.new()
+	me.setup({"seed": 5, "sides": [{"units": [], "champion": p.champion_id, "supports": []}, {"units": [], "champion": "", "supports": [], "foes": [String(GameData.get_monsters(String(c.continent["id"]))[0]["id"])], "foe_star": 3}]})
+	var mons := me.units.filter(func(x): return x.is_monster)
+	check(mons.size() > 0 and mons[0].stars == 3, "a wild Monster carries the King level it fights at as stars")
+	check(CommanderSystem.stars_marks(1) == "" and CommanderSystem.stars_marks(3) == "***" and CommanderSystem.star_info(2).begins_with("Lv 2 **"), "King star text is written like a unit's")
 	check(hp[0] < hp[1] and hp[1] < hp[2] and atk[0] < atk[1] and atk[1] < atk[2], "King HP / ATK grow with stars (HP %s, ATK %s)" % [str(hp), str(atk)])
 	# the AI power estimate counts the stars too
 	var a1 := BattleAI.army_power(c.players[0])
@@ -713,3 +720,249 @@ func _test_games() -> void:
 				steps += 1
 			finished = finished and m.state == MatchController.State.GAME_OVER
 	check(finished, "full AI games still finish with auctions and Special Dice")
+
+
+func _test_combos() -> void:
+	# role traits: tiers 2 / 4 / 6, every synergy is a special effect (no stat bonus)
+	var fxof := func(role: String, counts: Dictionary, key: String) -> float: return float(ComboSystem.unit_mods(role, counts)["fx"].get(key, 0.0))
+	check(is_equal_approx(fxof.call("Tank", {"Tank": 2}, "armor"), 0.05) and is_equal_approx(fxof.call("Tank", {"Tank": 4}, "armor"), 0.10) and is_equal_approx(fxof.call("Tank", {"Tank": 6}, "armor"), 0.15), "Iron Wall: Tank armor -5% / -10% / -15% damage taken")
+	check(fxof.call("Tank", {"Tank": 2}, "thorns") == 0.0 and is_equal_approx(fxof.call("Tank", {"Tank": 4}, "thorns"), 0.10) and is_equal_approx(fxof.call("Tank", {"Tank": 6}, "thorns"), 0.20), "Iron Wall: thorns from 4 Tanks")
+	check(fxof.call("Tank", {"Tank": 1}, "armor") == 0.0 and ComboSystem.active({"Tank": 1}).is_empty(), "one unit of a role is no combo")
+	check(is_equal_approx(fxof.call("Marksman", {"Marksman": 2}, "chill"), 3.0) and is_equal_approx(fxof.call("Marksman", {"Marksman": 6}, "chill"), 6.0) and fxof.call("Marksman", {"Marksman": 2}, "frenzy") == 0.0 and fxof.call("Marksman", {"Marksman": 4}, "frenzy") > 0.0, "Eagle Eye: chill from 2 Marksmen, frenzy from 4")
+	check(fxof.call("Mage", {"Support": 4}, "armor") > 0.0 and fxof.call("Mage", {"Support": 4}, "mend_self") == 0.0 and fxof.call("Support", {"Support": 4}, "mend_self") > 0.0, "Guardian Aura: only Supports mend, the whole army takes less damage from 4")
+	check(fxof.call("Assassin", {"Assassin": 4}, "execute") > 0.0 and fxof.call("Assassin", {"Assassin": 4}, "opener") > 0.0 and fxof.call("Tank", {"Assassin": 4}, "execute") == 0.0, "Shadow Strike: execute + opener for Assassins only")
+	check(fxof.call("Controller", {"Controller": 2}, "stun_proc") == 5.0 and fxof.call("Controller", {"Controller": 6}, "stun_proc") == 3.0 and fxof.call("Fighter", {"Controller": 6}, "stun_proc") == 0.0, "Tactician's Command: Controllers stun every 5th / 4th / 3rd attack")
+	for r in ComboSystem.ROLES:
+		var rm := ComboSystem.unit_mods(r, {r: 6})
+		check(float(rm["hp"]) == 0.0 and float(rm["atk"]) == 0.0 and float(rm["shield"]) == 0.0 and int(rm["move"]) == 0 and int(rm["range"]) == 0 and not (rm["fx"] as Dictionary).is_empty(), "role trait %s is a pure special effect (no stat bonus)" % r)
+	# duo combos fit their names
+	var gc := ComboSystem.duo_mods("Assassin", {"Assassin": 6, "Mage": 6})
+	check(float(gc["fx"].get("burn", 0.0)) > 0.0 and float(gc["fx"].get("death_burst", 0.0)) > 0.0 and ComboSystem.duo_mods("Tank", {"Assassin": 6, "Mage": 6})["fx"].is_empty(), "Glass Cannon: Assassin / Mage burn and explode on death, others unchanged")
+	check(is_equal_approx(float(ComboSystem.duo_mods("Controller", {"Tank": 6, "Support": 6, "Controller": 6})["fx"].get("armor", 0.0)), 0.06), "Frontline Shield: every unit takes 6% less damage")
+	check(float(ComboSystem.duo_mods("Fighter", {"Assassin": 6, "Fighter": 6})["fx"].get("stun_proc", 0.0)) == 4.0 and ComboSystem.duo_mods("Mage", {"Assassin": 6, "Fighter": 6})["fx"].is_empty(), "Pincer Strike: every 4th attack stuns, for Assassin and Fighter only")
+	var all7 := {}
+	for r in ComboSystem.ROLES:
+		all7[r] = 2
+	check(ComboSystem.active(all7).any(func(a): return a["name"] == "Grand Army") and float(ComboSystem.unit_mods("Controller", all7)["fx"].get("lifesteal", 0.0)) >= 0.05, "Grand Army: all 7 roles (2 units each) give every unit armor and lifesteal")
+	var all7_one := {}
+	for r in ComboSystem.ROLES:
+		all7_one[r] = 1
+	check(not ComboSystem.active(all7_one).any(func(a): return a["name"] == "Grand Army"), "Grand Army needs 2 units of each role, 1 is not enough")
+	check(ComboSystem.active({"Tank": 5, "Mage": 6}).all(func(x): return x["kind"] != "duo") and ComboSystem.active({"Tank": 1, "Mage": 1}).is_empty(), "pair duo combos need 6 units of EACH role")
+	check(ComboSystem.active({"Tank": 6, "Mage": 6}).any(func(x): return x["name"] == "Spell Bastion"), "6 Tanks + 6 Mages: Spell Bastion")
+	check(ComboSystem.missing_units(ComboSystem.DUO_COMBOS[0], {"Tank": 4}) == {"Tank": 2, "Support": 6}, "missing_units lists the units a duo combo still lacks")
+	check(ComboSystem.DUO_COMBOS.size() == 22, "22 duo combos: 21 role pairs + Grand Army")
+	var seen_ids := {}
+	var seen_pairs := {}
+	for dc in ComboSystem.DUO_COMBOS:
+		check(not seen_ids.has(dc["id"]), "duo combo id unique: %s" % dc["id"])
+		seen_ids[dc["id"]] = true
+		var keys: Array = dc["needs"].keys()
+		keys.sort()
+		check(not seen_pairs.has(str(keys)), "duo combo role set unique: %s" % dc["id"])
+		seen_pairs[str(keys)] = true
+		for r in keys:
+			check(ComboSystem.ROLES.has(r), "duo combo uses a known role: %s" % dc["id"])
+	for i in range(ComboSystem.ROLES.size()):
+		for j in range(i + 1, ComboSystem.ROLES.size()):
+			var pr := {ComboSystem.ROLES[i]: 6, ComboSystem.ROLES[j]: 6}
+			check(ComboSystem.active(pr).any(func(a): return a["kind"] == "duo"), "every role pair has a duo combo: %s + %s" % [ComboSystem.ROLES[i], ComboSystem.ROLES[j]])
+	var dfx := func(role: String, counts: Dictionary, key: String) -> float: return float(ComboSystem.duo_mods(role, counts)["fx"].get(key, 0.0))
+	check(is_equal_approx(dfx.call("Marksman", {"Marksman": 6, "Controller": 6}, "execute"), 0.20) and is_equal_approx(dfx.call("Assassin", {"Assassin": 6, "Support": 6}, "burn"), 0.20), "Target Painting / Venom Vial values")
+	check(is_equal_approx(dfx.call("Fighter", {"Tank": 6, "Fighter": 6}, "thorns"), 0.10) and is_equal_approx(dfx.call("Tank", {"Tank": 6, "Fighter": 6}, "guard"), 0.06) and dfx.call("Tank", {"Tank": 6, "Fighter": 6}, "thorns") == 0.0, "Vanguard Line: Fighters thorns, Tanks guard")
+	check(is_equal_approx(dfx.call("Fighter", {"Support": 6, "Fighter": 6}, "mend_self"), 0.04) and dfx.call("Mage", {"Support": 6, "Fighter": 6}, "mend_self") == 0.0, "Field Medic: only Fighters mend")
+	check(is_equal_approx(dfx.call("Assassin", {"Assassin": 6, "Controller": 6}, "opener"), 0.50) and dfx.call("Fighter", {"Assassin": 6, "Controller": 6}, "opener") == 0.0, "Ambush Plan: first strike for Assassins only")
+	check(is_equal_approx(dfx.call("Tank", {"Support": 6, "Controller": 6}, "mend_self"), 0.02), "War Council: every unit mends 2% HP")
+	for dc in ComboSystem.DUO_COMBOS:  # no duo combo is a stat bonus any more
+		for e in dc["effects"]:
+			check(not (e.has("hp") or e.has("atk") or e.has("shield") or e.has("move") or e.has("range")), "duo combo %s has no stat bonus" % dc["id"])
+			check(ComboSystem.FX_TYPES.any(func(k): return e.has(k)), "duo combo %s has a special effect" % dc["id"])
+	var all_facs: Array = []
+	for cont in GameData.continents:
+		for f in cont.get("factions", []):
+			all_facs.append(String(f["id"]))
+	check(all_facs.size() == 28 and ComboSystem.FACTION_TRAITS.size() == 28, "28 factions, each with its own trait")
+	for fid in all_facs:
+		check(ComboSystem.FACTION_TRAITS.has(fid), "faction trait exists: %s" % fid)
+		check(ComboSystem.faction_trait_effects(fid, 1).is_empty() and not ComboSystem.faction_trait_effects(fid, 2).is_empty(), "faction trait starts at 2 units: %s" % fid)
+		for e in ComboSystem.FACTION_TRAITS[fid]["effects"]:
+			for k in ComboSystem.STAT_KEYS:
+				check(not e.has(k), "faction trait %s has no stat bonus (%s)" % [fid, k])
+			var has_fx := false
+			for k in ComboSystem.FX_TYPES:
+				if e.has(k):
+					has_fx = true
+					check((e[k] as Array).size() == 3, "trait effect has 3 tiers: %s %s" % [fid, k])
+			check(has_fx, "faction trait effect is a special effect: %s" % fid)
+	var tfx := func(role: String, fac: String, n: int, key: String, ultra: bool = false) -> float: return float(ComboSystem.unit_mods(role, {}, fac, n, ultra)["fx"].get(key, 0.0))
+	check(is_equal_approx(tfx.call("Fighter", "solvaris", 2, "mend_self"), 0.02) and is_equal_approx(tfx.call("Fighter", "solvaris", 6, "mend_self"), 0.04), "Dawn Ward scales with the tier: mend 2% at 2 units, 4% at 6")
+	check(tfx.call("Tank", "nocthyr", 6, "opener") == 0.0 and is_equal_approx(tfx.call("Assassin", "nocthyr", 4, "opener"), 0.30), "Nightfall only gives Assassin / Marksman the opener")
+	check(tfx.call("Marksman", "voltrix", 2, "stun_proc") == 6.0 and tfx.call("Marksman", "voltrix", 6, "stun_proc") == 4.0 and tfx.call("Marksman", "voltrix", 8, "stun_proc", true) == 3.0 and tfx.call("Tank", "voltrix", 8, "stun_proc", true) == 0.0, "Overcharge: Marksman stun every 6th / 4th attack, 3rd in Ultra (count / 1.5)")
+	check(tfx.call("Mage", "inferna", 2, "death_burst") > 0.0 and tfx.call("Mage", "inferna", 2, "atk") == 0.0 and float(ComboSystem.unit_mods("Mage", {}, "inferna", 2)["hp"]) == 0.0, "Hellfire: a death burst, no stat change")
+	check(tfx.call("Mage", "astralis", 4, "splash") == 0.0 and tfx.call("Mage", "astralis", 6, "splash") > 0.0, "Star Charts: splash only at 6 units")
+	check(is_equal_approx(float(ComboSystem.unit_mods("Tank", {"Tank": 2}, "terragorn", 2)["fx"]["armor"]), 0.05 + 0.04), "faction trait stacks with role traits")
+	check(ComboSystem.unit_mods("Tank", {}, "", 6)["fx"].is_empty() and ComboSystem.faction_tier_index(1) == -1 and ComboSystem.faction_tier_index(2) == 0 and ComboSystem.faction_tier_index(4) == 1 and ComboSystem.faction_tier_index(7) == 2, "faction tier index")
+	var eight_same: Array = []
+	for _i in range(8):
+		eight_same.append("solvaris")
+	check(ComboSystem.faction_ultra(eight_same) == "solvaris" and ComboSystem.faction_ultra(eight_same.slice(0, 7)) == "", "Ultra faction needs 8+ units")
+	var mixed := eight_same.duplicate()
+	mixed[3] = "nocthyr"
+	var with_none := eight_same.duplicate()
+	with_none[0] = ""
+	check(ComboSystem.faction_ultra(mixed) == "" and ComboSystem.faction_ultra(with_none) == "", "Ultra faction: every unit must share one home faction")
+	check(ComboSystem.faction_bonus(8, true) == 0.0 and ComboSystem.faction_tier_name(8, true) == "Ultra" and ComboSystem.faction_bonus(6) == 0.0 and ComboSystem.faction_bonus(2) == 0.0, "no flat HP/ATK banner bonus in any Faction Tier or Ultra")
+	check(is_equal_approx(tfx.call("Fighter", "solvaris", 8, "mend_self", true), 0.06), "Ultra scales the faction trait x1.5 (Dawn Ward 4% -> 6%)")
+	check(tfx.call("Mage", "elarion", 6, "chill") == 4.0 and tfx.call("Mage", "elarion", 8, "chill", true) == 6.0, "Ultra lengthens a chill x1.5 (4 -> 6 ticks)")
+	check(ComboSystem.role_ultra({"Tank": 8}) == "Tank" and ComboSystem.role_ultra({"Tank": 7}) == "" and ComboSystem.role_ultra({"Tank": 8, "Mage": 1}) == "", "Ultra role: all units one role, 8+")
+	check(is_equal_approx(fxof.call("Tank", {"Tank": 8}, "armor"), 0.15 * 1.5) and is_equal_approx(fxof.call("Tank", {"Tank": 7, "Mage": 1}, "armor"), 0.15), "Ultra Iron Wall x1.5 only when ALL units are Tanks")
+	# Ultra special effects (flat, only in Ultra)
+	check(is_equal_approx(tfx.call("Fighter", "solvaris", 8, "lifesteal", true), 0.08) and is_equal_approx(tfx.call("Fighter", "solvaris", 8, "frenzy", true), 0.04) and tfx.call("Fighter", "solvaris", 6, "lifesteal") == 0.0, "Ultra Dominion: lifesteal + frenzy only in Faction Ultra")
+	check(String(ComboSystem.faction_tier("solvaris", 8, true)["special"]) == "Ultra Dominion" and String(ComboSystem.faction_tier("solvaris", 6)["special"]) == "" and ComboSystem.faction_tier_text(ComboSystem.faction_tier("solvaris", 8, true)).contains("Ultra Dominion"), "Faction Tier shows the Ultra special only in Ultra")
+	check(is_equal_approx(fxof.call("Tank", {"Tank": 8}, "second_life"), 0.30) and fxof.call("Tank", {"Tank": 7, "Mage": 1}, "second_life") == 0.0, "Role Ultra special: Unbreakable (Tanks return once at 30% HP) only when ALL units are Tanks")
+	check(fxof.call("Assassin", {"Assassin": 8}, "evade") == 3.0 and fxof.call("Mage", {"Mage": 8}, "burn") > 0.0 and fxof.call("Marksman", {"Marksman": 8}, "execute") > 0.0 and fxof.call("Controller", {"Controller": 8}, "stun_proc") == 3.0 and ComboSystem.scaled_fx_value("evade", 4.0, 1.5) == 3.0, "Role Ultra specials: Phantom Rush / Arcane Overreach / Deadeye Volley / Grand Strategy")
+	for r in ComboSystem.ROLES:
+		check(not ComboSystem.role_ultra_special(r).is_empty(), "every role has an Ultra special (%s)" % r)
+	check(ComboSystem.faction_tier_name(2) == "Rally" and ComboSystem.faction_tier_name(4) == "Legion" and ComboSystem.faction_tier_name(6) == "Host" and ComboSystem.faction_bonus(6) == 0.0 and ComboSystem.faction_tier_name(1) == "", "Faction Banner tiers: Rally / Legion / Host")
+	# Grand Army (Faction): every faction of the continent with 2+ units
+	var cfacs: Array = ["solvaris", "nocthyr", "valdoria", "elarion"]
+	check(ComboSystem.faction_army_active({"solvaris": 4, "nocthyr": 4, "valdoria": 3, "elarion": 3}, cfacs) and ComboSystem.faction_army_active({"solvaris": 2, "nocthyr": 2, "valdoria": 2, "elarion": 2}, cfacs) and ComboSystem.faction_army_active({"solvaris": 2, "nocthyr": 2, "valdoria": 2, "elarion": 8}, cfacs), "Grand Army (Faction): 2+ units of EVERY faction (8 units in all)")
+	check(not ComboSystem.faction_army_active({"solvaris": 2, "nocthyr": 2, "valdoria": 2, "elarion": 1}, cfacs) and not ComboSystem.faction_army_active({"solvaris": 5, "nocthyr": 5, "valdoria": 4, "elarion": 1}, cfacs) and not ComboSystem.faction_army_active({"solvaris": 14}, cfacs) and not ComboSystem.faction_army_active({}, []), "Grand Army (Faction): one faction short or one faction only is not enough")
+	check(ComboSystem.faction_army_missing({"solvaris": 2, "nocthyr": 1}, cfacs) == {"nocthyr": 1, "valdoria": 2, "elarion": 2}, "faction_army_missing lists the units still lacking per faction")
+	check(ComboSystem.faction_army_lacking({"solvaris": 2, "nocthyr": 2, "valdoria": 2, "elarion": 2}, cfacs) == 0 and ComboSystem.faction_army_lacking({"solvaris": 5, "nocthyr": 5, "valdoria": 4, "elarion": 0}, cfacs) == 2 and ComboSystem.faction_army_lacking({"solvaris": 2, "nocthyr": 2, "valdoria": 1}, cfacs) == 3, "faction_army_lacking: the larger of the thin-faction gap and the 8-unit gap")
+	var cb_ok := ComboSystem.CONTINENT_BONDS.size() == 7
+	var realms := {}  # per continent: units of its best-staffed faction
+	for cid in ["aetherion", "arcanum", "machina", "sylvaris", "drakmor", "thalassia", "eclipsia"]:
+		cb_ok = cb_ok and not ComboSystem.continent_bond(cid).is_empty() and not ComboSystem.unit_mods("Tank", {}, "", 0, false, false, ComboSystem.continent_bond(cid))["fx"].is_empty()
+		realms[cid] = 2
+	# Continent Bond: 2 units of one faction in EVERY continent; the effect is the one of the KING's continent only
+	cb_ok = cb_ok and ComboSystem.bonds_for(realms, "drakmor").get("names", []) == ["War Fever"] and ComboSystem.bonds_for(realms, "eclipsia").get("names", []) == ["Time Fold"] and ComboSystem.bonds_for(realms, "aetherion").get("names", []) == ["Royal Standard"]
+	var dr_fx: Dictionary = ComboSystem.unit_mods("Tank", {}, "", 0, false, false, ComboSystem.bonds_for(realms, "drakmor"))["fx"]
+	cb_ok = cb_ok and dr_fx.size() == 1 and is_equal_approx(float(dr_fx.get("rage", 0.0)), 0.08)
+	var six := realms.duplicate()
+	six["machina"] = 1  # one faction group short
+	cb_ok = cb_ok and ComboSystem.bonds_for(six, "drakmor").is_empty() and ComboSystem.bond_missing(six) == ["machina"] and ComboSystem.bonds_for({"arcanum": 9}, "arcanum").is_empty() and ComboSystem.bonds_for(realms, "").is_empty() and ComboSystem.bonds_for(realms, "unknown").is_empty() and ComboSystem.bond_missing(realms).is_empty()
+	check(cb_ok and ComboSystem.unit_mods("Tank", {})["fx"].is_empty(), "Continent Bond: 2 units of one faction in all 7 continents, the effect of the King's continent; one continent short is not enough")
+	check(is_equal_approx(float(ComboSystem.unit_mods("Tank", {}, "", 0, false, true)["fx"]["last_rites"]), 0.10) and is_equal_approx(float(ComboSystem.unit_mods("Mage", {}, "", 0, false, true)["fx"]["mend_self"]), 0.03) and ComboSystem.unit_mods("Tank", {})["fx"].is_empty(), "Grand Army (Faction): last rites + mend for every unit")
+	# Faction Tier: Faction Banner + faction trait fused into one tier (numbers unchanged)
+	var ft_h := ComboSystem.faction_tier("solvaris", 6)
+	check(ComboSystem.faction_tier("solvaris", 1).is_empty() and String(ft_h["name"]) == "Host" and is_equal_approx(float(ft_h["bonus"]), 0.0) and String(ft_h["trait"]) == "Dawn Ward" and not (ft_h["trait_effects"] as Array).is_empty(), "Faction Tier: 6 units = Dawn Ward at full tier, no banner bonus")
+	check(ComboSystem.faction_tier_text(ft_h).begins_with("Dawn Ward:") and String(ComboSystem.faction_tier("solvaris", 8, true)["name"]) == "Ultra" and is_equal_approx(float(ComboSystem.faction_tier("solvaris", 8, true)["bonus"]), 0.0), "Faction Tier text and Ultra tier")
+	check(int(ComboSystem.faction_tier("solvaris", 2)["next"]) == 4 and int(ft_h["next"]) == 0, "Faction Tier: units for the next tier")
+	# the engine applies them: a full faction line-up gets the Frontline Shield, a lone unit does not
+	CardDatabase.set_continent("aetherion")
+	var pieces := CardDatabase.faction_pieces("solvaris")
+	var full: Array = []
+	for i in range(pieces.size()):
+		full.append({"card_id": String(pieces[i]["id"]), "stars": 1, "cell": Vector2i(i, 7)})
+	var champ := String(GameData.find_faction("solvaris").get("champion", ""))
+	var e := BattleEngine.new()
+	e.setup({"seed": 3, "sides": [{"units": full, "champion": champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
+	var fx_ok := e.units_of(0).size() > 0
+	for u in e.units_of(0):
+		if not u.is_king and u.fx.is_empty():
+			fx_ok = false
+	check(fx_ok, "the engine gives every unit of the line-up its synergy special effects")
+	var lone := BattleEngine.new()
+	lone.setup({"seed": 3, "sides": [{"units": [full[0]], "champion": champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
+	var lone_ok := true
+	for u in lone.units_of(0):
+		if not u.is_king and not u.fx.is_empty():
+			lone_ok = false
+	check(lone_ok, "a lone unit has no synergy effect")
+	# Continent Bond in the engine: 2 units of ONE faction in each of the 7 continents on one side (a mixed-continent line-up), King of Aetherion / Drakmor
+	var fourteen: Array = []
+	var thirteen: Array = []
+	for ci in range(GameData.continents.size()):
+		var cid := String(GameData.continents[ci]["id"])
+		if not ComboSystem.CONTINENT_BONDS.has(cid):
+			continue
+		var fid := String((GameData.continents[ci]["factions"] as Array)[0]["id"])
+		var taken := 0
+		for cu in CardDatabase.units_of_continent(cid):
+			if String(cu["chess"]) != "pawn" and String(cu["faction"]) == fid and taken < 2:
+				taken += 1
+				fourteen.append({"card_id": String(cu["id"]), "stars": 1, "cell": Vector2i(fourteen.size() & 7, 7 - (fourteen.size() >> 3))})
+				if not (cid == "machina" and taken == 2):
+					thirteen.append({"card_id": String(cu["id"]), "stars": 1, "cell": Vector2i(thirteen.size() & 7, 7 - (thirteen.size() >> 3))})
+	var drak_champ := String(GameData.find_faction("drakhan").get("champion", ""))
+	var se := BattleEngine.new()
+	se.setup({"seed": 3, "sides": [{"units": fourteen, "champion": champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
+	check(fourteen.size() == 14 and se.log_lines.any(func(l): return String(l).contains("Continent Bond - Royal Standard")), "Continent Bond: 14 units (2 of one faction per continent) give every unit the effect of the Aetherion King")
+	var sd := BattleEngine.new()
+	sd.setup({"seed": 3, "sides": [{"units": fourteen, "champion": drak_champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
+	check(sd.log_lines.any(func(l): return String(l).contains("Continent Bond - War Fever")) and not sd.log_lines.any(func(l): return String(l).contains("Royal Standard")), "Continent Bond: a Drakmor King gets War Fever only (the effect follows the King's continent)")
+	var s13 := BattleEngine.new()
+	s13.setup({"seed": 3, "sides": [{"units": thirteen, "champion": champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
+	check(not s13.log_lines.any(func(l): return String(l).contains("Continent Bond")), "Continent Bond: one continent short (13 units) gives nothing")
+	_test_synergy_fx_engine()
+
+
+## The engine really applies each synergy special effect in a fight (unit.fx -> _x() in the attack / damage / death hooks).
+func _test_synergy_fx_engine() -> void:
+	CardDatabase.set_continent("aetherion")
+	var pieces := CardDatabase.faction_pieces("solvaris")
+	var champ := String(GameData.find_faction("solvaris").get("champion", ""))
+	var mk := func() -> BattleEngine:
+		var en := BattleEngine.new()
+		en.setup({"seed": 5, "sides": [{"units": [{"card_id": String(pieces[0]["id"]), "stars": 1, "cell": Vector2i(0, 7)}, {"card_id": String(pieces[1]["id"]), "stars": 1, "cell": Vector2i(1, 7)}], "champion": champ, "supports": []},
+			{"units": [{"card_id": String(pieces[0]["id"]), "stars": 1, "cell": Vector2i(0, 0)}, {"card_id": String(pieces[1]["id"]), "stars": 1, "cell": Vector2i(1, 0)}], "champion": champ, "supports": []}]})
+		return en
+	var en: BattleEngine = mk.call()
+	var a: BattleUnit = en.units_of(0).filter(func(x): return not x.is_king)[0]
+	var b: BattleUnit = en.units_of(1).filter(func(x): return not x.is_king)[0]
+	a.fx = {}
+	a.extra = ""
+	b.fx = {}
+	b.extra = ""
+	b.shield = 0
+	# armor: the target takes less damage
+	var plain := en._damage(b, 100)
+	b.hp = b.max_hp
+	b.fx = {"armor": 0.3}
+	var armored := en._damage(b, 100)
+	check(armored < plain and armored == 70, "synergy fx armor: -30%% damage taken (%d vs %d)" % [armored, plain])
+	# evade: every 2nd hit is avoided
+	b.hp = b.max_hp
+	b.fx = {"evade": 2}
+	b.hits_taken = 0
+	var h1 := en._damage(b, 50)
+	var h2 := en._damage(b, 50)
+	check(h1 > 0 and h2 == 0, "synergy fx evade: every 2nd hit is avoided")
+	# burn / chill / stun_proc / lifesteal / thorns come from the attacker's / target's fx
+	b.hp = b.max_hp
+	b.fx = {"thorns": 0.5}
+	a.fx = {"burn": 0.2, "chill": 3, "stun_proc": 1, "lifesteal": 0.5}
+	a.hp = maxi(1, a.max_hp - 50)
+	var hp_a := a.hp
+	en._attack(a, b)
+	check(b.burn_until > en.tick and b.burn_amount > 0, "synergy fx burn sets the target ablaze")
+	check(b.slow_until > en.tick and b.stun_until > en.tick, "synergy fx chill slows and stun_proc stuns the target")
+	check(a.hp != hp_a, "synergy fx lifesteal / thorns change the attacker's HP")
+	# execute / opener
+	en = mk.call()
+	a = en.units_of(0).filter(func(x): return not x.is_king)[0]
+	b = en.units_of(1).filter(func(x): return not x.is_king)[0]
+	a.fx = {"execute": 1.0}
+	a.extra = ""
+	b.hp = maxi(1, int(b.max_hp * 0.2))
+	var base := en.atk_now(a)
+	var before := b.hp
+	b.shield = 0
+	en._attack(a, b)
+	check(before - maxi(b.hp, 0) >= base, "synergy fx execute: bonus damage against a wounded target")
+	# frenzy / rage / aura_atk feed atk_now
+	a.fx = {"frenzy": 0.1, "rage": 0.5}
+	a.kills = 3
+	a.hp = a.max_hp / 4
+	check(en.atk_now(a) > int(round(a.base_atk * 1.3)), "synergy fx frenzy + rage raise ATK")
+	# second_life / last_rites / death_burst on death
+	en = mk.call()
+	a = en.units_of(0).filter(func(x): return not x.is_king)[0]
+	a.fx = {"second_life": 0.4}
+	a.extra = ""
+	a.shield = 0
+	en._kill(a)
+	check(a.alive and a.hp == maxi(1, int(a.max_hp * 0.4)), "synergy fx second_life: returns once")
+	en._kill(a)
+	check(not a.alive, "second_life only works once")

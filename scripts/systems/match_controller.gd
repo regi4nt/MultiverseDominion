@@ -44,6 +44,7 @@ var wager: int = 0  # Arena wager: the stake was paid at the start; a human win 
 var wager_odds: float = 2.0
 ## Arena "Random map": the continent was drawn, so the human also gets its in-game bonus (data/continents.json random_bonus.ingame).
 var random_map: bool = false
+var first_seat: int = 0  # seat that opens round 1 (random in Journey / Arena / Chaos); a round ends when play returns to it
 var chaos: bool = false  # Chaos Mode: the 40-tile board (see BoardBuilder.configure)
 var wager_settled: bool = false
 var match_difficulty: String = "normal"  # difficulty chosen for the match: sets everyone's Life and the coin reward
@@ -145,7 +146,8 @@ func setup(cfg: Dictionary) -> void:
 		if team_mode:
 			players[i].team = i % 2  # turn order alternates: A, B, A, B
 
-	current = 0
+	first_seat = (rng.randi() % players.size()) if (bool(cfg.get("random_first", false)) and not tutorial) else 0
+	current = first_seat
 	round_number = 1
 	state = State.AWAIT_ROLL
 	pending = {}
@@ -235,8 +237,27 @@ func _make_player(id: int, faction_id: String, is_ai: bool, difficulty: String, 
 func _init_army(p: PlayerState) -> void:
 	if p.is_ai or not human_present:
 		p.deck = Deck.create_default()
+		# An AI deck is built like the player's default deck, from the King's OWN continent and faction (8 Pawns + the 7 pieces of its faction),
+		# whatever continent the match is played on. A Pawn takes the faction of its slot in the King's continent (CardDatabase.effective_faction),
+		# so the 8 Pawns give 2 units of every faction of that continent: Faction Tier and Grand Army (Faction) work for it like for a player.
+		var ai_cont := GameData.continent_of_faction(p.faction_id)
+		if ai_cont != "" and ai_cont != String(continent["id"]):
+			var ai_units: Array[String] = []
+			for au in CardDatabase.units_of_continent(ai_cont):
+				if String(au.get("chess", "")) == "pawn" or String(au.get("faction", "")) == p.faction_id:
+					ai_units.append(String(au["id"]))
+			if ai_units.size() == Deck.UNIT_SLOTS:
+				p.deck.continent_id = ai_cont
+				p.deck.unit_ids = ai_units
 	else:
 		p.deck = SaveManager.get_deck(String(continent["id"]))  # the player's own unit loadout of this continent
+		# A King foreign to this continent may bring the units of HIS continent (a saved custom loadout), so King and units share a
+		# continent and Grand Army (Faction) can be active here (e.g. King Astralis with Arcanum units on Aetherion).
+		var king_cont := GameData.continent_of_faction(String(GameData.get_champion(p.champion_id).get("faction", "")))
+		if king_cont != "" and king_cont != String(continent["id"]):
+			var kdeck := SaveManager.get_deck(king_cont)
+			if not kdeck.unit_ids.is_empty():
+				p.deck = kdeck
 	p.deck.champion_id = p.champion_id
 	p.battle_deck = BattleDeck.new(p.deck, rng)
 	p.roster = UnitRoster.new()
@@ -674,6 +695,7 @@ func _advance_turn() -> void:
 		current += 1
 		if current >= n:
 			current = 0
+		if current == first_seat:  # play is back at the opening seat: a full round has been played
 			wrapped = true
 		var np := players[current]
 		if not np.alive:
@@ -734,7 +756,7 @@ func _warp(p: PlayerState, dest: int, label: String) -> void:
 
 
 func _give_start_bonus(p: PlayerState) -> void:
-	var bonus := int(GameData.b("start_bonus")) + WorldMods.start_bonus_extra
+	var bonus := int(GameData.b("chaos_start_bonus") if chaos else GameData.b("start_bonus")) + WorldMods.start_bonus_extra  # Chaos: the Gate is passed 2.5x as often, so it pays less
 	if p.has_passive("royal_treasury"):
 		bonus = int(bonus * (1.0 + p.passive_value))
 	if _is_human(p):
@@ -1726,7 +1748,7 @@ func to_dict() -> Dictionary:
 	for t in tiles:
 		tl.append([t.owner_id, t.portal_active, t.level, t.lease_left, t.lease_paid])
 	return {
-		"version": SAVE_FORMAT, "continent_id": continent["id"], "round": round_number, "current": current,
+		"version": SAVE_FORMAT, "continent_id": continent["id"], "round": round_number, "current": current, "first_seat": first_seat,
 		"state": int(state), "last_dice": [last_dice.x, last_dice.y], "winner_id": winner_id,
 		"human_present": human_present, "team_mode": team_mode, "winner_team": winner_team, "roll_double": _roll_was_double, "extra_roll": _extra_roll, "bonus_rolls": _bonus_rolls,
 		"tutorial": tutorial, "difficulty": match_difficulty, "journey": journey, "wager": wager, "wager_odds": wager_odds, "random_map": random_map, "chaos": chaos, "wager_settled": wager_settled, "round_limit": round_limit, "market": market_change, "pot": casino_pot, "tutorial_seen": tutorial_seen.duplicate(),
@@ -1824,6 +1846,7 @@ static func from_dict(d: Dictionary) -> MatchController:
 		c.tutorial_seen.append(String(id))
 	c.round_number = int(d["round"])
 	c.current = int(d["current"])
+	c.first_seat = int(d.get("first_seat", 0))
 	c.state = int(d["state"]) as State
 	c.last_dice = Vector2i(int(d["last_dice"][0]), int(d["last_dice"][1]))
 	c.winner_id = int(d["winner_id"])

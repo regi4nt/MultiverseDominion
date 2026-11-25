@@ -101,7 +101,8 @@ func _build(width_hint: float) -> void:
 		remove_child(_root)
 		_root.queue_free()
 	var vp := get_viewport().get_visible_rect().size
-	var panel_w := clampf(maxf(width_hint, 540.0), 320.0, vp.x - 48.0)
+	var ins := UiTheme.safe_insets()  # a wide dialog must not slide under the camera bezel
+	var panel_w := clampf(maxf(width_hint, 540.0), 320.0, vp.x - 48.0 - ins.x - ins.y)
 
 	_root = Control.new()
 	_root.theme = UiTheme.get_theme()  # a CanvasLayer does not pass the scene's theme down
@@ -115,10 +116,12 @@ func _build(width_hint: float) -> void:
 	dim.gui_input.connect(_on_backdrop_input)
 	_root.add_child(dim)
 
+	var safe := UiTheme.make_margin(0)  # centres the panel in the SAFE area (the dim above stays full-bleed)
+	safe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(safe)
 	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(center)
+	safe.add_child(center)
 
 	var accent := _tone_color()
 	var panel := PanelContainer.new()

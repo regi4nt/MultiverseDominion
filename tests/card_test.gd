@@ -38,7 +38,7 @@ func _ready() -> void:
 	var rt := Deck.from_dict(d.to_dict())
 	check(rt.card_list() == d.card_list(), "deck dict round-trip")
 
-	# Custom unit loadout: 15 unit types of ONE continent, factions mixed freely
+	# Custom unit loadout: 15 unit types, factions (and continents) mixed freely
 	CardDatabase.set_continent("aetherion")
 	var mix := Deck.create_default()
 	mix.continent_id = "aetherion"
@@ -56,14 +56,19 @@ func _ready() -> void:
 	check(not short.validate().is_empty(), "14 unit types is invalid")
 	var foreign := Deck.from_dict(mix.to_dict())
 	var arc_ids := CardDatabase.continent_unit_ids("arcanum")
-	foreign.unit_ids[14] = arc_ids[arc_ids.size() - 1]  # a piece of Arcanum in an Aetherion deck
-	check(not foreign.validate().is_empty(), "a unit card of another continent is invalid")
+	foreign.unit_ids[14] = arc_ids[arc_ids.size() - 1]  # a piece of Arcanum in an Aetherion deck: a mixed-continent deck is valid now
+	check(foreign.validate().is_empty() and foreign.card_list().size() == 151, "a deck may hold unit cards of several continents")
+	var unknown := Deck.from_dict(mix.to_dict())
+	unknown.unit_ids[14] = "no_such_unit"
+	check(not unknown.validate().is_empty(), "an unknown unit card is invalid")
 	var dupu := Deck.from_dict(mix.to_dict())
 	dupu.unit_ids[1] = dupu.unit_ids[0]
 	check(not dupu.validate().is_empty(), "a duplicate unit card is invalid")
 	check(Deck.from_dict(mix.to_dict()).card_list() == mix.card_list(), "custom loadout survives a dict round-trip")
 	foreign.sanitize_units()
-	check(foreign.unit_ids.is_empty(), "an invalid saved loadout falls back to the default")
+	check(foreign.unit_ids.size() == 15, "a mixed-continent loadout survives sanitize_units")
+	unknown.sanitize_units()
+	check(unknown.unit_ids.is_empty(), "an invalid saved loadout falls back to the default")
 	var saved_decks: Dictionary = SaveManager.data["decks"].duplicate(true)
 	SaveManager.set_deck(mix)
 	var back := SaveManager.get_deck("aetherion")
@@ -271,13 +276,15 @@ func _ready() -> void:
 			{"card_id": _piece_with_buff("ward", "rook"), "stars": 1, "cell": Vector2i(6, 5)}, {"card_id": _piece_with_buff("last_rites", "bishop"), "stars": 1, "cell": Vector2i(0, 7)}, {"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(1, 7)}], "champion": "champion_solvaris", "supports": []},
 		{"units": [{"card_id": "pawn_sun_squire", "stars": 1, "cell": Vector2i(4, 4)}], "champion": "champion_nocthyr", "supports": []}]})
 	var mine := eb.units_of(0)
+	for mu in mine:
+		mu.fx = {}  # synergy special effects (role / faction traits) stack on top of the card buff: measure the card buffs alone
 	check(eb._damage(mine[0], 100) == 90, "Oath of the Crown: Royal Guard takes 10% less damage")
 	var dodged := 0
 	for i in range(4):
 		if eb._damage(mine[1], 10) == 0:
 			dodged += 1
 	check(dodged == 1, "Slippery Fingers: every 4th hit is avoided (%d of 4)" % dodged)
-	check(mine[3].shield == int(round(mine[3].max_hp * mine[3].extra_value)) and mine[3].shield > 0, "Ward: the Rook starts with a shield")
+	check(mine[3].shield >= int(round(mine[3].max_hp * mine[3].extra_value)) and mine[3].shield > 0, "Ward: the Rook starts with a shield")
 	var foe: BattleUnit = eb.units_of(1)[0]
 	var foe_hp := foe.hp
 	eb._attack(foe, mine[2])
@@ -326,10 +333,10 @@ func _ready() -> void:
 	for bu in e.units:
 		(f0 if bu.side == 0 else f1).append(bu.faction)
 	check(f0 == ["valdoria", "valdoria"] and f1 == ["elarion", "elarion"], "faction pieces fight for their own faction (%s / %s)" % [str(f0), str(f1)])
-	# Valdoria's King passive (Iron Discipline, team_hp) multiplies on top of the +5% Faction Synergy
+	# Valdoria's King passive (Iron Discipline, team_hp) multiplies on top of the Faction Tier (no flat HP bonus now)
 	var kp_v: Dictionary = GameData.king_passives.get("champion_valdoria", {})
 	var kp_hp := float(kp_v.get("value", 0.0)) if kp_v.get("type", "") == "team_hp" else 0.0
-	check(e.units[0].max_hp == int(round(float(CardDatabase.unit_stats(vp[0]["id"], 1)["hp"]) * 1.05 * (1.0 + kp_hp))), "two own pieces give the side's Faction Synergy (+5%%, King passive HP +%d%%)" % int(round(kp_hp * 100.0)))
+	check(e.units[0].max_hp == int(round(float(CardDatabase.unit_stats(vp[0]["id"], 1)["hp"]) * (1.0 + kp_hp))), "two own pieces give no flat Faction Tier HP bonus (King passive HP +%d%%)" % int(round(kp_hp * 100.0)))
 
 	# Old saves only own the Aetherion set: ensure_collection adds the new continents' cards (9 copies each)
 	var saved: Dictionary = SaveManager.data.duplicate(true)

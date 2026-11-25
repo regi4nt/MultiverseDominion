@@ -2,10 +2,11 @@
 
 Status: **PHASE 1 (Foundation) + PHASE 2 (Territory Board) + PHASE 3 (Card System) + PHASE 4 (Battle System) + PHASE 5 (Game Loop) + PHASE 6 (Content) + PHASE 7 (Android) — selesai di sisi kode; **APK belum dibangun/diuji di perangkat** (lihat BUILD_ANDROID.md).**
 Proyek berjalan di Godot 4.7 (renderer GL Compatibility). Menu utama: New Match (Journey / Arena / Battle Chess / Tutorial), Card Hub (Collection / Deck / Info), Shop, Events (Mission / Achievement / Chests), Profile, Settings. Sebelum perubahan batas ronde per mode, diuji dengan Godot headless: import bersih, game AI penuh selesai, UI smoke test lolos; setelah perubahan itu tes belum dijalankan ulang.
+Perubahan terbaru (safe area notch, judul menu di kiri bawah, START di kanan bawah, zoom awal papan 100 petak, tombol Fit / 1:1, tab Info) ditulis tanpa Godot di tempat kerjanya, jadi **belum dijalankan sama sekali**: jalankan `tools/run_tests.sh` dan cek di perangkat (BUILD_ANDROID.md bagian 4).
 
 ## Menjalankan
 1. Buka Godot 4.7 -> Import -> pilih `project.godot` (biarkan import pertama selesai).
-2. Tekan F5. Alur: Main Menu -> NEW MATCH -> pilih OFFLINE (Journey / Arena / Battle Chess / Tutorial) -> untuk Journey dan Arena: pemain / difficulty / continent -> START MATCH (faksi diambil dari Deck) (lihat bagian "New Match").
+2. Tekan F5. Alur: Main Menu -> NEW MATCH -> pilih OFFLINE (Journey / Arena / Battle Chess / Tutorial) -> untuk Arena: pemain / difficulty / taruhan / continent; untuk Journey: continent / taruhan (tanpa pilihan difficulty: level AI mengikuti trofi, Easy 0+ / Normal 400+ / Hard 1100+) -> START MATCH (faksi diambil dari Deck) (lihat bagian "New Match").
 3. Tes otomatis (tanpa UI):
    `godot --headless --path . res://tests/sim_test.tscn` -> harus mencetak `TEST RESULT: PASS`.
    `godot --headless --path . res://tests/ui_smoke.tscn` -> memainkan papan lewat scene asli.
@@ -63,12 +64,13 @@ Proyek berjalan di Godot 4.7 (renderer GL Compatibility). Menu utama: New Match 
 
 ## Nyawa & hadiah per difficulty
 - **Nyawa (Life)** awal semua penguasa dalam match mengikuti difficulty: **Easy 5, Normal 3, Hard 1** (`data/balance.json` -> `life_by_difficulty`, `GameData.life_for`). Angka ini juga batas maksimal heal (Territory Shop, Royal Pardon, dadu Healing, dst.): `PlayerState.max_life`. Pada Hard, kekalahan duel atau bangkrut pertama langsung menyingkirkan penguasa. Tutorial memakai AI Normal dan 3 Life. Tersimpan di save/resume (`max_life`, `difficulty`); save lama dianggap 3.
+- **Difficulty Journey mengikuti trofi** (`balance.json` -> `journey_difficulty_by_trophies`, `SaveManager.journey_difficulty()`): Easy dari 0 trofi, Normal dari 400, Hard dari 1100. Nyawa, gold awal, batas ronde, hadiah, perubahan trofi, dan odds taruhan memakai tingkat itu; naik/turunnya trofi langsung mengubah tingkat match berikutnya. Arena tetap memilih difficulty sendiri.
 - **Hadiah Aether Coins setelah match** (Journey / Arena, `ShopSystem.WIN_REWARD_BY_DIFF` / `LOSS_REWARD_BY_DIFF`): Easy menang +100 / kalah +25, Normal +150 / +50, Hard +300 / +75. Bonus random-map Arena (hanya saat menang) dihitung dari hadiah menang difficulty yang dipilih; bonus benua berupa persen/tambahan coin dan **XP** (bukan lagi fragment: Arcanum +20 XP, Sylvaris +15 XP +15 coins, Eclipsia +25 XP; data di `data/continents.json` -> `random_bonus.xp`). Bonus XP digabung dengan XP match sehingga ikut memicu hadiah naik level.
 - **Battle Chess** (`PRACTICE_WIN_BY_DIFF` / `PRACTICE_LOSS_BY_DIFF`): Easy +50 / +10, Normal +75 / +15, Hard +150 / +25. Battle Chess tidak memakai Life.
 - Layar New Match menampilkan Life dan hadiah difficulty yang sedang dipilih; layar hasil menampilkan difficulty di baris coin. Taruhan (wager) tetap memakai pengali odds sendiri di atas hadiah ini.
 
 ## Taruhan / Wager (Arena dan Battle Chess)
-- Sebelum bertanding pemain bisa mempertaruhkan **Aether Coins** lewat **slider kelipatan 10** (0 = None, maksimal 1000, tombol - / + menggeser 10; batas atas mengikuti saldo, `ShopSystem.WAGER_STEP` / `WAGER_MAX`). Journey dan Tutorial tidak punya taruhan.
+- Sebelum bertanding pemain bisa mempertaruhkan **Aether Coins** lewat **slider kelipatan 10** (0 = None, maksimal 1000, tombol - / + menggeser 10; batas atas mengikuti saldo, `ShopSystem.WAGER_STEP` / `WAGER_MAX`). **Journey sekarang punya taruhan** (tanpa pilihan difficulty: level AI Journey mengikuti trofi, jadi odds taruhan juga ikut: Easy x1.5, Normal x2.0, Hard x3.0); Tutorial tidak punya taruhan.
 - **Arena**: panel *Wager* ada di kolom Match (di bawah Difficulty). **Battle Chess**: menekan kartunya membuka dialog kesulitan + taruhan, lalu tombol FIGHT.
 - Stake dibayar **saat match dimulai** (`SaveManager.place_wager`). Menang: dibayar **stake x odds** (stake sudah termasuk), kalah: stake hangus. Battle Chess seri: stake dikembalikan.
   Keluar di tengah Battle Chess = stake hangus. Arena: stake ikut tersimpan di match yang bisa dilanjutkan (`MatchController.wager`), diselesaikan satu kali (`wager_settled`).
@@ -160,11 +162,13 @@ Satu scene (`scripts/ui/match_setup.gd`) dengan dua tampilan. Tombol Back / Esc 
 - **Faksi dipilih di Deck**: tab **Faction** (dulu "King") di Card Hub menampilkan 28 faksi per benua. Faksi dari benua yang belum terbuka **terkunci** (tombol nonaktif,
   "Locked - unlock X in Journey") dan tidak bisa dipilih; faksi 4 benua yang terbuka bisa dipilih. Faksi terkunci terbuka otomatis saat benuanya dibuka lewat Journey.
   King pilihan = faksi pemain di setiap match dan di Battle Chess (`SaveManager.player_champion_id()` / `player_faction_id()`; King dari faksi terkunci di save lama jatuh kembali ke faksi terbuka pertama).
-  Faksi pemain boleh dari benua lain daripada benua match (musuh AI tetap dari faksi benua match); `GameData.find_faction` mencari di semua benua.
+  Faksi pemain boleh dari benua lain daripada benua match. Lawan AI Arena (termasuk Chaos) diundi dari faksi SEMUA benua (`any_continent_enemies`); di Journey lawan tetap dari faksi benua match. `GameData.find_faction` mencari di semua benua.
 - **Aturan home-continent** (`GameData.is_home_faction`): faksi tidak dibatasi benua dan bisa dimainkan di benua lain (hanya di luar Journey, mis. Arena; faksi tetap harus sudah terbuka).
-  Bonus faksi hanya aktif jika faksi dimainkan di **benua asalnya** (seluruh bidak dek = benua yang sama): **buff King** baru (`data/king_buffs.json`, 28 buff, dipasang saat King masuk Last Stand di `BattleEngine._enter_king`), **buff kartu unit** (`card_buffs.json`, dimatikan di `BattleEngine._spawn_unit` lewat `_home_bonus`) dan **Faction Synergy** 2/4/6 unit. Kartu unit dek selalu milik faksi benua yang dimainkan, jadi Faction Synergy otomatis terikat benua;
-  `BattleEngine._synergy` dan panel Synergy juga menolak faksi non-home sebagai pengaman (mis. bidak shared milik King asing).
-  Di benua asing faksi tetap bisa main, tanpa buff King, tanpa buff kartu, dan tanpa Faction Synergy (passive King tetap aktif di mana pun) untuk faksi itu (Role Synergy dan modifier benua tidak terpengaruh).
+  King asing = King yang faksinya bukan faksi benua match (`BattleEngine._home_bonus` = false). Yang tetap aktif untuk King asing: **passive King**, **Faction Tier**, **Grand Army (Faction)**, Role Synergy (trait role dan kombo duo), dan modifier benua.
+  Yang mati untuk King asing: **buff King** (`king_buffs.json`) dan **buff kartu unit** (`card_buffs.json`).
+  Faction Tier hanya menghitung unit yang faksinya SAMA dengan King (`BattleEngine._synergy`, `_faction_counts`). Grand Army (Faction) memakai hitungan terpisah semua faksi (`_continent_counts`) dan dinilai terhadap benua King ATAU benua match (`_army_active`), lihat bagian "Sinergi".
+  Pawn memakai id yang sama di semua benua; faksinya mengikuti slot Pawn di **benua King** (`CardDatabase.effective_faction`), jadi Pawn King asing ikut faksi benua King.
+  **Unit King asing**: pemain dengan King asing memakai loadout unit tersimpan untuk benua King (bila ada loadout kustom, `MatchController._init_army`), mis. King Astralis dengan unit Arcanum bermain di Aetherion; tanpa loadout itu dipakai dek benua match. Dek AI lihat bagian "Dek AI".
   **Journey wajib faksi asal**: tombol START MATCH nonaktif jika faksi di Deck bukan faksi benua Journey. Setup menampilkan catatan status bonus.
 - **Battle Chess**: membuka scene Battle (sebelumnya "Battle Practice"; sekarang bukan latihan: setiap battle memberi Aether Coins). **Tutorial**: match panduan seperti sebelumnya.
 - Perubahan perilaku: sebelumnya kemenangan di mode apa pun membuka benua berikutnya secara berurutan; sekarang hanya Journey, lewat mastery dan pilihan pemain. Benua yang sudah terbuka di save lama tetap terbuka (tetapi tidak memberi hak pilih; kemenangan lama tidak tercatat per faksi).
@@ -190,7 +194,7 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
 - Kapasitas catur (`CapacitySystem`): Pawn 1, Rook/Knight/Bishop 2, Queen 4, King 6; level 3 = 9 ... level 10 = 30.
   Asumsi: King/Champion tidak dihitung ke kapasitas deploy (hanya masuk saat Last Stand) — konfirmasi di Phase 4.
 - `BattleDeck`: tumpukan 135 kartu untuk Battle Shop (5 kartu per refresh, sisa kembali ke tumpukan).
-- Main Menu -> Card Hub (dulu "Card Hub"; nama di `GameSession.CARD_HUB_NAME`): satu layar dengan tiga tab. Tab Collection (filter, detail, stat 1/2/3 bintang), tab Deck (pilih Champion + tepat 15 Support, simpan ke save), dan tab **Info** (panduan: aturan dek, **Territory** (dadu, jenis petak, rent/region, Tax-Duel-Conquest, cara menang), 7 role + skill, sinergi faksi/role, dasar battle; semua angka dibaca dari data game). Card Hub juga bisa dibuka dari **Territory Board** (tombol Card Hub di kolom pemain): tampil sebagai overlay, match berhenti sementara (tidak disimpan/dimuat ulang), benua match dipulihkan saat ditutup, dan dek yang disimpan berlaku untuk match berikutnya.
+- Main Menu -> Card Hub (dulu "Card Hub"; nama di `GameSession.CARD_HUB_NAME`): satu layar dengan empat tab: **Lineup** (tab pembuka: formasi awal 8x4 dan urutan kartu Support; hasil disimpan per benua), Collection (filter, detail, stat 1/2/3 bintang), Deck (pilih Champion + tepat 15 Support, simpan ke save), dan tab **Info** (panduan: aturan dek, **Territory** (dadu, jenis petak, rent/region, Tax-Duel-Conquest, cara menang), 7 role + skill, sinergi faksi/role, dasar battle; semua angka dibaca dari data game). Card Hub juga bisa dibuka dari **Territory Board** (tombol Card Hub di kolom pemain): tampil sebagai overlay, match berhenti sementara (tidak disimpan/dimuat ulang), benua match dipulihkan saat ditutup, dan dek yang disimpan berlaku untuk match berikutnya.
 - Koleksi awal: semua unit x9 dan 15 dari 105 Support; 90 Support terkunci (cara membuka: Shop (Crystal); kemenangan match dan peti tidak lagi membuka kartu).
 
 ## Deck (Main Menu -> Card Hub -> tab Deck)
@@ -198,12 +202,12 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
   Tab: **Units n / 15** (filter per faksi), **Support n / 15** (filter per kategori), **Faction** (kartu faksi per benua dengan gaya yang sama; panel kiri menampilkan King terpilih + skill-nya; faksi terkunci diberi overlay LOCKED).
   Ketuk kartu koleksi untuk memasang (kartu yang sudah di deck tampak redup; ketuk lagi untuk melepas). Jika deck penuh, kartu itu "dipegang" dan semua slot menyala emas:
   ketuk satu kartu deck untuk menukarnya. Ketuk kartu di deck tanpa memegang kartu = melepasnya. Tooltip menampilkan skill/deskripsi.
-- **Kartu Unit mengikuti benua**: di tab Units, chip benua muncul begitu ada lebih dari satu benua terbuka (benua terkunci disembunyikan); yang bisa dipasang = 8 Pawn + 28 bidak dari 4 faksi benua itu. Faksi **boleh dicampur** selama
-  satu benua. Tiap benua punya susunan unit sendiri (disimpan per benua). Tiap tipe unit = 9 salinan (15 x 9 = 135).
+- **Kartu Unit boleh lintas benua**: di tab Units, chip benua (Cards: <benua>) memilih kartu benua mana yang ditampilkan di pool, sedangkan isi dek tetap tersimpan; yang bisa dipasang = 8 Pawn + bidak dari semua faksi benua terbuka. Faksi dan benua **boleh dicampur** (15 tipe unit), dan 2 unit dari satu faksi di setiap ke-7 benua sekaligus di lapangan mengaktifkan Continent Bond (efek benua King).
+  Tiap benua map tetap punya susunan unit sendiri (disimpan per benua). Tiap tipe unit = 9 salinan (15 x 9 = 135).
 - **King tidak terikat benua** (semua 28 King bisa dipilih) dan Support dipakai bersama semua benua. Total dek tetap 151 kartu.
 - Save hanya aktif jika 15 unit + 15 support terisi. "Reset to default" mengembalikan unit bawaan faksi King.
-- Di match, kartu unit = susunan benua yang dimainkan; King mengikuti faksi yang dipilih di Deck; di Battle Chess (Battle Practice) King mengikuti pilihan di dek.
-  Lawan AI tetap memakai dek bawaan faksinya.
+- Di match, kartu unit pemain = susunan benua yang dimainkan; bila King asing dan ada loadout tersimpan untuk benua King, loadout itu yang dipakai. King mengikuti faksi yang dipilih di Deck; di Battle Chess King mengikuti pilihan di dek.
+  **Dek AI**: dibuat sama seperti dek default pemain dari King-nya (15 tipe unit: 8 Pawn + 7 bidak faksi King, 9 salinan masing-masing). Bila King AI bukan dari benua match (Arena), unitnya tetap dari benua dan faksi King-nya (`MatchController._init_army`), bukan dari benua match; Pawn ikut faksi benua King sehingga tiap faksi benua King mendapat 2 Pawn.
 
 ## Battle System (Phase 4) — Main Menu -> New Match -> Offline -> Battle Chess (dulu "Battle Practice")
 - Grid 8x8; kamu di baris 4-7 (area 4x8), lawan di baris 0-3. Tanpa kontrol manual: semua unit bergerak/menyerang sendiri.
@@ -211,7 +215,7 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
   Deploy/Return (ketuk unit lalu ketuk petak), Auto Deploy. Satu mata uang (Dominion Gold); "budget" hanya batas belanja.
 - Engine (`BattleEngine`, deterministik per seed): 1 tick = 0.25 detik; prioritas target per role (Assassin = HP terendah,
   Marksman/Mage = musuh terlemah dalam jangkauan, lainnya = terdekat), range Chebyshev, gerak BFS 8 arah,
-  15 skill unit, Faction Synergy (2 unit sefaksi +5%, 4 = +15%, 6 = +30% HP/ATK) dan Role Synergy (2 unit semisi role +8%, 4 = +20%, 6 = +35%; Tank/Support = HP, Assassin/Mage/Marksman = ATK, Fighter/Controller = HP+ATK 60%).
+  15 skill unit, dan sinergi bernama (`ComboSystem`, `scripts/systems/combo_system.gd`): lihat bagian "Sinergi" di bawah.
 - **Summon King**: pemain bisa memanggil King lebih awal tanpa menunggu unit habis dengan membayar energy (`king_summon_energy` = 8, tombol di panel King; `BattleEngine.summon_king`). AI tetap hanya lewat Last Stand.
 - **Champion Last Stand**: Champion otomatis masuk arena saat semua unit biasa pihaknya kalah (dan langsung masuk jika tanpa unit),
   lalu memakai skill aktifnya. Champion kalah = pihak itu kalah. Stat King (HP 310-490, ATK 26-35) sengaja lebih besar daripada unit mana pun (maks HP 290 / ATK 25); tidak ada lagi pengali x3 (`champion_hp_mult` = 1.0).
@@ -232,6 +236,106 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
 - Diuji: 90 pertarungan AI-vs-AI selesai (terlama 85 tick), tanpa tumpang-tindih sel, aturan Last Stand tidak pernah dilanggar,
   tidak ada bias sisi (43/47), seed sama = hasil sama.
 
+## Sinergi (`ComboSystem`)
+**Semua sinergi adalah efek spesial, bukan bonus stat** (tidak ada bonus HP / ATK / shield / move / range). Efek semua sinergi aktif ditambahkan; mesinnya sama dengan buff kartu benua (`BattleEngine._x`, `BattleUnit.fx`). Bentuk data efek: `{"to": "all" atau daftar role, <efek>: nilai}`.
+
+**Efek** (`ComboSystem.FX_TYPES`): armor (damage diterima -x), evade (setiap hit ke-N dihindari), thorns (memantulkan x damage), execute (+x damage ke musuh di bawah 30% HP), frenzy (+x ATK per kill, maks 5), rage (+x ATK di bawah setengah HP), aura_atk (unit di sebelahnya +x ATK), burn (x ATK tiap 4 tick selama 12 tick), stun_proc (setiap serangan ke-N membuat target pingsan 1 tick), splash (x damage ke musuh di sebelah target), lifesteal, chill (target diperlambat x tick), opener (serangan pertama +x), last_rites (saat mati menyembuhkan sekutu di sebelahnya x% HP), death_burst (saat mati meledak x ATK ke musuh di sebelahnya), mend_self (menyembuhkan diri x% HP tiap 8 tick), guard (sekutu dalam 2 petak -x damage), second_life (bangkit sekali dengan x% HP).
+Nilai berupa pecahan (0,10 = 10%), kecuali hitungan (evade, stun_proc: makin kecil makin kuat, tidak pernah di bawah `FX_COUNT_MIN` = 3) dan durasi (chill). Penumpukan: hitungan ambil yang terendah, chill dan second_life ambil yang tertinggi; batas atas di `FX_CAP` (armor 60%, guard 50%, second_life 90%, thorns 100%).
+
+**1. Faction Tier** (`faction_tier`): trait faksi per tier **Rally 2 / Legion 4 / Host 6** unit SEFAKSI dengan King (unit faksi lain tidak mendapat Faction Tier). Satu baris di panel COMBOS, log battle, dan tab Info; tanpa bonus HP / ATK flat. Tetap aktif di benua mana pun, juga untuk King asing. Pawn ikut faksi slot-nya di benua King. Trait tiap faksi (`FACTION_TRAITS`, nilai Rally / Legion / Host; hanya mengenai unit faksi itu):
+
+| Faksi | Trait | Efek |
+|---|---|---|
+| Solvaris | Dawn Ward | semua: mend_self 2/3/4% |
+| Nocthyr | Nightfall | Assassin/Marksman: opener 15/30/50% |
+| Valdoria | Rally the Banner | Fighter: aura_atk 3/5/8%; Support: mend_self 2/3/5% |
+| Elarion | Moonlit Focus | Mage/Controller: chill 2/3/4 tick |
+| Astralis | Star Charts | Mage/Marksman: evade tiap ke-6/5/4; Mage: splash 0/0/20% |
+| Ignivar | Wildfire | semua: burn 5/8/12% |
+| Cryndel | Frost Armor | Tank/Fighter/Support: armor 4/7/10%; Tank/Fighter/Support: chill 0/2/3 tick |
+| Umbrael | Umbral Step | Assassin/Mage: evade tiap ke-6/5/4; Assassin: opener 0/0/40% |
+| Ferrum | Forged Hulls | semua: armor 2/4/6% |
+| Voltrix | Overcharge | Marksman: stun_proc tiap ke-6/5/4 |
+| Chronex | Time Dilation | Tank/Fighter/Assassin: evade tiap ke-6/5/4; Tank/Fighter/Assassin: opener 0/0/30% |
+| Nexaris | Linked Network | Controller/Support: aura_atk 3/5/8%; semua: mend_self 1/2/3% |
+| Verdantia | Lifebloom | Support/Controller: mend_self 3/5/8% |
+| Besthara | Pack Instinct | Fighter/Assassin: frenzy 3/5/8% |
+| Floralis | Petal Veil | Support/Mage/Marksman: guard 3/5/8% |
+| Terragorn | Stone Skin | Tank/Fighter: armor 4/7/11% |
+| Drakhan | Dragon's Might | semua: rage 5/10/15% |
+| Inferna | Hellfire | semua: death_burst 15/30/50% |
+| Bloodfang | Bloodlust | Fighter/Assassin: lifesteal 4/7/10% |
+| Warborn | War Cry | semua: aura_atk 2/3/4% |
+| Abyssal | Crushing Depths | Tank/Mage: thorns 5/10/16% |
+| Pelagia | Tidal Blessing | Support/Controller/Mage: mend_self 2/3/5% |
+| Tempestra | Storm Surge | Assassin/Fighter: stun_proc tiap ke-7/6/5 |
+| Corsaria | Plunder | semua: execute 8/12/20% |
+| Solstice | Radiant Zenith | Tank/Support: armor 3/5/8%; semua: last_rites 3/5/8% |
+| Paradox | Paradox Loop | Marksman/Mage/Controller: evade tiap ke-7/6/5; Marksman/Mage/Controller: second_life 0/0/30% |
+| Eternis | Eternal Bulwark | Tank/Support/Mage: armor 3/5/8%; Tank/Support/Mage: second_life 0/0/25% |
+| Oblivion | Void Hunger | Assassin/Mage: lifesteal 5/8/12%; Assassin/Mage: execute 5/10/15% |
+
+**2. Trait role** (`ROLE_TRAITS`): satu per role, tier 2 / 4 / 6 unit satu role (satu role tidak perlu satu faksi):
+
+| Role | Trait | 2 unit | 4 unit | 6 unit |
+|---|---|---|---|---|
+| Tank | Iron Wall | Tank: armor 5% | Tank: armor 10%, thorns 10% | Tank: armor 15%, thorns 20% |
+| Support | Guardian Aura | Support: mend_self 3% | Support: mend_self 5%; semua: armor 3% | Support: mend_self 7%; semua: armor 5% |
+| Assassin | Shadow Strike | Assassin: execute 15% | Assassin: execute 30%, opener 25% | Assassin: execute 50%, opener 50% |
+| Mage | Arcane Surge | Mage: splash 15% | Mage: splash 25% | Mage: splash 40%, burn 15% |
+| Marksman | Eagle Eye | Marksman: chill 3 tick | Marksman: chill 5 tick, frenzy 4% | Marksman: chill 6 tick, frenzy 6% |
+| Fighter | Warband | Fighter: frenzy 4% | Fighter: frenzy 7%, rage 15% | Fighter: frenzy 10%, rage 30%, lifesteal 10% |
+| Controller | Tactician's Command | Controller: stun_proc tiap ke-5 | Controller: stun_proc tiap ke-4, aura_atk 5% | Controller: stun_proc tiap ke-3, aura_atk 8% |
+
+**3. Kombo duo** (`DUO_COMBOS`, 22 kombo): 6 unit dari KEDUA role (`DUO_UNITS` = 6); setiap pasangan dari 7 role punya kombo (21) + Grand Army. **Grand Army** adalah pengecualian: 2 unit dari tiap 7 role (14 unit, semua trait role aktif) karena 7 x 6 melebihi kapasitas 30.
+
+| Kombo | Syarat | Efek |
+|---|---|---|
+| Frontline Shield | Tank + Support | semua: armor 6% |
+| Glass Cannon | Assassin + Mage | Assassin/Mage: burn 15%, death_burst 40% |
+| Sniper's Nest | Marksman + Tank | Marksman: opener 40%, evade tiap ke-5 |
+| Pincer Strike | Assassin + Fighter | Assassin/Fighter: stun_proc tiap ke-4 |
+| Arcane Ward | Mage + Support | Mage: evade tiap ke-5 |
+| Battle Plan | Controller + Fighter | Fighter: frenzy 5% |
+| Vanguard Line | Tank + Fighter | Fighter: thorns 10%; Tank: guard 6% |
+| Command Post | Controller + Tank | Tank: armor 8% |
+| Field Medic | Support + Fighter | Fighter: mend_self 4% |
+| Covering Fire | Marksman + Support | Marksman: lifesteal 10% |
+| Spellblade | Mage + Fighter | Mage/Fighter: burn 12% |
+| Crossfire | Marksman + Assassin | Marksman/Assassin: execute 20% |
+| Arcane Tactics | Controller + Mage | Mage: chill 3 tick; Controller: mend_self 4% |
+| Ambush Plan | Assassin + Controller | Assassin: opener 50% |
+| Spell Bastion | Tank + Mage | Mage: armor 8%; Tank: thorns 10% |
+| War Council | Support + Controller | semua: mend_self 2% |
+| Bait and Strike | Tank + Assassin | Tank: thorns 15%; Assassin: opener 30% |
+| Venom Vial | Assassin + Support | Assassin: burn 20% |
+| Hold the Line | Fighter + Marksman | Fighter: armor 8%; Marksman: execute 15% |
+| Ranged Barrage | Mage + Marksman | Mage/Marksman: splash 15% |
+| Target Painting | Marksman + Controller | Marksman: execute 20%; Controller: chill 4 tick |
+| Grand Army | 7 role x 2 unit | semua: armor 5%, lifesteal 5% |
+
+**4. Grand Army (Faction)** (`FACTION_ARMY`): versi faksi dari Grand Army. Aktif bila SETIAP faksi dari satu benua punya minimal `FACTION_ARMY_MIN` = 2 unit di lapangan dan faksi-faksi itu berjumlah minimal `FACTION_ARMY_TOTAL` = 8 unit (4 faksi x 2). Efek: seluruh unit last_rites 10% dan mend_self 3%. Benua yang dinilai = benua King ATAU benua yang dimainkan (`BattleEngine._army_active`; panel Synergy menampilkan yang paling dekat terpenuhi), jadi King asing juga bisa mengaktifkannya. Bertumpuk dengan semua sinergi lain, tetapi **tidak** bersama Ultra (Ultra butuh satu faksi saja). Hitungan: `BattleEngine._continent_counts` (semua faksi benua, bukan hanya faksi King), `ComboSystem.faction_army_active / faction_army_lacking`.
+
+**5. Ultra** (`ULTRA_MIN` = 8 unit, `ULTRA_SCALE` = 1,5): tier di atas Host. Aktif bila SEMUA unit lineup memakai sinergi yang sama: satu faksi asal (trait faksi di kekuatan Host dibuat x1,5) atau satu role (trait role di kekuatan 6 unit x1,5). Persentase dan durasi x1,5, hitungan dibagi 1,5 (tidak di bawah 3). Ditambah **efek spesial Ultra** (flat, tidak ikut x1,5, hanya di Ultra):
+- Faksi, **Ultra Dominion**: semua unit lifesteal 8% dan frenzy 4%.
+- Role: Tank **Unbreakable** (Tank bangkit sekali di 30% HP); Support **Sanctuary** (seluruh pasukan armor 5%); Assassin **Phantom Rush** (evade tiap hit ke-3, opener +50%); Mage **Arcane Overreach** (burn 20%, splash 20%); Marksman **Deadeye Volley** (execute +30%, chill 4 tick); Fighter **Berserk Charge** (rage +40%, lifesteal 12%); Controller **Grand Strategy** (setiap serangan ke-6 seluruh pasukan membuat target pingsan).
+
+**6. Continent Bond** (`CONTINENT_BONDS`, `ComboSystem.bonds_for`, `bond_missing`): satu sinergi yang menyatukan ke-7 benua. Aktif bila di lapangan ada **2 unit dari SATU faksi di SETIAP benua** (`BOND_FACTION_UNITS` = 2; faksi mana pun dari benua itu, jadi 2 x 7 = 14 unit minimal; Pawn dan bidak bersama dihitung sebagai faksi King; unit tanpa faksi tidak dihitung). **Efeknya tergantung King**: seluruh unit mendapat efek bond **benua asal King** (hanya satu efek, lihat tabel), bukan efek benua lain. Contoh: King Drakhan (Drakmor) -> semua unit War Fever (rage 8%); King Solvaris (Aetherion) -> semua unit Royal Standard (armor 3%). Bertumpuk dengan semua sinergi lain, termasuk Ultra. Panel COMBOS menampilkan progres "Continent Bond: n / 7 continents" bila sudah ada 2+ benua yang tercukupi. **Dek boleh berisi kartu unit dari benua mana pun** (`Deck.validate`, `CardDatabase.any_unit_ids`): di tab Deck, baris chip "Cards: <benua>" memilih kartu benua mana yang ditampilkan di pool, dan isi dek tetap tersimpan. Bidak dari benua lain bertarung tanpa buff kartu benua map yang dimainkan (`BattleEngine._spawn_unit`). Efek per benua King:
+
+| Benua King | Nama | Efek (semua unit) |
+|---|---|---|
+| Aetherion | Royal Standard | armor 3% |
+| Arcanum | Arcane Resonance | splash 10% |
+| Machina | Clockwork Precision | opener 15% |
+| Sylvaris | Verdant Renewal | mend 2% |
+| Drakmor | War Fever | rage 8% |
+| Thalassia | Tidal Surge | chill 2 tick |
+| Eclipsia | Time Fold | evade tiap ke-8 |
+
+Logika: `BattleEngine._continent_unit_counts` (log `combo: Continent Bond`), `ComboSystem.bonds_for`, panel Synergy dan tab Info. Tes: `rules_test`.
+
+Angka-angka ini belum diseimbangkan lewat banyak simulasi; semuanya ada di `combo_system.gd`. Tab Info (Synergies) dan panel Synergy di layar Battle dibaca dari data yang sama.
+
 ## Game Loop (Phase 5) — Territory Encounter & Duel
 - Berhenti di wilayah lawan -> **pemilik** memilih **Tax** atau **Duel** (UI menampilkan tombol untuk pemain yang berhak menjawab).
 - Pemilik memilih Duel -> pengunjung boleh **Accept** atau **Refuse** (bayar rent + penalti `refuse_duel_penalty`, bisa diatur di `balance.json`).
@@ -240,7 +344,7 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
   Duel yang melibatkan pemain manusia tampil sebagai overlay Battle; duel AI vs AI diselesaikan instan (hasil masuk log).
 - Penyerang menang -> **Conquest** (ambil wilayah) atau **Victory Reward** (gold = 75% dari harga wilayah + total biaya upgrade, wilayah tetap dan levelnya tetap). Saat Conquest, level upgrade wilayah direset ke 0.
 - Saat pemain manusia tidak bisa membayar (Tax, Refuse Duel, event kehilangan gold), muncul pilihan **utang**: jual lahan satu per satu (harga + upgrade x sell_ratio, level kembali 0), cairkan saham, **beli nyawa** (harga Restore Life), lalu **Pay**. Pilihan *Sell everything and settle* menjual semua lahan secara otomatis; bila masih kurang, kehilangan 1 Life dan bailout.
-- **Chaos Mode**: kartu sendiri di New Match > Offline, di sebelah kanan Arena. Pertandingan Arena (benua, taruhan, hadiah sama) di papan 40 petak: 4 sudut + 9 petak per sisi, 4 Territory per wilayah (majority 3, Regional Dominion 4), tetap 4 Portal. Dipilih lewat `GameSession.chaos_mode`; disimpan di save (`chaos`). Journey dan Tutorial selalu 100 petak.
+- **Chaos Mode**: kartu sendiri di New Match > Offline, di sebelah kanan Arena. Pertandingan Arena (benua, taruhan, hadiah sama) di papan 40 petak: 4 sudut + 9 petak per sisi, 4 Territory per wilayah (majority 3, Regional Dominion 4), tetap 4 Portal. Giliran pertama diacak di Journey/Arena/Chaos (`random_first`, `first_seat`; ronde berakhir saat giliran kembali ke seat pembuka). Bintang King (Lv 1-3) tampil di token pertarungan, panel King, dan kartu pemain seperti bintang unit (`CommanderSystem.stars_marks` / `star_info`). Android: mode immersive (bar sistem tersembunyi) jadi default dan diterapkan ulang saat aplikasi kembali aktif (`SaveManager.fullscreen_wanted`, `_reapply_immersive`); toggle Fullscreen di Settings tetap bisa mematikannya. Odds taruhan FFA x2,5 (Chaos x0,75), hadiah Chaos x0,5 (`chaos_reward_mult`) dan chest satu tingkat lebih rendah; simulasi keseimbangan: `godot --headless --path . res://tests/balance_sim.tscn -- 200`. Ganti nama profil: tombol "Rename" di dialog profil (`ProfileView.open_rename`, `SaveManager.set_profile_name`, maks 16 karakter); berlaku untuk match yang dimulai setelahnya. Kombo sinergi dirombak jadi kombo bernama (lihat `ComboSystem`). Penyeimbangan: batas ronde 12/16/20 (easy/normal/hard), harga Territory ×2 (`chaos_price_mult`), bonus Gate 80 G (`chaos_start_bonus`). Dipilih lewat `GameSession.chaos_mode`; disimpan di save (`chaos`). Journey dan Tutorial selalu 100 petak.
 - Pemain yang kalah duel kehilangan 1 Life (spesifikasi bagian 6). Jika penyerang kalah: wilayah tetap. Jika pemilik kalah: penyerang
   memilih Conquest/Reward. `defender_loses_life=false` mengembalikan aturan "hanya penyerang yang kehilangan Life" (bagian 12).
   Life 0 = tereliminasi. Heal Life lewat Territory Shop (`heal_price`).
@@ -269,7 +373,7 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
   match yang dipulihkan berjalan identik dengan aslinya sampai selesai (3 benua).
 - Layar: audit tata letak di 7 rasio (16:9, 18:9, 20:9, 21:9, 16:10, 4:3, 5:3): 0 kontrol keluar layar, semua tombol >= 48 px
   (minimum global 52 px). Dua bug nyata ditemukan dan diperbaiki lewat audit ini: panel persiapan battle terlalu tinggi
-  (board terpotong di 720 px) dan HUD tidak memakai lebar ekstra di layar lebar. Screenshot ada di `docs/screenshots/`.
+  (board terpotong di 720 px) dan HUD tidak memakai lebar ekstra di layar lebar. Screenshot ada di `docs/screenshots/` (dibuat ulang dari game lewat `layout_test -- shots`, `newmatch_shots` dan `docs_shots`; `docs_shots` membuat screenshot unlock Journey, Collection dan papan teritori penuh).
 - Performa (desktop; ponsel kelas bawah ~5-10x lebih lambat): tick battle terburuk 1.3 ms (timer 250 ms), satu game AI penuh 76 ms,
   satu duel AI instan <= 13 ms, memori logika ~18 MB, 0 kebocoran setelah 40 game dan 75 siklus buat/hapus scene.
   `low_processor_mode` aktif (hemat baterai), max FPS 60, renderer GL Compatibility.
@@ -287,7 +391,7 @@ ekonomi yang terlalu ketat justru mengurangi kepemilikan tanah sehingga encounte
 - **World modifier** (`WorldMods`): Aetherion Royal Tithe (+50 START), Arcanum Arcane Markets (pasar saham Bank +10% tiap ronde), Machina Industrial Age (rent +25%,
   harga shop -20%), Sylvaris Bountiful Harvest (+6 G per wilayah per ronde), Drakmor War Fever (ATK battle +15%, pemenang duel +60 G),
   Thalassia Sea Trade (tax setengah, Reroll Token 40 G), Eclipsia Time Fold (+1 Reroll Token tiap lewat START, bonus roll maks 3).
-- **Kartu (v19)**: tiap faksi punya **dek 15 tipe unit** (15 x 9 salinan = 135): **8 Pawn benua** (2 per faksi, "slot" 0-3; di benua lain ia milik faksi benua itu, nama diawali
+- **Kartu (v19)**: tiap faksi punya **dek 15 tipe unit** (15 x 9 salinan = 135): **8 Pawn benua** (2 per faksi, "slot" 0-3; di benua lain ia milik faksi benua itu, dan untuk sisi ber-King ia ikut faksi slot-nya di benua King (`CardDatabase.effective_faction`); nama diawali
   nama faksi, mis. "Ferrum Royal Guard"; sama untuk semua faksi di benua itu) + **7 bidak milik faksi sendiri** (2 Rook, 2 Knight, 2 Bishop, 1 Queen; `faction: "<id faksi>"`,
   `slot: -1`, field `continent`): 28 faksi x 7 = **196 kartu unik** dengan nama, nama skill, angka skill (`skill.params`), buff, serta HP/ATK sendiri. Dek ditentukan
   oleh Champion (`Deck.faction_id()` -> `CardDatabase.faction_units`), jadi Battle Shop hanya menawarkan Pawn benua + bidak faksi pemain.
@@ -374,6 +478,21 @@ Project > Export > Android; renderer sudah GL Compatibility, orientasi sensor la
   - Pemain di giliran pertama menang lebih sering di Arena 4 Player (23-38% vs 25% adil), terbesar di Easy dan di batas pendek.
   Kesimpulan sementara: batas Normal sudah wajar; Hard Journey 40 dan Arena 50 kemungkinan terlalu panjang untuk manfaatnya. Belum diuji dengan pemain manusia, benua selain Aetherion, atau sampel lebih besar.
 
-## Peta Territory: zoom dan kamera
-Layar Territory dan Battle tiga kolom ala Monopoly (Battle: tombol + kartu Support di kiri, papan 8x8 di tengah, shop + bench di kanan, log di kanan saat bertarung). Territory: papan di tengah, Card Hub + kartu pemain di kiri atas, Round + Menu dengan history (log) di bawahnya di kanan (aksi di bawah log; tombol dadu di dalam papan). Papan tampil utuh (zoom 1x) dan kamera mengikuti pion saat di-zoom. Geser dengan drag, cubit atau roda mouse untuk zoom,
-tombol + / - / Fit dan Speed di pojok kiri bawah layar; semua tombol aksi (Roll Dice, Reroll, Move, End Turn, Buy, special dice) di pojok kanan bawah layar untuk zoom manual atau melihat seluruh papan. Ketuk petak untuk info. Kode: `scripts/ui/board_view.gd`.
+## Peta Territory: posisi START, zoom dan kamera
+Layar Territory dan Battle tiga kolom ala Monopoly (Battle: tombol + kartu Support di kiri, papan 8x8 di tengah, shop + bench di kanan, log di kanan saat bertarung). Territory: papan di tengah, Card Hub + kartu pemain di kiri, Round + Menu dengan history (log) di kanan (aksi di bawah log; tombol dadu di dalam papan). Kode: `scripts/ui/board_view.gd`, `scripts/systems/board_builder.gd`.
+- **START (Dominion Gate) ada di pojok kanan bawah** dan pion berjalan searah jarum jam. Indeks petak 0 = START; `BoardBuilder.grid_pos(idx)` meletakkan cincin dari pojok kiri atas lalu memutarnya 180 derajat (`_ring_pos` = tata letak asli). Urutan petak dan logika game tidak berubah; berlaku untuk papan 100 dan 40 petak, dan save lama ikut tampil dengan orientasi baru.
+- **Zoom awal**: papan 40 petak (Chaos) tampil utuh. Papan 100 petak dibuka ter-zoom `grid / 11` (sekitar 2,36x) sehingga ukuran petak sama dengan papan 40 petak (`BoardView.default_zoom()`); kamera mengikuti pion. Zoom hanya dihitung ulang saat ukuran papan berganti, jadi Duel atau Card Hub tidak mereset zoom pemain (`zoom` bersifat static).
+- **Kontrol** (pojok kiri bawah): `+` / `-` zoom, **Fit** menampilkan seluruh papan lalu tombolnya berganti jadi **1:1** untuk kembali ke ukuran petak awal di pion giliran saat ini (di papan 40 petak tombol selalu Fit), **Speed** 1x / 2x / 4x. Geser dengan drag, cubit atau roda mouse untuk zoom. Semua tombol aksi (Roll Dice, Reroll, Move, End Turn, Buy, special dice) di pojok kanan bawah layar. Ketuk petak untuk info.
+
+## Safe area / notch kamera
+- Layar penuh (immersive) aktif di Android. `UiTheme.safe_insets()` membaca safe area, cutout, dan perkiraan untuk HP lama tanpa laporan cutout (waterdrop notch, rasio >= 1,9), ditambah slider **Notch margin** di Settings (0-120). Latar tetap penuh layar; hanya isi yang digeser.
+- `UiTheme.make_margin(px, vertical)` untuk layar biasa, `UiTheme.follow_insets(node, callback)` untuk elemen yang menempel di tepi layar di luar container (kartu profil menu utama, panel aksi dan kontrol zoom Territory). Inset dibaca ulang saat jendela berubah (rotasi, lipat, slider) dan dua kali setelah layar tampil (0,35 dan 1,5 detik) karena Android sering baru melapor sesudah frame pertama.
+- `UiDialog` menengahkan panelnya di area aman dan membatasi lebarnya dengan inset; latar redupnya tetap penuh layar.
+- Saat headless `safe_insets()` selalu 0, jadi perilaku ini hanya bisa dicek di perangkat atau emulator.
+
+## Menu utama
+Judul MULTIVERSE DOMINION, garis pemisah, tagline, dan versi ada di kiri bawah; kartu profil (nama, gelar, level, EXP; ketuk untuk detail) di kiri atas; kolom tombol di kanan: CONTINUE MATCH, NEW MATCH, Card Hub, Shop, Events, Settings, Quit.
+
+## Tab Info (Card Hub -> Info)
+Panduan yang dibangun dari data game (`scripts/ui/card_collection.gd`, `_info_*`): Overview, Lineup, Territory, Roles & Skills, Synergies, Battle. Bagian Territory memuat aturan petak, sewa, Duel, batas ronde Journey / Arena / Chaos, Landmark, angka Chaos Mode, monster dan tambang tersembunyi (tanpa membocorkan lokasi), level King, dan kontrol kamera peta. Angka diambil dari `data/balance.json` lewat `GameData`, jadi ikut berubah saat keseimbangan diubah; hanya teks aturan yang perlu diperbarui manual.
+
