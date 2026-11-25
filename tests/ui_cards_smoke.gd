@@ -84,9 +84,15 @@ func _ready() -> void:
 		push_error("14 unit cards must disable Save and show 14 / 15 on the Units tab")
 	var other_id := ""
 	for u in CardDatabase.all_units():
-		if String(u["chess"]) != "pawn" and String(u["faction"]) != first_faction:
+		if String(u["chess"]) != "pawn" and String(u["faction"]) != first_faction and SaveManager.owned_count(String(u["id"])) >= 1:  # only owned cards can join the deck
 			other_id = String(u["id"])
 			break
+	if other_id == "":  # a fresh profile owns no piece of another faction: grant one so the mixed-faction rule is what gets tested
+		for u in CardDatabase.all_units():
+			if String(u["chess"]) != "pawn" and String(u["faction"]) != first_faction:
+				other_id = String(u["id"])
+				SaveManager.data["collection"][other_id] = 1
+				break
 	db._toggle_unit(other_id)
 	await get_tree().process_frame
 	var factions := {}

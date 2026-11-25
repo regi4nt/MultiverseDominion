@@ -17,10 +17,20 @@ func _ready() -> void:
 	GameSession.difficulty = "normal"
 	GameSession.ai_count = 3
 	GameSession.resume_match = false
-	var board: Control = load("res://scenes/territory_board/territory_board.tscn").instantiate()
-	add_child(board)
-	await get_tree().process_frame
-	var c: MatchController = board.ctrl
+	# the opening seat is random: build the board again until the human opens (the autosave is written at the start of the human turn)
+	var board: Control
+	var c: MatchController
+	for attempt in range(40):
+		SaveManager.clear_match()
+		board = load("res://scenes/territory_board/territory_board.tscn").instantiate()
+		add_child(board)
+		await get_tree().process_frame
+		c = board.ctrl
+		if c.current == 0:
+			break
+		remove_child(board)
+		board.queue_free()
+		await get_tree().process_frame
 	check_eq(SaveManager.has_match(), true, "autosave written at the start of the human turn", fails)
 	# Card Hub overlay: opens over the match, pauses it, restores the continent, closes with Back
 	var match_continent := CardDatabase.active_continent
