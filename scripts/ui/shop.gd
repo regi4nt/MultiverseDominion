@@ -64,7 +64,7 @@ class GachaPanel extends HBoxContainer:
 		left.custom_minimum_size = Vector2(340, 0)
 		add_child(left)
 		var lbox := VBoxContainer.new()
-		lbox.add_theme_constant_override("separation", 10)
+		lbox.add_theme_constant_override("separation", 8)  # compact: the left column must fit a 720 px high screen
 		left.add_child(lbox)
 		title_label = UiTheme.make_label("CARD GACHA", 26, UiTheme.COL_GOLD)
 		lbox.add_child(title_label)
@@ -93,10 +93,10 @@ class GachaPanel extends HBoxContainer:
 		sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		lbox.add_child(sp)
 		lbox.add_child(UiTheme.make_label("Costs Gacha Tickets (get them in Exchange or from chests and missions)", 15, UiTheme.COL_MUTED))
-		pull1 = UiTheme.make_button("", 60)
+		pull1 = UiTheme.make_button("", 56)
 		pull1.pressed.connect(_on_pull.bind(1))
 		lbox.add_child(pull1)
-		pull10 = UiTheme.make_primary("", 72)
+		pull10 = UiTheme.make_primary("", 64)
 		pull10.pressed.connect(_on_pull.bind(10))
 		lbox.add_child(pull10)
 

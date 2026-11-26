@@ -191,7 +191,7 @@ func _dashed(a: Vector2, b: Vector2, col: Color, dash: float = 8.0) -> void:
 	var dir := (b - a) / maxf(dist, 0.001)
 	var d := 0.0
 	while d < dist:
-		draw_line(a + dir * d, a + dir * minf(d + dash, len), col, 1.5)
+		draw_line(a + dir * d, a + dir * minf(d + dash, dist), col, 1.5)
 		d += dash * 2.0
 
 

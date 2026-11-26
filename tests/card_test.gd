@@ -73,7 +73,7 @@ func _ready() -> void:
 	SaveManager.set_deck(mix)
 	var back := SaveManager.get_deck("aetherion")
 	check(back.unit_ids == mix.unit_ids and back.champion_id == mix.champion_id, "the loadout is saved per continent")
-	check(SaveManager.get_deck("arcanum").unit_ids.is_empty(), "another continent keeps the default units")
+	check(SaveManager.get_deck("arcanum").unit_ids == mix.unit_ids, "a continent with no saved loadout uses the one saved last")
 	SaveManager.data["decks"] = saved_decks
 	SaveManager.save_game()
 	var king_other := Deck.create_default()

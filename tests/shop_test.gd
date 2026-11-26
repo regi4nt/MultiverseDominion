@@ -36,7 +36,7 @@ func _ready() -> void:
 	SaveManager.set_profile_name(old_name)
 	var rc0 := SaveManager.coins()
 	SaveManager.record_match(true, 10, 1000, "aetherion", false, "solvaris", {}, "normal", 0.5)
-	check(SaveManager.last_reward == int(round(ShopSystem.win_reward("normal") * 0.5)) and SaveManager.coins() == rc0 + SaveManager.last_reward, "reward_mult 0.5 halves the coin reward (Chaos)")
+	check(SaveManager.last_reward == int(round(ShopSystem.win_reward("normal") * 0.5)) and SaveManager.coins() >= rc0 + SaveManager.last_reward, "reward_mult 0.5 halves the coin reward (Chaos); level-up / event bonuses may add more")
 	var c0 := SaveManager.coins()
 	var f0 := SaveManager.fragments()
 	var xp0 := SaveManager.profile_xp()
@@ -122,6 +122,8 @@ func _ready() -> void:
 		for r in ShopSystem.pull_batch(1, rng):
 			if bool(r["new"]):
 				check(int(r["fragments"]) == 0, "a new card gives no fragments")
+			elif int(r.get("king_b", 0)) > 0:
+				check(int(r["fragments"]) == 0, "a duplicate King raises its B level instead of giving fragments")
 			else:
 				check(int(r["fragments"]) == int(ShopSystem.DUPLICATE_FRAGMENTS[String(r["rarity"])]), "a duplicate gives the fragments of its rarity")
 				dup_total += int(r["fragments"])
@@ -159,7 +161,7 @@ func _ready() -> void:
 	check(plegs == 1, "a Legendary always drops within %d pulls" % ShopSystem.PITY_LIMITS["legendary"])
 	var counts := {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
 	for i in range(4000):
-		counts[ShopSystem.roll_rarity(rng, 0)] += 1
+		counts[ShopSystem.roll_rarity(rng, {})] += 1
 	check(counts["common"] > counts["rare"] and counts["rare"] > counts["epic"] and counts["epic"] > counts["legendary"] and counts["legendary"] > 0, "rarity frequencies follow the rates (%s)" % str(counts))
 	check(ShopSystem.locked_supports().size() < 40, "600 pulls unlock most Support cards (%d left)" % ShopSystem.locked_supports().size())
 

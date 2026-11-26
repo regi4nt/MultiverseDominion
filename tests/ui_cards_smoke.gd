@@ -122,6 +122,7 @@ func _ready() -> void:
 		fails += 1
 	# --- King: any King of any continent
 	SaveManager.unlock_continent("arcanum")  # the King / faction of a locked continent cannot be picked
+	SaveManager.data["collection"]["champion_astralis"] = 1  # a King must be owned to be chosen (Shop / Gacha)
 	db._set_pool_tab("king")
 	db._set_king("champion_astralis")
 	await get_tree().process_frame

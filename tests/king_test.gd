@@ -86,7 +86,7 @@ func _test_gacha() -> void:
 
 
 func _battle_cfg(locked: bool) -> Dictionary:
-	var prep := BattlePrep.new()
+	var prep := BattlePrep.new(Deck.create_default(), RandomNumberGenerator.new(), 0, 0, 1)
 	return {"seed": 5, "ai_supports": [false, false], "manual_king": [true, false], "king_skill_locked": [locked, false], "sides": [
 		prep.to_side_cfg("champion_solvaris", []), prep.to_side_cfg("champion_nocthyr", [])]}
 

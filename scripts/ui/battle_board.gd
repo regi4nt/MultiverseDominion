@@ -206,10 +206,10 @@ func _build_ui() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.add_child(status_label)
 	var menu := UiTheme.make_button("Menu", 44)
-	menu.custom_minimum_size.x = 90
 	menu.visible = duel_context.is_empty()  # a duel cannot be abandoned
 	menu.pressed.connect(_request_leave)
-	head.add_child(menu)
+	right.add_child(menu)  # the Menu button sits at the top of the other side column, so the status text gets the full column width (a 720 px high screen has no room for 10 wrapped lines)
+	right.move_child(menu, 0)
 
 	# ---- left column (top -> bottom): synergy combos | selected unit + Reroll | ... | Auto Deploy + Level Up (bottom-left corner)
 	var syn_panel := PanelContainer.new()
@@ -247,7 +247,7 @@ func _build_ui() -> void:
 	bench_gap = Control.new()
 	bench_gap.visible = false
 	center.add_child(bench_gap)
-	grid.resized.connect(func(): bench_grid.custom_minimum_size.x = grid.size.x)  # bench row is exactly as wide as the board
+	grid.resized.connect(_fit_bench_width)  # bench row is exactly as wide as the board
 	var push := Control.new()  # pushes Auto Deploy + Level Up to the bottom
 	push.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	prep_panel.add_child(push)
@@ -276,7 +276,11 @@ func _build_ui() -> void:
 	prep_left.add_child(legend)
 	shop_box = VBoxContainer.new()
 	shop_box.add_theme_constant_override("separation", 3)
-	prep_left.add_child(shop_box)
+	shop_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var shop_scroll := UiTheme.make_scroll()  # the offers are random (a Support card with a long text is 3 lines): on a 720 px high screen the list scrolls instead of pushing the column off the screen
+	shop_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shop_scroll.add_child(shop_box)
+	prep_left.add_child(shop_scroll)
 	prep_actions = VBoxContainer.new()
 	prep_actions.add_theme_constant_override("separation", 6)
 	left.add_child(prep_actions)
@@ -291,7 +295,7 @@ func _build_ui() -> void:
 	sell_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sell_btn.pressed.connect(_on_sell)
 	row2.add_child(sell_btn)
-	var start := UiTheme.make_primary("LOCK FORMATION\n& FIGHT", 72)
+	var start := UiTheme.make_primary("LOCK FORMATION\n& FIGHT", 56)
 	start.pressed.connect(_on_start_pressed)
 	prep_actions.add_child(auto_btn)  # Auto Deploy: bottom-right corner, above Lock Formation
 	prep_actions.add_child(start)
@@ -420,6 +424,10 @@ func _on_start_pressed() -> void:
 
 # ------------------------------------------------------------------ preparation
 
+func _fit_bench_width() -> void:
+	bench_grid.custom_minimum_size.x = grid.size.x
+
+
 func _refresh_prep() -> void:
 	status_label.text = "%sGold %d | Budget %d\nLevel %d | Capacity %d/%d" % [_round_line(), prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
 	if not _bm.is_empty() and duel_context.is_empty():
@@ -466,7 +474,7 @@ func _refresh_prep() -> void:
 	var bench := prep.bench_units()
 	for i in range(int(GameData.b("prep_slots"))):
 		var b := UiTheme.make_button("", 48)
-		b.custom_minimum_size = Vector2(40, 44)
+		b.custom_minimum_size = Vector2(40, 48)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.clip_text = true
 		b.add_theme_font_size_override("font_size", 13)

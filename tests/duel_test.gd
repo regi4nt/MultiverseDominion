@@ -300,6 +300,7 @@ func _test_chaos_mode() -> void:
 		var dd := GameData.get_deposit(String(e["id"]))
 		if String(dd.get("kind", "")) == "mine":
 			mine_d = dd
+	BoardBuilder.configure(true)  # the matches above (a1, j1) reset the static Chaos flag
 	check(DepositSystem.rounds_of(int(mine_d["rounds"])) < int(mine_d["rounds"]) and DepositSystem.gold_of(int(mine_d["income"])) > int(mine_d["income"]), "Chaos Mode: mines run fewer rounds and pay more per round")
 	var wp: PlayerState = c.players[1]
 	wp.position = 5
