@@ -1,0 +1,104 @@
+{
+ "prologue": {
+  "title": "The Shattered Dial",
+  "lines": [
+   "Before the continents had names, there was the Dial: one great clock of light that kept every world in step. Seven realms turned upon it, each in its own season, each in its own hour.",
+   "Then the Dial cracked. Nobody remembers who struck it. Time spilled between the realms, and a thing was born in the spill: the Dominion, a hunger for ground, gold and crowns.",
+   "You are a Claimant. The Dominion has chosen you to cross the seven continents, win each realm's four great houses over (or beat them down), and gather the pieces of the Dial before the last hour runs out."
+  ]
+ },
+ "chapters": [
+  {
+   "id": "aetherion",
+   "title": "The Crown That Would Not Fit",
+   "lines": [
+    "Aetherion was the first realm to wake, and it woke arguing. Four houses claimed the empty throne: Aurelian's radiant Solvaris, Vesper's silent Nocthyr, Lord Valdric's iron Valdoria and Queen Elarael's star-watching Elarion.",
+    "The kingdom's old law was simple: whoever holds Crown Reach, Sunmarch, Emerald Vale and Dusk Keep is king. Nobody has held all four in a hundred years, because the coin that pays for armies keeps flowing to whoever stands closest to the crown.",
+    "The Royal Tithe still rings in every counting-house. Pass the gates, take your share, and learn the first lesson of the Dominion: land is gold, and gold is power.",
+    "Beyond the Dusk Keep a wraith is said to wear a crown that never fit its head. Beat the houses, and the road to the next realm opens."
+   ],
+   "teaser": "Four houses, one empty throne, and a tithe that never stops.",
+   "goal": "Win with each house of Aetherion to open the way to Arcanum."
+  },
+  {
+   "id": "arcanum",
+   "title": "The Spire That Counted Spells",
+   "lines": [
+    "Arcanum is a realm that reads. Its Spellwright Spire holds every spell ever cast, and its markets trade in them: a fire charm is worth more in winter, a ward more before a war.",
+    "Seraphine Starcaller reads the sky for the price of tomorrow. Pyrrhus Emberlord burns what he cannot buy. Glacia Frostweaver freezes the books to keep them honest, and Morrowen the Hollow keeps the Umbral Vault, where forgotten spells go to be forgotten.",
+    "The Arcane Markets rise a little every round, and everyone is certain it will fall tomorrow. Be certain of nothing here: a spell cast by a Claimant of Aetherion burns a different colour.",
+    "A piece of the Dial hums inside the Spire. The Archmagi know it, and they have been charging admission."
+   ],
+   "teaser": "A realm that trades in spells, and a market that only goes up. For now.",
+   "goal": "Win with each house of Arcanum to open the way to Machina."
+  },
+  {
+   "id": "machina",
+   "title": "The Age of Gears",
+   "lines": [
+    "Machina does not wait for magic. Where Arcanum cast, Machina built, and the smoke of the Gearworks can be seen from the Spire on a clear day.",
+    "Ironclad Goliath-7 builds anything that can be bolted. Tesla Voltarine powers anything that can be wired. Horologe Chronarch repairs the one thing nobody can fix: time itself, one cog at a time. And the Nexus Prime Arbiter watches the Grid, which has started to answer back.",
+    "Everything is cheaper in the Industrial Age except land. Rents rise, factories rise, and whoever stops upgrading is ground into the floor.",
+    "The Chrono Foundry's clocks all run a few seconds off from one another. The Foundry-masters call it a rounding error. You know better. It is the Dial, leaking."
+   ],
+   "teaser": "Smoke, steel and a clock that is slightly wrong.",
+   "goal": "Win with each house of Machina to open the way to Sylvaris."
+  },
+  {
+   "id": "sylvaris",
+   "title": "What the Roots Remember",
+   "lines": [
+    "Sylvaris grew where Machina's smoke did not reach, and for a long time it grew quietly. The Verdant Canopy is older than the first crown. The Elder Thornwarden remembers when Aetherion was a meadow.",
+    "Fangmother Besthara leads the Beast Hollow and does not take prisoners, only guests. Lilith Bloomweaver tends the Bloom Meadow, whose flowers always know when someone is lying. Terragorn the Mountain is the Terra Roots, and has not moved in a thousand years.",
+    "The Bountiful Harvest feeds every territory you hold. Hold many. The forest rewards patience and punishes the hurried, and it has been watching your hurry since the Gearworks.",
+    "Deep in the Roots, something answers when you say the word 'Dial'. The Thornwarden says the first Claimant came here too, and planted something."
+   ],
+   "teaser": "A forest that remembers every Claimant who ever crossed it.",
+   "goal": "Win with each house of Sylvaris to open the way to Drakmor."
+  },
+  {
+   "id": "drakmor",
+   "title": "The War Under Dragonspine",
+   "lines": [
+    "Drakmor is what happens when a realm stops arguing and starts fighting. Peace here is the time it takes to sharpen a blade.",
+    "Drakhan Wyrmlord rules Dragonspine from the sky. Inferna Hellbride works the Hellforge, where every weapon is paid for in someone's name. Bloodfang Reaver runs the Pits, and Thane Krogg of the Warborn holds the Bastion, which has never fallen and has never been asked nicely.",
+    "War Fever burns in every unit: all battle units hit harder, and every duel winner is paid in gold. Do not walk away from a fight in Drakmor. They remember who did.",
+    "The dragons say the Dial broke here first. Not a crack, a scream. Whoever finds the piece will hear it still."
+   ],
+   "teaser": "Four warlords, one mountain, and a fever that makes every blade sharper.",
+   "goal": "Win with each house of Drakmor to open the way to Thalassia."
+  },
+  {
+   "id": "thalassia",
+   "title": "Charts of the Drowned Hour",
+   "lines": [
+    "Thalassia is mostly water and entirely rumour. The Tempest Strait swallows maps, the Coral Atoll rearranges itself, and the Abyss Trench is deeper than any chart admits.",
+    "Nerith, Leviathan Caller, speaks for the Abyssal. Pelagia Tidemother keeps the peace on the Atoll, in her fashion. Tempestra Stormlord is the Strait. Captain Redtide Corsa sails out of Corsair Cove and has never once told the truth about where the treasure is, but the treasure is always there.",
+    "Sea trade runs on trust and tides, so taxes are halved and a good reroll is cheap. Everything else costs what it costs. Look for what the waves have hidden: some of it is gold, and some of it is a mine that was never supposed to be opened.",
+    "A drowned clock lies under the Strait, still ticking. Every sailor who hears it comes home with a story that has a different ending."
+   ],
+   "teaser": "Storms, corsairs and a clock that ticks under the sea.",
+   "goal": "Win with each house of Thalassia to open the way to Eclipsia."
+  },
+  {
+   "id": "eclipsia",
+   "title": "The Last Hour",
+   "lines": [
+    "Eclipsia is where the Dial is kept, if 'kept' is the word for something that has been broken, mended and broken again more times than anyone can count.",
+    "Helion Solstice guards the Solstice Dial, whose hands only move forward. Paradox Wanderer lives in the Loop and has already met you. Eternis the Unending holds the Eternal Hour, which has never ended, and Oblivion Harbinger waits at the Rim for everything else.",
+    "Time folds here: pass START and a Reroll Token appears, and doubles can bring bonus rolls. The tokens are a gift from the Dial, and the Dial is rarely generous without a reason.",
+    "You have crossed seven realms. You have beaten, bargained with and outlasted every house in them, and in every realm you found a piece of the Dial waiting. Here, at the last hour, you learn who struck it in the first place, and why they hoped you would arrive."
+   ],
+   "teaser": "The seventh realm, the broken Dial, and the question of who struck it.",
+   "goal": "Reach the trophy goal and win with all four houses of Eclipsia to finish the road."
+  }
+ ],
+ "epilogue": {
+  "title": "After the Last Hour",
+  "lines": [
+   "It was the first Claimant who struck the Dial, long ago, because a perfect clock leaves nothing to win. They broke it on purpose, so that someone would one day have to cross the seven realms to mend it. That someone was you.",
+   "The Dial turns again. It is not what it was: the seams show, and every realm keeps its own hour now. But it turns, and the Dominion, having nothing left to hunger for, finally rests.",
+   "The seven continents are yours to walk in any order, at any difficulty you choose. The houses still wait. They remember you, and they would very much like a rematch."
+  ]
+ }
+}

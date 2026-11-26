@@ -35,6 +35,34 @@ static func rows_for(side: int) -> Array[int]:
 	return [3, 2, 1, 0]
 
 
+## Later rounds of a duel reuse the enemy army of round 1, but the ground is drawn again every round. An enemy unit (entries of a side
+## config: {card_id, stars, cell}) that now stands on a highland it may not use (melee) moves to the nearest free plains cell of
+## its own half, like BattlePrep.set_terrain does for the player's army.
+static func fit_units_to_terrain(units: Array, terrain: Dictionary, side: int) -> void:
+	var taken := {}
+	for e in units:
+		taken[e["cell"]] = true
+	for e in units:
+		var cell: Vector2i = e["cell"]
+		if Terrain.can_stand(terrain, int(CardDatabase.get_unit(String(e["card_id"]))["range"]), cell):
+			continue
+		var best := Vector2i(-1, -1)
+		var best_d := 9999
+		for row in rows_for(side):
+			for col in range(BattleEngine.COLS):
+				var c := Vector2i(col, row)
+				if terrain.has(c) or taken.has(c):
+					continue
+				var d := absi(c.x - cell.x) + absi(c.y - cell.y)
+				if d < best_d:
+					best_d = d
+					best = c
+		if best.x >= 0:
+			taken.erase(cell)
+			taken[best] = true
+			e["cell"] = best
+
+
 static func _preferred_rows(role: String, side: int) -> Array[int]:
 	var r := rows_for(side)  # [front, mid, back1, back2]
 	match role:

@@ -942,6 +942,7 @@ func _on_start_battle() -> void:
 			enemy_cfg = {"units": [], "champion": "", "supports": [], "foes": [String(duel_context["monster"])], "foe_star": commander_star}  # same side config as MonsterSystem.fight
 		elif _round > 1 and not _duel_enemy_cfg.is_empty():
 			enemy_cfg = _duel_enemy_cfg.duplicate(true)  # later rounds of the duel: the same enemy army (the AI does not shop again)
+			BattleAI.fit_units_to_terrain(enemy_cfg["units"], terrain, 1)  # the ground is drawn again each round: no melee unit may start on a highland
 		else:
 			enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1, terrain, me.level)  # the AI shops at OUR level
 			_duel_enemy_cfg = enemy_cfg.duplicate(true)
@@ -1238,6 +1239,7 @@ func _show_result() -> void:
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
+	_result_dim = dim  # every result screen (Battle Chess AND multi-round duels) must be removed by _next_round
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(520, 0)
 	var cc := CenterContainer.new()  # keeps the panel exactly in the middle of the screen whatever its size
@@ -1263,7 +1265,6 @@ func _show_result() -> void:
 			var done_txt := "Mission complete: %s  +%d gold%s" % [String(_bm.get("name", "")), BattleMission.reward_gold(_bm), " (kept for the next round)" if _series != "single" else ""]
 			var fail_txt := "Mission failed: %s" % BattleMission.text(_bm)
 			v.add_child(UiTheme.make_label(done_txt if _bm_done else fail_txt, 18, Color("59cd90") if _bm_done else UiTheme.COL_MUTED))
-		_result_dim = dim
 		_result_rewards(v, won)
 	else:
 		if duel_context.has("monster"):

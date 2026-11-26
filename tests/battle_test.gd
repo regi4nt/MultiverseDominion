@@ -81,6 +81,10 @@ func _test_terrain() -> void:
 	check(not Terrain.can_stand({Vector2i(2, 5): true}, 1, Vector2i(2, 5)) and Terrain.can_stand({Vector2i(2, 5): true}, 2, Vector2i(2, 5)), "terrain: highland is for ranged units only")
 	# a melee unit never ends a battle on a highland
 	var ground := {Vector2i(3, 4): true, Vector2i(3, 3): true, Vector2i(4, 4): true, Vector2i(4, 3): true}
+	# a multi-round duel reuses the enemy army: a melee unit that the new ground puts on a highland is moved to plains
+	var reused := [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 1)}]
+	BattleAI.fit_units_to_terrain(reused, {Vector2i(3, 1): true}, 1)
+	check(not ({Vector2i(3, 1): true}).has(reused[0]["cell"]) and reused[0]["cell"].y <= 3, "duel round 2+: an enemy melee unit on new highland moves to plains in its own half")
 	var e := BattleEngine.new()
 	e.setup({"seed": 4, "ai_supports": [false, false], "terrain": ground, "sides": [
 		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 6)}], "champion": "champion_valdoria", "supports": []},

@@ -35,6 +35,7 @@ func default_data() -> Dictionary:
 		"trading": {"pos": {}, "realized": 0},  # Shop > Trading (see TradeSystem): open positions per asset + total realized profit in Chips
 		"chests": {"slots": [null, null, null, null], "opened": 0, "storage": [], "drops": 0, "limit_at": 0},  # Arena reward chests (see ChestSystem): 4 slots, each null or {grade, start, ready}
 		"events": {},  # Missions + Achievements (see EventHub)
+		"story_seen": [],  # Journey story: ids of the pages (prologue, continent ids, epilogue) the player has already opened (see StorySystem)
 		"trophies": 0,  # Journey trophy road: a win raises it, a defeat lowers it; continents open at their unlock_trophies
 	}
 

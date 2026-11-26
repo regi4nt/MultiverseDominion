@@ -48,6 +48,8 @@ var _difficulty_note: Label
 var _arena_difficulty: String = ""  # Journey has no difficulty choice until every continent is open: the Arena choice is kept here meanwhile
 var _ladder_grid: GridContainer  # Journey: trophy ranges of every continent and level
 var _start_btn: Button
+var _story_btn: Button  # Journey setup: opens the story card
+var _story_node: Control = null  # the open story card (StoryPanel), if any
 var _home_note: Label
 
 
@@ -75,7 +77,9 @@ func _ready() -> void:
 
 ## Android Back / Esc: from the setup view go back to the mode hub, from the hub leave to the Main Menu.
 func on_back_requested() -> void:
-	if _view == "setup":
+	if _story_node != null:
+		(_story_node as StoryPanel).close_panel()
+	elif _view == "setup":
 		_show_hub()
 	else:
 		get_tree().change_scene_to_file(MENU_SCENE)
@@ -96,6 +100,7 @@ func _reset_root() -> void:
 	_ladder_grid = null
 	_trophy_note = null
 	_start_btn = null
+	_story_btn = null
 	_home_note = null
 	_root = VBoxContainer.new()
 	_root.add_theme_constant_override("separation", 10)
@@ -468,6 +473,12 @@ func _show_setup(kind: String) -> void:
 	back.size_flags_stretch_ratio = 1.0
 	back.pressed.connect(_show_hub)
 	bottom.add_child(back)
+	if kind == "journey":
+		_story_btn = UiTheme.make_button("Story", 60)
+		_story_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_story_btn.pressed.connect(func(): _open_story())
+		bottom.add_child(_story_btn)
+		_refresh_story_btn()
 	var start := UiTheme.make_primary("START MATCH", 60)
 	start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	start.size_flags_stretch_ratio = 2.0
@@ -478,6 +489,26 @@ func _show_setup(kind: String) -> void:
 	_refresh_continent_info()
 	_refresh_champion()
 	_refresh_journey_hint()
+	if kind == "journey" and StorySystem.first_unseen() != "":  # a new chapter (or the prologue) opens by itself, once
+		_open_story.call_deferred(StorySystem.first_unseen())
+
+
+## Journey story card: opens on `start_id` (default: the chapter of the continent being played). Closing it refreshes the Story button.
+func _open_story(start_id: String = "") -> void:
+	if _story_node != null:
+		return
+	var sp := StoryPanel.new(start_id if start_id != "" else StorySystem.current_id())
+	sp.closed.connect(func():
+		_story_node = null
+		_refresh_story_btn())
+	add_child(sp)
+	_story_node = sp
+
+
+## "Story" button: a mark shows while there is a page the player has not read yet.
+func _refresh_story_btn() -> void:
+	if _story_btn != null:
+		_story_btn.text = "Story  (NEW)" if StorySystem.first_unseen() != "" else "Story"
 
 
 func _on_start() -> void:
