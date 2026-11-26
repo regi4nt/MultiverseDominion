@@ -4,13 +4,14 @@ extends RefCounted
 ##   Plains    any unit (melee and ranged) can stand and walk there.
 ##   Highland  ranged units only (attack range >= MIN_RANGE). Ranged units standing there deal extra damage
 ##             (balance key highland_atk_bonus). Melee units can neither deploy on it, walk onto it nor be teleported onto it.
-## The layout is drawn at random for every duel, mirrored top / bottom so both sides get the same ground.
+## The layout is drawn at random for every duel, point-mirrored (rotated 180 degrees) so each side sees the SAME ground from its own seat:
+## a highland on your left in your half is on the enemy's left in theirs.
 
 const MIN_RANGE := 2
 const PAIRS := 3  # mirrored pairs of highland cells (= 6 cells on the board)
 
 
-## Random layout: PAIRS cells in the lower half (rows 4-6) plus their mirror image (rows 3-1). Rows 0 and 7 stay plains
+## Random layout: PAIRS cells in the lower half (rows 4-6) plus their 180-degree rotation (rows 3-1). Rows 0 and 7 stay plains
 ## so the Champions always have somewhere to enter.
 static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	var t := {}
@@ -21,7 +22,7 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 		if t.has(c):
 			continue
 		t[c] = true
-		t[Vector2i(c.x, 7 - c.y)] = true
+		t[Vector2i(BattleEngine.COLS - 1 - c.x, 7 - c.y)] = true
 	return t
 
 

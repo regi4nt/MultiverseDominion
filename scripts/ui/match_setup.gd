@@ -1,10 +1,11 @@
 extends Control
 ## New Match. Two views in one scene:
 ##  - HUB: OFFLINE tab (Journey, Arena, Chaos, Battle Chess, Tutorial; 4 cards show at once, swipe the row for the rest) and ONLINE tab (Classic, Ranked, Battle Chess: coming soon).
-##  - SETUP (Journey / Arena): players -> difficulty -> continent -> START MATCH. There is no faction choice here: the
+##  - SETUP (Journey / Arena): players -> difficulty (Journey: set by the trophies until every continent is open) -> continent -> START MATCH. There is no faction choice here: the
 ##    faction (and its King) is chosen in Card Hub -> Deck -> Faction; locked factions cannot be picked.
-## Journey = 1vs1 story path: win on a continent with each of its 4 factions to master it; every mastered continent lets the
-## player CHOOSE one locked continent to open. Chaos = the same free match on the 40-tile board (it is an Arena setup with GameSession.chaos_mode).
+## Journey = 1vs1 trophy road: a win earns trophies, a defeat loses some, and the trophies open the continents. Every continent has
+## all 3 AI levels (Easy -> Normal -> Hard by trophies, shown in a table); once the last continent is open the level is picked freely.
+## Chaos = the same free match on the 40-tile board (it is an Arena setup with GameSession.chaos_mode).
 ## Arena = free match (1vs1, 2vs2, 4 player) on open continents, unlocks nothing.
 ## Battle Chess opens the 8x8 auto-battle (pays Aether Coins); Tutorial starts the guided match.
 
@@ -44,7 +45,8 @@ var _journey_hint: Label
 var _trophy_note: Label
 var _wager_panel: WagerPanel
 var _difficulty_note: Label
-var _arena_difficulty: String = ""  # Journey has no difficulty choice (always Normal): the Arena choice is kept here meanwhile
+var _arena_difficulty: String = ""  # Journey has no difficulty choice until every continent is open: the Arena choice is kept here meanwhile
+var _ladder_grid: GridContainer  # Journey: trophy ranges of every continent and level
 var _start_btn: Button
 var _home_note: Label
 
@@ -91,6 +93,7 @@ func _reset_root() -> void:
 	_portrait = null
 	_continent_text = null
 	_journey_hint = null
+	_ladder_grid = null
 	_trophy_note = null
 	_start_btn = null
 	_home_note = null
@@ -250,6 +253,11 @@ func _journey_status() -> String:
 	var next := SaveManager.next_continent_goal()
 	if next == "":
 		return "%d trophies  -  every continent open" % SaveManager.trophies()
+	var miss: Array = SaveManager.journey_gate_missing(next)
+	if not miss.is_empty():  # trophies alone do not open it: the previous continent still needs a win with each faction
+		var prev := SaveManager.journey_prev_continent(next)
+		var total: int = (GameData.get_continent(prev).get("factions", []) as Array).size()
+		return "%d trophies  -  %s: win with every %s faction (%d / %d)" % [SaveManager.trophies(), String(GameData.get_continent(next)["name"]).capitalize(), String(GameData.get_continent(prev)["name"]).capitalize(), total - miss.size(), total]
 	return "%d trophies  -  %s at %d" % [SaveManager.trophies(), String(GameData.get_continent(next)["name"]).capitalize(), SaveManager.continent_trophies(next)]
 
 
@@ -274,7 +282,7 @@ func _ask_battle_wager() -> void:
 	GameSession.wager = 0
 	GameSession.category = "battle_chess"
 	# The map (continent: world bonuses, cards shown) is random each battle; the army always comes from the Deck saved in the Card Hub.
-	GameSession.battle_deck_continent = SaveManager.last_deck_continent()
+	GameSession.battle_deck_continent = SaveManager.battle_deck_continent()  # never "": an empty value made the deck follow the random map
 	var maps := _open_continents()
 	if not maps.is_empty():
 		GameSession.continent_id = String(maps[randi() % maps.size()])
@@ -410,7 +418,7 @@ func _show_setup(kind: String) -> void:
 	_kind = kind
 	GameSession.category = kind
 	GameSession.wager = mini(GameSession.wager, SaveManager.coins())  # Journey and Arena both take a wager
-	if kind == "journey":  # Journey has no difficulty choice: it follows the trophies, and the player wagers instead
+	if kind == "journey" and not SaveManager.journey_difficulty_free():  # until the last continent opens, Journey has no difficulty choice: it follows the trophies of the continent, and the player wagers instead
 		if _arena_difficulty == "":
 			_arena_difficulty = String(GameSession.difficulty)
 		GameSession.difficulty = SaveManager.journey_difficulty()
@@ -534,9 +542,14 @@ func _build_match_column(parent: Control) -> void:
 			UiTheme.scroll_passthrough(b)
 			c.add_child(b)
 	else:
-		var note := UiTheme.make_label("Story path: master a continent to unlock another one.", 15, UiTheme.COL_MUTED)
+		var note_text_j := "Road finished: choose your own difficulty. Wins still earn trophies." if _journey_free() else "Trophy road: wins earn trophies, defeats lose some. Trophies open new continents; each continent has 3 levels (Easy, Normal, Hard)."
+		var note := UiTheme.make_label(note_text_j, 15, UiTheme.COL_MUTED)
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		c.add_child(note)
+		if not _journey_free():  # what is left before the difficulty becomes free
+			var goal := UiTheme.make_label(_final_goal_text(), 15, UiTheme.COL_GOLD)
+			goal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			c.add_child(goal)
 		c.add_child(UiTheme.make_label("Players", 20, UiTheme.COL_TEXT))
 		var fmt := PanelContainer.new()
 		var fsb := UiTheme.make_box(Color(ACCENT["journey"], 0.12), ACCENT["journey"].darkened(0.35), 2, 12, 0)
@@ -553,7 +566,7 @@ func _build_match_column(parent: Control) -> void:
 		_journey_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		c.add_child(_journey_hint)
 	_wager_panel = null
-	if _kind == "arena":
+	if _kind == "arena" or _journey_free():
 		c.add_child(UiTheme.make_label("Difficulty", 20, UiTheme.COL_TEXT))
 		var drow := HBoxContainer.new()
 		drow.add_theme_constant_override("separation", 8)
@@ -582,17 +595,26 @@ func _build_match_column(parent: Control) -> void:
 	c.add_child(_wager_panel)
 
 
-## "Easy 0+, Normal 400+, Hard 1100+": the trophy ladder of the Journey AI level.
+## "Easy 0+, Normal 50+, Hard 100+": the 3 AI levels inside the current Journey continent (by trophies).
 func _difficulty_ladder() -> String:
-	var table: Dictionary = GameData.b("journey_difficulty_by_trophies", {})
-	var rows: Array = []
-	for d in table:
-		rows.append([int(table[d]), String(d).capitalize()])
-	rows.sort_custom(func(x, y): return x[0] < y[0])
-	var parts: Array[String] = []
-	for r in rows:
-		parts.append("%s %d+" % [r[1], r[0]])
-	return ", ".join(parts)
+	var st := SaveManager.journey_tier_starts(SaveManager.trophies())
+	return "Easy %d+, Normal %d+, Hard %d+" % [st[0], st[1], st[2]]
+
+
+## "Goal: reach 2800 trophies and win on Eclipsia with each of its 4 factions (2 / 4 factions) to choose your own difficulty.": what frees the Journey difficulty.
+func _final_goal_text() -> String:
+	var last := SaveManager.journey_last_continent()
+	var cname := String(GameData.get_continent(last).get("name", last)).capitalize()
+	var total: int = (GameData.get_continent(last).get("factions", []) as Array).size()
+	var goal_t := SaveManager.journey_final_trophy_goal()
+	if not SaveManager.is_continent_unlocked(last):
+		return "Goal: open %s (%d trophies), reach %d trophies and win there with each of its %d factions to choose your own difficulty." % [cname, SaveManager.continent_trophies(last), goal_t, total]
+	return "Goal: reach %d trophies (%d now) and win on %s with each of its %d factions (%d / %d) to choose your own difficulty." % [goal_t, SaveManager.trophies(), cname, total, total - SaveManager.journey_final_missing().size(), total]
+
+
+## The Journey road is finished (last continent cleared with all its factions): the difficulty is chosen by the player (same Easy / Normal / Hard buttons as Arena).
+func _journey_free() -> bool:
+	return _kind == "journey" and SaveManager.journey_difficulty_free()
 
 
 ## Life and coin reward of the chosen difficulty (easy 5 Life / normal 3 / hard 1).
@@ -600,8 +622,8 @@ func _refresh_difficulty_note() -> void:
 	if _difficulty_note == null:
 		return
 	var d := String(GameSession.difficulty)
-	if _kind == "journey":  # no difficulty to pick: just state the fixed rules
-		_difficulty_note.text = "AI level: %s - it follows your trophies (%s).\nEveryone starts with %d Life (a lost duel or bankruptcy costs 1). Reward: win +%d, loss +%d Aether Coins." % [
+	if _kind == "journey" and not _journey_free():  # no difficulty to pick: just state the fixed rules
+		_difficulty_note.text = "AI level: %s (set by your trophies on this continent: %s).\nEveryone starts with %d Life (a lost duel or bankruptcy costs 1). Reward: win +%d, loss +%d Aether Coins." % [
 			d.capitalize(), _difficulty_ladder(), GameData.life_for(d), ShopSystem.win_reward(d), ShopSystem.loss_reward(d)]
 		return
 	_difficulty_note.text = "%s: everyone starts with %d Life (a lost duel or bankruptcy costs 1).\nReward: win +%d, loss +%d Aether Coins." % [
@@ -670,6 +692,47 @@ func _build_continent_column(parent: Control) -> void:
 			_refresh_journey_hint())
 		UiTheme.scroll_passthrough(b)
 		c.add_child(b)
+	if _kind == "journey":
+		_build_ladder_table(c)
+
+
+## Journey: table of the trophy ranges of every continent and AI level. The row of your current continent is gold; while the level is
+## forced by the trophies, the cell you are in is gold too. Locked continents are dimmed.
+func _build_ladder_table(parent: Control) -> void:
+	parent.add_child(UiTheme.make_divider())
+	parent.add_child(UiTheme.make_label("Difficulty by trophies", 20, UiTheme.COL_TEXT))
+	var note := UiTheme.make_label("Each continent has 3 levels. When the next continent opens, the level goes back to Easy.", 15, UiTheme.COL_MUTED)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(note)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 4)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(grid)
+	_ladder_grid = grid
+	for h in ["Continent", "Easy", "Normal", "Hard"]:
+		var hl := UiTheme.make_label(h, 15, UiTheme.COL_GOLD_DIM)
+		hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(hl)
+	var t := SaveManager.trophies()
+	var cur_id := String(SaveManager.journey_band(t)["id"])
+	var cur_diff := SaveManager.difficulty_for_trophies(t)
+	var forced := not SaveManager.journey_difficulty_free()
+	for row in SaveManager.journey_ladder():
+		var id := String(row["id"])
+		var open := SaveManager.is_continent_unlocked(id)
+		var is_cur := id == cur_id
+		var base := UiTheme.COL_TEXT if open else UiTheme.COL_MUTED
+		var nl := UiTheme.make_label(String(row["name"]).capitalize(), 15, UiTheme.COL_GOLD if is_cur else base)
+		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(nl)
+		for d in ["easy", "normal", "hard"]:
+			var rg: Array = row[d]
+			var hit: bool = is_cur and forced and d == cur_diff
+			var cl := UiTheme.make_label("%d-%d" % [rg[0], rg[1]], 15, UiTheme.COL_GOLD if (hit or (is_cur and not forced)) else base)
+			cl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			grid.add_child(cl)
 
 
 ## Open for the current setup: Journey needs the continent unlocked; Arena plays on every playable continent
@@ -691,6 +754,9 @@ func _open_continents() -> Array:
 
 func _continent_state(id: String, open: bool) -> String:
 	if not open:
+		if _kind == "journey" and not SaveManager.journey_gate_missing(id).is_empty():
+			var prev := SaveManager.journey_prev_continent(id)
+			return "Locked  -  %d trophies + win with each %s faction" % [SaveManager.continent_trophies(id), String(GameData.get_continent(prev).get("name", prev)).capitalize()]
 		return "Locked  -  %d trophies" % SaveManager.continent_trophies(id)
 	if _kind != "journey":
 		return "Open" if SaveManager.is_continent_unlocked(id) else "Open  -  King & Pawn stay locked"
@@ -785,6 +851,11 @@ func _refresh_journey_hint() -> void:
 		_journey_hint.text = "%s is not a faction of %s: Journey only allows its own factions. Pick one in your Deck." % [fname, cname]
 	else:
 		_journey_hint.text = "Win with %s on %s: +%d trophies. A defeat: %d." % [fname, cname, SaveManager.trophy_delta(true, d), SaveManager.trophy_delta(false, d)]
+		var next := SaveManager.next_continent_goal()  # faction gate: the next continent needs a win with every faction of this one
+		if next != "" and SaveManager.journey_prev_continent(next) == cid:
+			var total: int = (GameData.get_continent(cid).get("factions", []) as Array).size()
+			var won := SaveManager.journey_won_factions(cid)
+			_journey_hint.text += "\n%s needs a win with each %s faction (%d / %d)%s." % [String(GameData.get_continent(next).get("name", next)).capitalize(), cname.capitalize(), won.size(), total, "  -  " + fname + " already won" if won.has(fid) else ""]
 
 
 func _refresh_continent_info() -> void:

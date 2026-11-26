@@ -3,7 +3,7 @@ extends HBoxContainer
 ## Used by the Shop > Gamble tab (bets and winnings in Chips, the default) and by the Territory Casino (Dominion Gold).
 ## The panel only asks `play_fn` for a round and plays the result back; the money is moved by whoever owns the currency.
 ## Config keys (all optional): "unit" (name shown after amounts), "bets" (Array of ints), "balance" (Callable -> int),
-## "games" (Array of game ids that can be picked), "play" (Callable(game, choice, bet) -> round dictionary of ShopSystem.gamble), "hint" (text), "title" (header text).
+## "compact" (bool: simple floating card), "games" (Array of game ids that can be picked), "play" (Callable(game, choice, bet) -> round dictionary of ShopSystem.gamble), "hint" (text), "title" (header text).
 
 const GambleStage := preload("res://scripts/ui/gamble_stage.gd")
 
@@ -33,6 +33,9 @@ var _play_fn: Callable
 var _hint: String = ""
 var _title: String = "GAMBLE"
 var gfx: Control  # GambleStage: the drawn coin / dice / reels
+var compact := false  # true = the small floating card of the Territory Casino (one column, no side panel)
+var footer: VBoxContainer  # compact only: the owner adds its own buttons here (e.g. Leave)
+var bal_label: Label  # compact only: current balance
 
 const GAME_NAMES := {"coin": "Coin Flip", "dice": "Dice", "slots": "Slots"}
 const CHOICES := {
@@ -52,9 +55,13 @@ func _init(r: RandomNumberGenerator, cfg: Dictionary = {}) -> void:
 	_play_fn = cfg.get("play", func(g: String, c: String, b: int) -> Dictionary: return ShopSystem.gamble(g, c, b, rng))
 	_hint = String(cfg.get("hint", "Fast money, real risk. Bets and winnings are Chips only: get Chips in the Exchange tab and turn winnings back into coins there."))
 	_title = String(cfg.get("title", "GAMBLE"))
+	compact = bool(cfg.get("compact", false))
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_theme_constant_override("separation", 12)
-	_build()
+	if compact:
+		_build_compact()
+	else:
+		_build()
 
 func _build() -> void:
 	var left := PanelContainer.new()
@@ -129,8 +136,80 @@ func _build() -> void:
 	sbox.add_child(net_label)
 	_pick_game(game)
 
+## Simple floating card (Territory Casino): title + balance, the drawn game, result, pick, bet, Play. Nothing else.
+func _build_compact() -> void:
+	alignment = BoxContainer.ALIGNMENT_CENTER
+	size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	stage = PanelContainer.new()
+	stage.custom_minimum_size = Vector2(440, 0)
+	stage.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_set_stage_color(UiTheme.COL_GOLD_DIM)
+	add_child(stage)
+	var m := UiTheme.make_margin(18)
+	stage.add_child(m)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	m.add_child(box)
+	# header: CASINO - Game ........ 1200 G
+	var head := HBoxContainer.new()
+	box.add_child(head)
+	var title := UiTheme.make_label("%s  -  %s" % [_title, String(GAME_NAMES[game])], 22, UiTheme.COL_GOLD)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	bal_label = UiTheme.make_label("", 20, UiTheme.COL_TEXT)
+	head.add_child(bal_label)
+	# the drawn coin / dice / reels
+	gfx = GambleStage.new()
+	gfx.custom_minimum_size = Vector2(0, 150)
+	gfx.sound.connect(func(n: String): Sfx.play(n))
+	box.add_child(gfx)
+	# result (one short block)
+	headline = UiTheme.make_label("Place your bet", 28, UiTheme.COL_GOLD)
+	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	headline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(headline)
+	detail = UiTheme.make_label("", 18, UiTheme.COL_TEXT)
+	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(detail)
+	net_label = UiTheme.make_label("", 22, UiTheme.COL_MUTED)
+	net_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(net_label)
+	rules = UiTheme.make_label("", 13, UiTheme.COL_MUTED)
+	rules.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(rules)
+	# pick (hidden for Slots) and bet
+	choice_row = HFlowContainer.new()
+	choice_row.alignment = FlowContainer.ALIGNMENT_CENTER
+	choice_row.add_theme_constant_override("h_separation", 6)
+	box.add_child(choice_row)
+	bet_row = HFlowContainer.new()
+	bet_row.alignment = FlowContainer.ALIGNMENT_CENTER
+	bet_row.add_theme_constant_override("h_separation", 6)
+	box.add_child(bet_row)
+	var bg := ButtonGroup.new()
+	for amount in bets:
+		var bb := UiTheme.make_toggle(str(amount), bg, 44)
+		bb.custom_minimum_size.x = 64
+		bb.button_pressed = (amount == bet)
+		bb.pressed.connect(func():
+			bet = int(amount)
+			refresh())
+		bet_row.add_child(bb)
+	game_row = HBoxContainer.new()  # kept so _set_busy works; the Casino has one game, so it is never shown
+	game_row.visible = false
+	box.add_child(game_row)
+	play_btn = UiTheme.make_primary("Play", 56)
+	play_btn.pressed.connect(_on_play)
+	box.add_child(play_btn)
+	footer = VBoxContainer.new()
+	box.add_child(footer)
+	_pick_game(game)
+
+
 func _set_stage_color(c: Color) -> void:
-	stage.add_theme_stylebox_override("panel", UiTheme.make_box(Color(c.darkened(0.8), 0.95), c, 2, 14))
+	stage.add_theme_stylebox_override("panel", UiTheme.make_box(Color(c.darkened(0.8), 0.97), c, 2, 18, 18 if compact else 0))
 
 func _pick_game(g: String) -> void:
 	game = g
@@ -153,6 +232,7 @@ func _pick_game(g: String) -> void:
 			rules.text = "Two dice. Low (2-6) or High (8-12) pays x%.1f, exactly Seven pays x%.1f." % [ShopSystem.DICE_PAYOUT["low"], ShopSystem.DICE_PAYOUT["seven"]]
 		"slots":
 			rules.text = "Three reels. Three 7s pay x%d, any other three alike x%d, two alike x%.1f." % [int(ShopSystem.SLOT_JACKPOT), int(ShopSystem.SLOT_TRIPLE), ShopSystem.SLOT_PAIR]
+	choice_row.visible = not opts.is_empty()
 	gfx.set_idle(g)
 	headline.text = "Place your bet"
 	headline.add_theme_color_override("font_color", UiTheme.COL_GOLD)
@@ -264,4 +344,6 @@ func lock() -> void:
 
 func refresh() -> void:
 	play_btn.text = "Play  (%d %s)" % [bet, unit]
+	if bal_label != null:
+		bal_label.text = "%d %s" % [int(_balance_fn.call()), unit]
 	play_btn.disabled = locked or int(_balance_fn.call()) < bet

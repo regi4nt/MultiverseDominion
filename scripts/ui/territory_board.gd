@@ -7,7 +7,7 @@ var board_view: BoardView
 var _centre: PanelContainer
 var round_label: Label
 var _mission_lines: Array[String] = []  # result-screen lines about the mission reward
-var _mission_label: Label  # Continent Mission line (Arena / Chaos), hidden otherwise
+var _mission_text: RichTextLabel  # ONE mission UI: the King mission line + the Continent mission line (Arena / Chaos)
 var _mission_panel: PanelContainer
 var turn_label: Label
 var player_box: VBoxContainer
@@ -126,13 +126,18 @@ func _build_ui() -> void:
 	menu.custom_minimum_size.x = 96
 	menu.pressed.connect(func(): _leave_dialog.popup_centered(Vector2i(460, 160)))
 	head.add_child(menu)
-	_mission_panel = PanelContainer.new()  # Arena / Chaos: the continent's one special mission and its progress
+	_mission_panel = PanelContainer.new()  # under Menu: ONE box with the King mission and (Arena / Chaos) the continent mission
 	_mission_panel.visible = false
 	_mission_panel.add_theme_stylebox_override("panel", UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 2, 10))
 	right.add_child(_mission_panel)
-	_mission_label = UiTheme.make_label("", 15, UiTheme.COL_GOLD)
-	_mission_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_mission_panel.add_child(_mission_label)
+	_mission_text = RichTextLabel.new()
+	_mission_text.bbcode_enabled = true
+	_mission_text.fit_content = true
+	_mission_text.scroll_active = false
+	_mission_text.mouse_filter = Control.MOUSE_FILTER_IGNORE  # drags and taps pass through; the tooltip sits on the panel
+	_mission_text.add_theme_font_size_override("normal_font_size", 15)
+	_mission_text.add_theme_font_size_override("bold_font_size", 15)
+	_mission_panel.add_child(_mission_text)
 	var hub_btn := UiTheme.make_button(GameSession.CARD_HUB_NAME, 48)  # Collection / Deck / Info without leaving the match
 	hub_btn.pressed.connect(_open_hub)
 	left.add_child(hub_btn)
@@ -325,24 +330,44 @@ func _on_state_changed() -> void:
 	_maybe_open_duel()
 	if ctrl.state == MatchController.State.AWAIT_ROLL:
 		var key := "%d:%d" % [ctrl.round_number, ctrl.current]
-		if key != _pan_key:  # a new turn: bring that player's pawn into view (once, so manual panning is not undone)
+		if key != _pan_key:  # a new turn: bring the HUMAN player's pawn into view (once, so manual panning is not undone); AI turns leave the camera alone
 			_pan_key = key
-			board_view.pan_to_tile(p.position)
+			if not p.is_ai:
+				board_view.pan_to_tile(p.position)
 	if ctrl.state == MatchController.State.AWAIT_ROLL and not ctrl.current_player().is_ai:
 		_autosave()  # start of the human turn: a stable moment
 
 
-## Continent Mission box: name, goal, progress and reward (green once complete).
+## ONE mission box under Menu, one line per mission: King (level-up mission of the human King, with progress) and, in Arena / Chaos,
+## Continent (goal, progress, reward). A finished mission is green with a check mark.
 func _refresh_mission() -> void:
 	if _mission_panel == null or ctrl == null:
 		return
-	_mission_panel.visible = ctrl.has_mission()
-	if not ctrl.has_mission():
+	var human: PlayerState = null
+	for p in ctrl.players:
+		if not p.is_ai:
+			human = p
+			break
+	var show_king := human != null and human.alive
+	var show_cont := ctrl.has_mission()
+	_mission_panel.visible = show_king or show_cont
+	if not _mission_panel.visible:
 		return
-	var done := ctrl.mission_done
-	_mission_label.text = "%s MISSION  %s\n%s\nProgress %d / %d   Reward: %s" % [
-		"\u2713" if done else "\u2605", "(complete)" if done else "", ctrl.mission_text(), ctrl.mission_progress, ctrl.mission_target, ctrl.mission_reward_text()]
-	_mission_label.add_theme_color_override("font_color", Color("59cd90") if done else UiTheme.COL_GOLD)
+	var gold := "#" + UiTheme.COL_GOLD.to_html(false)
+	var green := "#59cd90"
+	var t := "[b][color=%s]MISSION[/color][/b]" % gold
+	var tip: Array[String] = []
+	if show_king:
+		var mm := CommanderSystem.mission_of(human)
+		var maxed := mm.is_empty()
+		t += "\n[color=%s]%s King %s: %s[/color]" % [green if maxed else gold, "\u2713" if maxed else "\u2605", CommanderSystem.star_text(human.commander_star), CommanderSystem.mission_text(human)]
+		tip.append("King mission: %s. Completing it gives your King its next level (more HP and ATK in Last Stand)." % (String(mm["name"]) if not maxed else "complete"))
+	if show_cont:
+		var done := ctrl.mission_done
+		t += "\n[color=%s]%s Continent: %s  (%d / %d)  Reward: %s[/color]" % [green if done else gold, "\u2713" if done else "\u2605", ctrl.mission_text(), ctrl.mission_progress, ctrl.mission_target, ctrl.mission_reward_text()]
+		tip.append("Continent mission: a special goal of this continent, paid when completed.")
+	_mission_text.text = t
+	_mission_panel.tooltip_text = "\n".join(tip)
 
 
 func _refresh_players() -> void:
@@ -403,12 +428,6 @@ func _refresh_players() -> void:
 				mine_l.clip_text = true
 				mine_l.tooltip_text = "\n".join(mines.map(func(e): return "%s (%d rounds left)" % [DepositSystem.summary(String(e["id"])), int(e["left"])]))
 				col.add_child(mine_l)
-			if not p.is_ai:  # the player's active Commander mission
-				var ml := UiTheme.make_label("Mission: " + CommanderSystem.mission_text(p), 13, UiTheme.COL_GOLD)
-				ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-				var mm := CommanderSystem.mission_of(p)
-				ml.tooltip_text = "Commander mission: %s. Completing it gives your Commander its next star (more HP and ATK in Last Stand)." % (String(mm["name"]) if not mm.is_empty() else "complete")
-				col.add_child(ml)
 		else:
 			col.add_child(UiTheme.make_label("OUT", 18, UiTheme.COL_DANGER))
 		player_box.add_child(card)
@@ -489,33 +508,34 @@ func _sync_casino() -> void:
 	if _casino_node != null or _hub_node != null:
 		return
 	var actor := ctrl.decision_actor()
-	var wrap := PanelContainer.new()
+	# Simple floating card: a light dim behind it, one small centred panel, everything inside it.
+	var wrap := Control.new()
 	wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
-	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
-	wrap.add_theme_stylebox_override("panel", UiTheme.make_box(Color(0.03, 0.04, 0.08, 0.94), Color(0, 0, 0, 0), 0, 0))
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP  # blocks the board behind the card
+	var dim := ColorRect.new()
+	dim.color = Color(0.02, 0.03, 0.07, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(center)
 	add_child(wrap)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 24)
-	wrap.add_child(margin)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	margin.add_child(box)
 	var panel := GamblePanel.new(ctrl.rng, {
-		"unit": "G", "bets": ctrl.casino_bets(), "games": [String(ctrl.pending.get("game", "coin"))], "title": "CASINO",
-		"hint": "The Casino drew a random Gamble game for this visit (Coin Flip, Dice or Slots), played with your Dominion Gold. One round per visit, then you leave the Casino.",
+		"compact": true, "unit": "G", "bets": ctrl.casino_bets(), "games": [String(ctrl.pending.get("game", "coin"))], "title": "CASINO",
 		"balance": func() -> int: return actor.gold,
 		"play": func(g: String, c: String, b: int) -> Dictionary: return ctrl.casino_play(g, c, b)})
-	var leave := UiTheme.make_primary("Leave casino", 64)
+	var leave := UiTheme.make_button("Leave casino", 48)
 	panel.round_done.connect(func(r: Dictionary):
 		ctrl.casino_report(actor, r)
 		panel.lock()  # one round per visit
 		leave.text = "Continue")
-	box.add_child(panel)
+	panel.footer.add_child(leave)
 	leave.pressed.connect(func():
 		if not panel.busy:  # wait for the animation so the round is always reported
 			ctrl.decide("leave"))
-	box.add_child(leave)
+	center.add_child(panel)
 	_casino_node = wrap
 
 
@@ -579,7 +599,7 @@ func _on_game_over(_winner: int) -> void:
 		if ctrl.journey:
 			_journey_lines.append("Trophies %s%d  (total %d)" % ["+" if SaveManager.last_trophy_delta >= 0 else "", SaveManager.last_trophy_delta, SaveManager.trophies()])
 			for oid in SaveManager.last_opened_continents:
-				_journey_lines.append("%s opened! Its unit cards are now in the Shop." % String(GameData.get_continent(oid).get("name", oid)))
+				_journey_lines.append("%s opened! Its unit cards are now in the Shop and its Kings are yours (B1)." % String(GameData.get_continent(oid).get("name", oid)))
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

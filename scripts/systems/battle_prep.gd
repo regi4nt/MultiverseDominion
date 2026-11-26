@@ -217,7 +217,7 @@ func refresh_offers(paid: bool) -> bool:
 		if o != "":
 			back.append(o)
 	battle_deck.return_cards(back)
-	offers = battle_deck.draw_shop()
+	offers = battle_deck.draw_shop(-1, level)  # the rarity of the offers follows the shop level
 	return true
 
 

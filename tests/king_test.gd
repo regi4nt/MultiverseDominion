@@ -17,6 +17,9 @@ func check(cond: bool, msg: String) -> void:
 func _fresh() -> void:
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.ensure_collection()
+	# a new save owns every King of the open continent (Journey faction gate); these tests start from "only Solvaris" to test collecting
+	for k in ["champion_nocthyr", "champion_valdoria", "champion_elarion"]:
+		(SaveManager.data["collection"] as Dictionary).erase(k)
 
 
 func _ready() -> void:
@@ -34,6 +37,20 @@ func _ready() -> void:
 
 
 func _test_collection() -> void:
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.ensure_collection()
+	var gift_ok := true
+	for f in GameData.get_continent("aetherion")["factions"]:
+		gift_ok = gift_ok and SaveManager.king_b(String(f["champion"])) == 1
+	check(gift_ok, "a new save owns the 4 Kings of the open continent at B1 (Journey gift)")
+	check(SaveManager.grant_continent_kings("aetherion").is_empty() and SaveManager.king_b("champion_nocthyr") == 1, "granting again changes nothing and never lowers a level")
+	SaveManager.add_king_copy("champion_nocthyr")
+	SaveManager.grant_continent_kings("aetherion")
+	check(SaveManager.king_b("champion_nocthyr") == 2, "an owned King keeps its B level when the gift is granted")
+	SaveManager.data["trophies"] = 149
+	for fid in ["solvaris", "nocthyr", "valdoria", "elarion"]:
+		SaveManager.record_match(true, 10, 100, "aetherion", true, fid, {}, "normal")
+	check(SaveManager.is_continent_unlocked("arcanum") and SaveManager.king_b("champion_astralis") == 1 and SaveManager.king_b("champion_umbrael") == 1 and not SaveManager.owns_king("champion_ferrum"), "opening Arcanum hands over its 4 Kings (B1), not the next continent's")
 	_fresh()
 	check(SaveManager.king_b("champion_solvaris") == 1 and SaveManager.owns_king("champion_solvaris"), "a new save owns only the default King, at B1")
 	check(not SaveManager.owns_king("champion_nocthyr") and not SaveManager.can_use_king("champion_nocthyr"), "the other Kings are cards to collect")

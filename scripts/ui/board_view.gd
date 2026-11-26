@@ -17,7 +17,7 @@ var _cell: float = 10.0
 var _origin: Vector2 = Vector2.ZERO
 
 # Camera: the 26x26 ring is only ~27 px per tile when it fits a 720 px screen, so the view is zoomed and
-# follows the moving pawn. Drag pans, pinch / +/- buttons zoom, "Fit" zooms in on the player.
+# follows the moving pawn. Drag pans, pinch / +/- buttons zoom, "Fit" shows the whole 100-tile board and then reads "1:1" (back to the normal tile size).
 const SPEEDS: Array[float] = [1.0, 2.0, 4.0]
 static var speed_mult: float = 1.0  # kept between scenes; restored from the saved settings on first use
 const HOP_TIME := 0.17  # seconds per tile while a pawn walks (one hop per tile)
@@ -143,14 +143,46 @@ func _on_zoom_button(factor: float) -> void:
 		return
 	_kill_camera_tweens()
 	if factor == 0.0:
-		_user_cam = false
-		# Fit = focus on the player only: zoom in on the human player's pawn (the current player if there is no human).
-		zoom = maxf(default_zoom(), FIT_PLAYER_ZOOM)
-		_focus = _player_focus()
+		if _can_show_whole_board():
+			if _is_whole_board():
+				# 1:1 -> back to the normal tile size, on the human player's pawn
+				_user_cam = false
+				zoom = default_zoom()
+				_focus = _player_focus()
+			else:
+				# Fit -> the whole board; the button now reads 1:1
+				_user_cam = true
+				zoom = ZOOM_MIN
+				_focus = Vector2(0.5, 0.5)
+		else:
+			# 40-tile board: the normal size already IS the whole board, so Fit stays Fit and focuses on the player
+			_user_cam = false
+			zoom = maxf(default_zoom(), FIT_PLAYER_ZOOM)
+			_focus = _player_focus()
+		_update_fit_label()
 		queue_redraw()
 	else:
 		_user_cam = true
 		_zoom_at(factor, size * 0.5)
+
+
+## True when the normal tile size is larger than "whole board" (the 100-tile board), so Fit has a 1:1 to return to.
+func _can_show_whole_board() -> bool:
+	return default_zoom() > ZOOM_MIN + 0.001
+
+
+func _is_whole_board() -> bool:
+	return zoom <= ZOOM_MIN + 0.001
+
+
+## The third zoom button reads "Fit" normally and "1:1" while the whole board is shown (only where there is a 1:1 to go back to).
+func _update_fit_label() -> void:
+	if _zoom_btns.size() < 3:
+		return
+	var t := "1:1" if (_can_show_whole_board() and _is_whole_board()) else "Fit"
+	if _zoom_btns[2].text != t:
+		_zoom_btns[2].text = t
+		_zoom_btns[2].custom_minimum_size.x = 52.0 if t == "1:1" else 42.0
 
 
 ## Centres the camera on a tile (board space).
@@ -202,7 +234,8 @@ func bind(c: MatchController) -> void:
 	ctrl.players_changed.connect(queue_redraw)
 	ctrl.dice_rolled.connect(_on_dice_rolled)
 	ctrl.player_moved.connect(_on_player_moved)
-	var cur := ctrl.current_player()
+	var me := _human_player()
+	var cur := me if me != null else ctrl.current_player()  # start on the human's pawn, not on whoever moves first
 	if cur != null:
 		focus_tile(cur.position)
 	queue_redraw()
@@ -245,7 +278,10 @@ func _on_player_moved(pid: int, from_i: int, to_i: int, warped: bool) -> void:
 	var steps := posmod(to_i - from_i, BoardBuilder.tiles_total)
 	if warped or steps == 0 or steps > 14 or FxMode.is_lite():  # Lite: the pawn lands directly, no hopping
 		_visual_pos[pid] = float(to_i)
-		focus_tile(to_i)
+		if _camera_follows(pid):
+			focus_tile(to_i)
+		else:
+			queue_redraw()
 		return
 	_busy += 1
 	var tw := create_tween()
@@ -256,7 +292,7 @@ func _on_player_moved(pid: int, from_i: int, to_i: int, warped: bool) -> void:
 
 func _set_vis(v: float, pid: int) -> void:
 	_visual_pos[pid] = v
-	if _user_cam:
+	if _user_cam or not _camera_follows(pid):  # AI pawns walk without dragging the camera away from you
 		queue_redraw()
 		return
 	# The camera glides with the pawn (centre of the two tiles it is between) instead of snapping per tile.
@@ -272,6 +308,22 @@ func _anim_done(pid: int, to_i: int) -> void:
 	_visual_pos[pid] = float(to_i)
 	_busy = maxi(_busy - 1, 0)
 	queue_redraw()
+
+
+## The human player (null in an AI-only match).
+func _human_player() -> PlayerState:
+	if ctrl == null:
+		return null
+	for p in ctrl.players:
+		if not p.is_ai:
+			return p
+	return null
+
+
+## The camera follows the human player's pawn only (and everybody's when no human plays, e.g. an AI-only match).
+func _camera_follows(pid: int) -> bool:
+	var me := _human_player()
+	return me == null or me.id == pid
 
 
 ## Board-space point (0..1) of the human player's pawn; falls back to the current player, then to the board centre.
@@ -550,6 +602,7 @@ func _terr() -> Dictionary:
 
 func _draw() -> void:
 	_layout()
+	_update_fit_label()  # zoom changed by +/-, pinch, wheel or Fit: keep the label in sync
 	var sk := _terr()
 	var s := _cell * BoardBuilder.grid
 	_rr(Rect2(_origin, Vector2(s, s)), sk["frame_bg"], _cell * 0.6, sk["frame"], 2.0, _cell * 0.5)

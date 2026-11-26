@@ -33,6 +33,7 @@ var bench_gap: Control  # holds the bench row's height while the bench is hidden
 var sel_label: Label
 var sell_btn: Button
 var reroll_btn: Button
+var _legend_labels: Dictionary = {}  # rarity -> legend label (shows the shop odds of the current level)
 var level_btn: Button
 var hand_label: Label
 var hand_box: VBoxContainer
@@ -60,6 +61,8 @@ var _enemy_hand: Array = []
 var _result_shown := false
 var _bm: Dictionary = {}  # Battle Chess Continent Mission of the played continent ({} in duels)
 var _bm_done: bool = false
+var _mission_panel: PanelContainer  # ONE mission box under the synergies (same look as the Territory board): King mission + Continent mission
+var _mission_text: RichTextLabel
 var _duel_msg: String = ""
 var _tip_panel: PanelContainer = null
 var _tip_label: Label = null
@@ -78,6 +81,9 @@ var _wins: int = 0
 var _losses: int = 0
 var _draws: int = 0
 var _series_coins: int = 0  # Aether Coins earned over the whole run (shown in the final summary)
+var _surrender_btn: Button  # the Surrender button of a duel (null in Battle Chess, which has the Menu button)
+var _surrender_dialog: UiDialog
+var _surrendered: bool = false  # the duel was surrendered: the result is reported once
 var _forfeited: bool = false  # "End Run" in a 10-round run: the wager counts as lost
 var _series_over: bool = false  # the run is finished (or was a single battle): the result screen offers New Battle / Main Menu
 var _result_dim: ColorRect  # the result screen of the round that was just played
@@ -205,11 +211,14 @@ func _build_ui() -> void:
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.add_child(status_label)
-	var menu := UiTheme.make_button("Menu", 44)
-	menu.visible = duel_context.is_empty()  # a duel cannot be abandoned
-	menu.pressed.connect(_request_leave)
-	right.add_child(menu)  # the Menu button sits at the top of the other side column, so the status text gets the full column width (a 720 px high screen has no room for 10 wrapped lines)
-	right.move_child(menu, 0)
+	# Battle Chess keeps its Menu button; a duel of a match (Journey / Arena / Chaos, monster hunts too) shows SURRENDER in the same spot.
+	# The tutorial duel is scripted, so it has neither.
+	var menu := UiTheme.make_button("Menu" if duel_context.is_empty() else "Surrender", 44)
+	menu.visible = duel_context.is_empty() or not bool(duel_context.get("tutorial", false))
+	menu.pressed.connect(_request_leave if duel_context.is_empty() else _request_surrender)
+	_surrender_btn = menu if not duel_context.is_empty() else null
+	menu.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	head.add_child(menu)  # Menu / Surrender sits in the top-right corner, next to the status text
 
 	# ---- left column (top -> bottom): synergy combos | selected unit + Reroll | ... | Auto Deploy + Level Up (bottom-left corner)
 	var syn_panel := PanelContainer.new()
@@ -217,11 +226,24 @@ func _build_ui() -> void:
 	synergy_box = VBoxContainer.new()
 	synergy_box.add_theme_constant_override("separation", 0)
 	syn_panel.add_child(synergy_box)
+	_mission_panel = PanelContainer.new()  # under the synergies: replaces the old "select a unit" guide (same box as the Territory board)
+	_mission_panel.visible = false
+	_mission_panel.add_theme_stylebox_override("panel", UiTheme.make_box(Color("2a2150"), UiTheme.COL_GOLD, 2, 10))
+	right.add_child(_mission_panel)
+	_mission_text = RichTextLabel.new()
+	_mission_text.bbcode_enabled = true
+	_mission_text.fit_content = true
+	_mission_text.scroll_active = false
+	_mission_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mission_text.add_theme_font_size_override("normal_font_size", 14)
+	_mission_text.add_theme_font_size_override("bold_font_size", 14)
+	_mission_panel.add_child(_mission_text)
 	prep_panel = VBoxContainer.new()
 	prep_panel.add_theme_constant_override("separation", 6)
 	prep_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(prep_panel)
-	sel_label = UiTheme.make_label("Select a unit from the bench, then tap a cell in your area. Tap a unit on the board, then another unit to swap places, or the preparation area to take it back.", 14, UiTheme.COL_MUTED)
+	sel_label = UiTheme.make_label("", 14, UiTheme.COL_MUTED)  # details of the selected unit / Support card only (the mission box replaced the guide)
+	sel_label.visible = false
 	sel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sel_label.max_lines_visible = 5
 	sel_label.custom_minimum_size.y = 90
@@ -268,6 +290,7 @@ func _build_ui() -> void:
 		var ll := UiTheme.make_label("\u25A0 %s" % String(r).capitalize(), 12, UiTheme.rarity_color(r))
 		ll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		legend.add_child(ll)
+		_legend_labels[r] = ll
 	lineup_legend = UiTheme.make_label("[Recommended]", 12, UiTheme.COL_GOLD)
 	lineup_legend.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lineup_legend.tooltip_text = "Support cards that belong to the Support slots you set in the Lineup tab of the Card Hub"
@@ -290,14 +313,14 @@ func _build_ui() -> void:
 	prep_actions.add_child(message_label)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 6)
-	prep_left.add_child(row2)  # Sell sits directly below the unit offers
+	prep_actions.add_child(row2)  # Sell sits beside Auto Deploy, above Lock Formation
 	sell_btn = UiTheme.make_button("Sell", 44)
 	sell_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sell_btn.pressed.connect(_on_sell)
 	row2.add_child(sell_btn)
 	var start := UiTheme.make_primary("LOCK FORMATION\n& FIGHT", 56)
 	start.pressed.connect(_on_start_pressed)
-	prep_actions.add_child(auto_btn)  # Auto Deploy: bottom-right corner, above Lock Formation
+	row2.add_child(auto_btn)
 	prep_actions.add_child(start)
 
 	# ---- battle panel
@@ -364,6 +387,13 @@ func _build_ui() -> void:
 	_leave_dialog.cancel_button_text = "Stay"
 	_leave_dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn"))
 	add_child(_leave_dialog)
+	_surrender_dialog = UiDialog.new()
+	_surrender_dialog.title = "Surrender?"
+	_surrender_dialog.tone = "danger"
+	_surrender_dialog.ok_button_text = "Surrender"
+	_surrender_dialog.cancel_button_text = "Keep fighting"
+	_surrender_dialog.confirmed.connect(_do_surrender)
+	add_child(_surrender_dialog)
 	_start_dialog = UiDialog.new()
 	_start_dialog.title = "No units deployed"
 	_start_dialog.tone = "warn"
@@ -383,9 +413,8 @@ func _round_line() -> String:
 	if _series == "single":
 		return ""
 	var of_txt := " / %d" % ShopSystem.series_rounds(_series_diff) if _series == "ten" else ""
-	var mis := ("\nKing mission: " + CommanderSystem.mission_text_battle(_cmd)) if _cmd != null else ""
 	var lives_txt := "  Lives %d/%d" % [_lives_left(), ShopSystem.series_lives(_series_diff)] if _series == "survival" else ""
-	return "Round %d%s  W%d L%d D%d%s%s\n" % [_round, of_txt, _wins, _losses, _draws, lives_txt, mis]
+	return "Round %d%s  W%d L%d D%d%s\n" % [_round, of_txt, _wins, _losses, _draws, lives_txt]
 
 
 ## Lives left in a Battle Chess Survival run (Easy 5 / Normal 3 / Hard 1 at the start; every defeat costs one).
@@ -412,6 +441,38 @@ func _request_leave() -> void:
 func on_back_requested() -> void:
 	if duel_context.is_empty():
 		_request_leave()
+	else:
+		_request_surrender()  # Android Back in a duel = the Surrender button (still asks first)
+
+
+## Surrender button of a duel (replaces the Menu button): ask first, the whole duel counts as lost.
+func _request_surrender() -> void:
+	if _result_shown or _surrendered or bool(duel_context.get("tutorial", false)) or _surrender_dialog == null:
+		return
+	if duel_context.has("monster"):
+		_surrender_dialog.dialog_text = "Surrender the hunt? The monster holds its lair and you lose %d G." % int(GameData.b("monster_defeat_gold"))
+	else:
+		var opp_name := String((duel_context["opponent"] as PlayerState).display_name)
+		_surrender_dialog.dialog_text = "Surrender the duel against %s? It counts as a defeat%s." % [opp_name, " (rounds already fought are kept in the tally)" if _duel_rounds > 1 and _round > 1 else ""]
+	_surrender_dialog.popup_centered(Vector2i(460, 170))
+
+
+## Confirmed surrender: the duel is lost right now and reported like any defeat (the opponent wins, no bonus gold).
+func _do_surrender() -> void:
+	if _surrendered or duel_context.is_empty():
+		return
+	_surrendered = true
+	var me: PlayerState = duel_context["human"]
+	if phase == "prep":  # spending made in the prep is permanent: sync it like the start of a fight (units were bought with that gold)
+		prep.finish()
+		me.gold = prep.gold
+		me.level = prep.level
+		me.capacity = prep.capacity()
+	if duel_context.has("monster"):
+		battle_finished.emit({"monster": true, "won": false, "ticks": 0, "gold_delta": 0})
+		return
+	var opp: PlayerState = duel_context["opponent"]
+	battle_finished.emit({"winner": opp.id, "bonus_gold": 0, "gold_delta": {me.id: int(_duel_delta[0]), opp.id: int(_duel_delta[1])}})
 
 
 ## "Lock formation & fight": an empty formation needs a confirmation (it used to start silently).
@@ -430,9 +491,13 @@ func _fit_bench_width() -> void:
 
 func _refresh_prep() -> void:
 	status_label.text = "%sGold %d | Budget %d\nLevel %d | Capacity %d/%d" % [_round_line(), prep.gold, prep.budget_left, prep.level, prep.used_capacity(), prep.capacity()]
-	if not _bm.is_empty() and duel_context.is_empty():
-		status_label.text += "\nMission: %s  (+%d G)" % [BattleMission.text(_bm), BattleMission.reward_gold(_bm)]
+	_refresh_mission()
 	lineup_legend.visible = deck != null and deck.has_support_lineup()
+	var odds := BattleDeck.odds_for_level(prep.level) if BattleDeck.level_odds_enabled else {}
+	for r in _legend_labels.keys():  # "Rare 37%": the chance of that rarity per offer at the current level (next reroll / round)
+		var pct := int(odds.get(r, 0))
+		(_legend_labels[r] as Label).text = "\u25A0 %s %d%%" % [String(r).capitalize(), pct] if not odds.is_empty() else "\u25A0 %s" % String(r).capitalize()
+		(_legend_labels[r] as Label).tooltip_text = "Shop level %d: each offer is %s with %d%% chance. Level Up to raise the odds of Rare / Epic / Legendary cards." % [prep.level, String(r), pct]
 	for c in shop_box.get_children():
 		shop_box.remove_child(c)
 		c.queue_free()
@@ -509,7 +574,7 @@ func _refresh_prep() -> void:
 	if selected != null and not prep.roster.units.has(selected):
 		selected = null
 	if selected == null:
-		sel_label.text = "Select a unit from the bench, then tap a cell in your area (rows below the gold line). Tap a unit on the board, then another unit to swap places, or the preparation area to take it back.\nHighland (peak tiles): ranged units only, +%d%% ATK. Plains: any unit." % int(float(GameData.b("highland_atk_bonus", 0.15)) * 100.0)
+		sel_label.text = ""
 		sel_label.add_theme_color_override("font_color", UiTheme.COL_MUTED)
 	else:
 		var card := CardDatabase.get_unit(selected.card_id)
@@ -527,6 +592,7 @@ func _refresh_prep() -> void:
 		sell_btn.text = "Sell (+%d G)" % int(prep.support_price(sid) * float(GameData.b("sell_ratio")))
 	else:
 		sell_btn.text = "Sell"
+	sel_label.visible = selected != null or selected_support >= 0
 	sell_btn.disabled = selected == null and selected_support < 0
 	hand_label.text = "Support hand (%d/%d) - tap a card, then Sell:" % [prep.hand.size(), int(GameData.b("hand_max"))]
 	for c in hand_box.get_children():
@@ -549,6 +615,35 @@ func _refresh_prep() -> void:
 	_refresh_synergy()
 	grid.selected = selected
 	grid.queue_redraw()
+
+
+## ONE mission box under the synergies (same look as the Territory board): the King mission of the run (level-up, with progress) and the
+## Continent mission of this battle (goal, progress, Gold reward). A finished mission is green with a check mark.
+func _refresh_mission() -> void:
+	if _mission_panel == null:
+		return
+	var show_king := _cmd != null and _series != "single" and duel_context.is_empty()
+	var show_cont := not _bm.is_empty() and duel_context.is_empty()
+	_mission_panel.visible = show_king or show_cont
+	if not _mission_panel.visible:
+		return
+	var gold := "#" + UiTheme.COL_GOLD.to_html(false)
+	var green := "#59cd90"
+	var t := "[b][color=%s]MISSION[/color][/b]" % gold
+	var tip: Array[String] = []
+	if show_king:
+		var maxed := CommanderSystem.mission_of(_cmd).is_empty()
+		t += "\n[color=%s]%s King %s: %s[/color]" % [green if maxed else gold, "\u2713" if maxed else "\u2605", CommanderSystem.star_text(_cmd.commander_star), CommanderSystem.mission_text_battle(_cmd)]
+		tip.append("King mission: completing it gives your King its next level (from the next round).")
+	if show_cont:
+		var g := BattleMission.goal(_bm)
+		var prog := mini(BattleMission.progress(_bm, engine), g) if phase == "battle" and engine != null else 0
+		if _bm_done:
+			prog = g
+		t += "\n[color=%s]%s Continent: %s  (%d / %d)  Reward: +%d Gold[/color]" % [green if _bm_done else gold, "\u2713" if _bm_done else "\u2605", BattleMission.text(_bm), prog, g, BattleMission.reward_gold(_bm)]
+		tip.append("Continent mission: a special goal of this battle. The Gold is paid at once when it is completed.")
+	_mission_text.text = t
+	_mission_panel.tooltip_text = "\n".join(tip)
 
 
 ## Top-left panel: the named combos of the deployed units (ComboSystem): Faction Tier (unnamed tiers at 2 / 4 / 6 units: banner bonus + the faction's own trait in one row),
@@ -595,7 +690,7 @@ func _refresh_synergy() -> void:
 		var ftier := ComboSystem.faction_tier(String(fac), n, is_ultra)  # Faction Tier: banner bonus + faction trait in ONE row
 		var nxt := int(ftier["next"])
 		var fl := _synergy_row("%s%s x%d  %s%s" % ["Ultra: " if is_ultra else "", fname, n, ComboSystem.faction_tier_text(ftier), ("  (next at %d)" % nxt) if nxt > 0 and not is_ultra else ""])
-		fl.tooltip_text = "Faction Tier: the faction trait for the whole faction, stronger at 2 / 4 / 6 units. %s%s" % [String(ftier["trait_blurb"]), "  ULTRA: every unit is of this faction, the faction trait is x%s, special %s: %s" % [str(ComboSystem.ULTRA_SCALE), ComboSystem.ULTRA_FACTION_SPECIAL["name"], ComboSystem.ULTRA_FACTION_SPECIAL["blurb"]] if is_ultra else "  ULTRA: field %d+ units that are ALL of this faction." % ComboSystem.ULTRA_MIN]
+		fl.tooltip_text = "Faction Tier: the faction trait for the whole faction, stronger at 2 / 4 / 6 units. %s%s" % [String(ftier["trait_blurb"]), "  ULTRA: every unit is of this faction, the faction trait is x%s and every unit gets a bonus: %s" % [str(ComboSystem.ULTRA_SCALE), ComboSystem.ULTRA_FACTION_SPECIAL["blurb"]] if is_ultra else "  ULTRA: field %d+ units that are ALL of this faction." % ComboSystem.ULTRA_MIN]
 		fl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		fl.clip_text = false
 	var army_conts: Array = []  # Grand Army (Faction): the King's continent OR the played one (the closer one is shown)
@@ -631,6 +726,18 @@ func _refresh_synergy() -> void:
 		if have >= 2:
 			var pl := _synergy_row("%s: %d / %d continents" % [ComboSystem.BOND_NAME, have, ComboSystem.CONTINENT_BONDS.size()], false)
 			pl.tooltip_text = "Continent Alliance: field %d units of one faction in EVERY continent. Every unit then gains the bond effect of your King's continent." % ComboSystem.BOND_FACTION_UNITS
+	var fm_near: Array = []  # Continent Formation: a faction one unit short of 4 -> [1, text]
+	var fm_king := GameData.continent_of_faction(_own_faction) if _own_faction != "" else ""
+	for fm in ComboSystem.formation_active(bond_fac_counts, fm_king):  # Continent Formation: 4 units of ONE faction of the King's continent give those units its effect
+		var fm_name := String(GameData.get_faction(CardDatabase.active_continent, String(fm["faction"])).get("name", String(fm["faction"]).capitalize()))
+		var fml := _synergy_row("%s: %s x%d  %s" % [fm["name"], fm_name, int(fm["count"]), ComboSystem.effects_text(fm["effects"])])
+		fml.tooltip_text = "%s (%s): %d units of ONE faction of your King's continent give the units of that faction the effect of that continent. %s" % [ComboSystem.FORMATION_NAME, String(fm["continent"]).capitalize(), ComboSystem.FORMATION_UNITS, fm["blurb"]]
+		fml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		fml.clip_text = false
+	for ff in bond_fac_counts:
+		if fm_king != "" and GameData.continent_of_faction(String(ff)) == fm_king and ComboSystem.formation_lacking(int(bond_fac_counts[ff])) == 1:
+			var ff_name := String(GameData.get_faction(CardDatabase.active_continent, String(ff)).get("name", String(ff).capitalize()))
+			fm_near.append([1, "%s (add 1 %s)" % [ComboSystem.formation_of(GameData.continent_of_faction(String(ff)))["name"], ff_name]])
 	var cr_near: Array = []  # Continent Specialties that lack at most 3 units (and have progress in both halves): [units lacking, text]
 	var cr_counts := {}  # per continent-role pairing: {"faction": units of the continent's best faction (bond_best), "role": units of that role}
 	for cc in ComboSystem.CONTINENT_ROLE_COMBOS:
@@ -687,6 +794,7 @@ func _refresh_synergy() -> void:
 	if army_total > 0 and army_total <= 3 and not fac_counts.is_empty():
 		near.append([army_total, "%s (add %s)" % [ComboSystem.FACTION_ARMY["name"], ", ".join(army_parts)]])
 	near.append_array(cr_near)
+	near.append_array(fm_near)
 	near.sort_custom(func(x, y): return int(x[0]) < int(y[0]))
 	var near_text: Array[String] = []
 	for nr in near:
@@ -835,7 +943,7 @@ func _on_start_battle() -> void:
 		elif _round > 1 and not _duel_enemy_cfg.is_empty():
 			enemy_cfg = _duel_enemy_cfg.duplicate(true)  # later rounds of the duel: the same enemy army (the AI does not shop again)
 		else:
-			enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1, terrain)
+			enemy_cfg = BattleAI.prepare_ai_army(duel_context["opponent"], rng, 1, terrain, me.level)  # the AI shops at OUR level
 			_duel_enemy_cfg = enemy_cfg.duplicate(true)
 	_bm_done = false
 	engine = BattleEngine.new()
@@ -920,6 +1028,7 @@ func _check_battle_mission() -> void:
 	prep.gold += g
 	prep.budget_left += g
 	log_view.add_text("MISSION COMPLETE! %s: +%d gold.\n" % [String(_bm.get("name", "")), g])
+	_refresh_mission()
 
 
 func _update_battle_ui() -> void:
@@ -928,8 +1037,7 @@ func _update_battle_ui() -> void:
 		_log_index += 1
 	status_label.text = "%sTick %d / %d" % [_round_line(), engine.tick, BattleEngine.MAX_TICKS]
 	battle_status.text = "You: %d units, HP %d\nEnemy: %d units, HP %d" % [engine.regulars_alive(0), engine.total_hp(0), engine.regulars_alive(1), engine.total_hp(1)]
-	if not _bm.is_empty() and duel_context.is_empty():
-		battle_status.text += "\n" + BattleMission.status_line(_bm, engine, _bm_done)
+	_refresh_mission()
 	_refresh_king_btn()
 	_refresh_energy()
 	grid.queue_redraw()
@@ -1215,6 +1323,7 @@ func _result_rewards(v: VBoxContainer, won: bool) -> void:
 	coins += bonus
 	_series_coins += coins
 	var cmd_line := _bc_mission_update(won)
+	_refresh_mission()
 	v.add_child(UiTheme.make_label(SaveManager.xp_line(), 18, UiTheme.COL_GOLD))
 	var goes_on := ShopSystem.series_continues(_series, _round, _losses, _series_diff)
 	_series_over = not goes_on
@@ -1295,6 +1404,7 @@ func _next_round() -> void:
 		_result_dim = null
 	_result_shown = false
 	engine = null
+	_bm_done = false  # a new round starts its Continent mission from 0
 	phase = "prep"
 	selected = null
 	selected_support = -1

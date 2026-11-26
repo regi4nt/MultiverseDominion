@@ -56,11 +56,23 @@ func _test_unlock_rules() -> void:
 	check(SaveManager.trophies() == 70 - 30 - 10, "Easy defeats take 30, Hard defeats only 10")
 	# climb to the Arcanum threshold: the continent opens by itself, only its cards are opened for the Shop
 	_fresh_save()
+	# faction gate: trophies alone do not open the next continent, every faction of the current one has to win first
+	for i in range(6):
+		SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "normal")
+	check(SaveManager.trophies() == 149 and not SaveManager.is_continent_unlocked("arcanum"), "only Solvaris won: the trophies wait at 149 and Arcanum stays locked")
+	check(SaveManager.journey_gate_missing("arcanum").size() == 3 and SaveManager.difficulty_for_trophies(SaveManager.trophies()) == "hard", "3 Aetherion factions are still missing and the level stays Hard")
+	SaveManager.record_match(true, 10, 100, "aetherion", true, "nocthyr", {}, "normal")
+	SaveManager.record_match(true, 10, 100, "aetherion", true, "valdoria", {}, "normal")
+	check(not SaveManager.is_continent_unlocked("arcanum") and SaveManager.journey_gate_missing("arcanum") == ["elarion"], "3 of 4 Aetherion factions won: Arcanum is still locked")
+	SaveManager.record_match(true, 10, 100, "aetherion", true, "elarion", {}, "normal")
+	check(SaveManager.is_continent_unlocked("arcanum") and SaveManager.last_opened_continents == ["arcanum"] and SaveManager.trophies() >= 150, "the last missing faction win opens Arcanum")
+	_fresh_save()
+	var aeth_factions := ["solvaris", "nocthyr", "valdoria", "elarion"]
 	var wins := 0
 	while not SaveManager.is_continent_unlocked("arcanum") and wins < 20:
-		SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "normal")
+		SaveManager.record_match(true, 10, 100, "aetherion", true, String(aeth_factions[wins % 4]), {}, "normal")
 		wins += 1
-	check(wins == 5 and SaveManager.trophies() == 150, "5 Normal wins reach 150 trophies and open Arcanum")
+	check(wins == 5 and SaveManager.trophies() == 150, "5 Normal wins with all 4 factions reach 150 trophies and open Arcanum")
 	check(SaveManager.last_opened_continents == ["arcanum"], "the result reports the newly opened continent")
 	check(SaveManager.can_use_faction("astralis"), "the opened continent's factions can be used")
 	check(not SaveManager.is_continent_unlocked("machina"), "the next continent stays locked")
@@ -219,6 +231,7 @@ func _test_faction_rules() -> void:
 func _test_deck_ui() -> void:
 	_fresh_save()
 	SaveManager.data["collection"]["champion_nocthyr"] = 1  # Kings are cards: only owned Kings can lead the deck
+	(SaveManager.data["collection"] as Dictionary).erase("champion_valdoria")  # a new save owns the open continent's Kings: drop one to test an unowned King
 	GameSession.open_deck_tab = true
 	var coll: Control = load("res://scenes/card_collection/card_collection.tscn").instantiate()
 	add_child(coll)
@@ -292,7 +305,7 @@ func _test_ui() -> void:
 	(n._cards_row.get_node("Card_journey/Tap") as Button).pressed.emit()
 	check(n._view == "setup" and n._kind == "journey", "tapping Journey opens its setup")
 	check(GameSession.category == "journey" and GameSession.mode == "custom_ai" and GameSession.ai_count == 1, "Journey is always 1 vs 1")
-	check(GameSession.continent_id == "aetherion", "Journey preselects the continent to master")
+	check(GameSession.continent_id == "aetherion", "Journey preselects the newest open continent")
 	check(_find_button(n, "2.  ARCANUM") != null and _find_button(n, "2.  ARCANUM").disabled, "Journey: locked continents stay locked until the trophies are reached")
 	check(_find_button(n, "2.  ARCANUM").text.find("150 trophies") >= 0, "a locked continent row shows the trophies it needs")
 	check(_find_button(n, "1.  AETHERION").text.find("Open") >= 0, "an open continent row says Open")
@@ -300,7 +313,16 @@ func _test_ui() -> void:
 	check(n._journey_hint.text.find("Solvaris") >= 0 and n._journey_hint.text.find("AETHERION") >= 0, "Journey hint names the faction that must win")
 	check(_find_button(n, "Easy") == null and _find_button(n, "Hard") == null, "Journey has no difficulty choice")
 	check(GameSession.difficulty == "easy" and SaveManager.journey_difficulty() == "easy", "Journey starts on Easy (0 trophies)")
-	check(SaveManager.difficulty_for_trophies(399) == "easy" and SaveManager.difficulty_for_trophies(400) == "normal" and SaveManager.difficulty_for_trophies(1099) == "normal" and SaveManager.difficulty_for_trophies(1100) == "hard" and SaveManager.difficulty_for_trophies(5000) == "hard", "Journey difficulty follows the trophies: Easy < 400, Normal < 1100, Hard from 1100")
+	check(SaveManager.difficulty_for_trophies(0) == "easy" and SaveManager.difficulty_for_trophies(49) == "easy" and SaveManager.difficulty_for_trophies(50) == "normal" and SaveManager.difficulty_for_trophies(99) == "normal" and SaveManager.difficulty_for_trophies(100) == "hard" and SaveManager.difficulty_for_trophies(149) == "hard", "Journey: Aetherion (0-149) is split in Easy / Normal / Hard thirds")
+	var ladder := SaveManager.journey_ladder()
+	check(ladder.size() == 7 and ladder[0]["id"] == "aetherion" and ladder[0]["normal"] == [50, 99] and ladder[1]["hard"] == [317, 399] and ladder[6]["id"] == "eclipsia" and ladder[6]["hard"] == [2600, 2799], "the Journey ladder lists every continent with its Easy / Normal / Hard trophy ranges")
+	var ladder_ok := true
+	for i in range(ladder.size() - 1):
+		ladder_ok = ladder_ok and int(ladder[i]["hard"][1]) + 1 == int(ladder[i + 1]["easy"][0]) and int(ladder[i]["easy"][1]) + 1 == int(ladder[i]["normal"][0]) and int(ladder[i]["normal"][1]) + 1 == int(ladder[i]["hard"][0])
+	check(ladder_ok, "the ladder has no gaps or overlaps between levels and continents")
+	check(n._ladder_grid != null and n._ladder_grid.get_child_count() == 4 + 4 * ladder.size(), "the Journey setup shows the difficulty table (header + one row per continent)")
+	check(SaveManager.difficulty_for_trophies(150) == "easy" and SaveManager.difficulty_for_trophies(400) == "easy" and SaveManager.difficulty_for_trophies(1100) == "easy" and SaveManager.difficulty_for_trophies(2200) == "easy", "Journey: every new continent starts on Easy again")
+	check(SaveManager.difficulty_for_trophies(1599) == "hard" and SaveManager.difficulty_for_trophies(2799) == "hard" and SaveManager.difficulty_for_trophies(2400) == "normal", "Journey: the last stretch of each continent is Hard (the last continent uses journey_last_continent_span)")
 	check(n._wager_panel != null and n._wager_panel.kind == "journey", "Journey shows the wager panel")
 	SaveManager.data["wallet"]["coins"] = 600
 	n._wager_panel._on_pick(100)
@@ -311,10 +333,51 @@ func _test_ui() -> void:
 	check(GameSession.difficulty == "normal" and GameSession.to_match_config()["difficulty"] == "normal", "at 500 trophies Journey is on Normal")
 	SaveManager.data["trophies"] = 0
 	n._show_setup("journey")
+	check(not SaveManager.journey_difficulty_free() and _find_button(n, "Hard") == null, "while a continent is still locked the Journey difficulty is forced")
+	# the road is finished only when the last continent is open AND all its 4 factions have won there
+	var kept_unlocked: Array = (SaveManager.data["unlocked_continents"] as Array).duplicate()
+	var kept_factions: Array = (SaveManager.data["unlocked_factions"] as Array).duplicate()
+	var kept_wins: Dictionary = (SaveManager.data["journey_wins"] as Dictionary).duplicate(true)
+	for c in GameData.continents:
+		SaveManager.unlock_continent(String(c["id"]))
+	n._show_setup("journey")
+	check(SaveManager.journey_last_continent() == "eclipsia" and not SaveManager.journey_difficulty_free() and _find_button(n, "Hard") == null, "every continent open but Eclipsia not cleared: the Journey difficulty is still forced")
+	var eclipsia_factions: Array = []
+	for f in GameData.get_continent("eclipsia")["factions"]:
+		eclipsia_factions.append(String(f["id"]))
+	check(eclipsia_factions.size() == 4 and SaveManager.journey_final_missing().size() == 4, "Eclipsia has 4 factions and none has won yet")
+	for i in range(3):
+		SaveManager.record_match(true, 10, 100, "eclipsia", true, String(eclipsia_factions[i]), {}, "normal")
+	SaveManager.record_match(true, 10, 100, "eclipsia", true, String(eclipsia_factions[0]), {}, "normal")  # a repeat win does not count twice
+	SaveManager.record_match(false, 10, 100, "eclipsia", true, String(eclipsia_factions[3]), {}, "normal")  # a defeat does not count
+	check(SaveManager.journey_final_missing() == [eclipsia_factions[3]] and not SaveManager.journey_difficulty_free(), "3 of 4 Eclipsia factions won: still forced, one faction missing")
+	n._show_setup("journey")
+	check(n._journey_hint != null and _find_button(n, "Hard") == null, "with 3 / 4 factions the Journey setup still has no difficulty buttons")
+	SaveManager.record_match(true, 10, 100, "eclipsia", true, String(eclipsia_factions[3]), {}, "normal")
+	check(SaveManager.journey_final_missing().is_empty() and not SaveManager.journey_difficulty_free(), "all 4 Eclipsia factions won but the trophies are still inside Eclipsia's range: the difficulty stays forced")
+	check(SaveManager.journey_final_trophy_goal() == 2800, "the road ends at the end of Eclipsia's trophy range (2800)")
+	SaveManager.data["trophies"] = 2799
+	check(not SaveManager.journey_difficulty_free(), "2799 trophies: Eclipsia's Hard tier is not finished yet")
+	SaveManager.data["trophies"] = 2800
+	check(SaveManager.journey_difficulty_free(), "2800 trophies and all 4 Eclipsia factions won: the Journey difficulty is free")
+	n._show_setup("journey")
+	var hard_btn := _find_button(n, "Hard")
+	check(hard_btn != null and _find_button(n, "Easy") != null and _find_button(n, "Normal") != null, "free Journey shows the Easy / Normal / Hard buttons")
+	if hard_btn != null:
+		hard_btn.pressed.emit()
+	check(GameSession.difficulty == "hard" and GameSession.to_match_config()["difficulty"] == "hard", "the chosen free Journey difficulty reaches the match config")
+	n._show_setup("journey")
+	check(GameSession.difficulty == "hard", "the free Journey choice is kept when the setup is rebuilt")
+	SaveManager.data["unlocked_continents"] = kept_unlocked
+	SaveManager.data["unlocked_factions"] = kept_factions
+	SaveManager.data["journey_wins"] = kept_wins
+	SaveManager.data["trophies"] = 0
+	n._show_setup("journey")
+	check(GameSession.difficulty == SaveManager.journey_difficulty(), "locking a continent again forces the trophy difficulty back")
 	GameSession.wager = 0
 	# climb the trophy road: the continent opens by itself
 	for i in range(5):
-		SaveManager.record_match(true, 10, 100, "aetherion", true, "solvaris", {}, "normal")
+		SaveManager.record_match(true, 10, 100, "aetherion", true, String(["solvaris", "nocthyr", "valdoria", "elarion"][i % 4]), {}, "normal")
 	n._show_setup("journey")
 	var arc := _find_button(n, "2.  ARCANUM")
 	check(arc != null and not arc.disabled and arc.text.find("Open") >= 0, "reaching the trophies opens the continent")

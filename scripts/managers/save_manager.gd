@@ -25,7 +25,7 @@ func default_data() -> Dictionary:
 		"settings": {"master_volume": 0.8, "default_difficulty": "normal", "sfx": true, "check_updates": true, "skipped_update": "", "fullscreen": false, "effects": "pro"},
 		"campaign": {"progress": 0},  # TODO (Phase 6): Story Campaign
 		"unlocked_continents": ["aetherion"],
-		"journey_wins": {},  # continent id -> ids of the factions that won a Journey match on it
+		"journey_wins": {},  # continent id -> ids of the factions that won a Journey match on it (all 4 of the last continent free the Journey difficulty)
 		"unlocked_factions": ["solvaris", "nocthyr", "valdoria", "elarion"],
 		"collection": {},  # TODO (Phase 3): Card Collection
 		"decks": {},  # TODO (Phase 3): Deck Configuration
@@ -169,6 +169,20 @@ func unlock_continent(id: String) -> void:
 	for f in GameData.get_continent(id).get("factions", []):
 		if not (data["unlocked_factions"] as Array).has(f["id"]):
 			data["unlocked_factions"].append(f["id"])
+
+
+## Journey gives the Kings of a continent for free as B1 cards (a King already owned keeps its level), so the player can win with
+## each faction of it (the faction gate of the next continent). Returns the ids of the Kings that were added.
+func grant_continent_kings(id: String) -> Array[String]:
+	var added: Array[String] = []
+	if not data.has("collection") or not (data["collection"] is Dictionary):
+		return added
+	for f in GameData.get_continent(id).get("factions", []):
+		var kid := String(f.get("champion", ""))
+		if kid != "" and CardDatabase.is_king(kid) and owned_count(kid) == 0:
+			data["collection"][kid] = 1
+			added.append(kid)
+	return added
 
 
 ## The Journey continent to play by default: the newest open one (highest unlock_trophies).
@@ -324,22 +338,125 @@ func trophy_floor() -> int:
 	return best
 
 
-## Journey has no difficulty choice: the AI gets harder as the trophies grow (balance.json "journey_difficulty_by_trophies":
-## the difficulty whose trophy threshold is the highest one reached; Easy from 0, Normal from 400, Hard from 1100).
+## Trophy band of the Journey continent that `t` trophies put you on: {"id", "from", "to"}. "from" = its unlock_trophies, "to" = the
+## unlock_trophies of the next continent (the last continent uses balance.json "journey_last_continent_span").
+static func journey_band(t: int) -> Dictionary:
+	var cur := ""
+	var cur_at := -1
+	var next_at := -1
+	for c in GameData.continents:
+		if not c.get("playable", false):
+			continue
+		var at := int(c.get("unlock_trophies", 0))
+		if at <= t and at > cur_at:
+			cur = String(c["id"])
+			cur_at = at
+	for c in GameData.continents:
+		if not c.get("playable", false):
+			continue
+		var at2 := int(c.get("unlock_trophies", 0))
+		if at2 > cur_at and (next_at == -1 or at2 < next_at):
+			next_at = at2
+	if next_at == -1:
+		next_at = cur_at + int(GameData.b("journey_last_continent_span", 600))
+	return {"id": cur, "from": maxi(cur_at, 0), "to": next_at}
+
+
+## Journey has no difficulty choice: EVERY continent has all 3 levels. Its trophy range (from its own unlock_trophies up to the
+## next continent's) is split in three equal parts: Easy first, Normal in the middle, Hard last, then the next continent opens
+## and starts Easy again. Losing never drops you below the continent's floor, so each continent always starts on Easy.
+## (Past the last continent's range and with all its 4 factions won, the player chooses the level freely: see journey_difficulty_free.)
 static func difficulty_for_trophies(t: int) -> String:
-	var table: Dictionary = GameData.b("journey_difficulty_by_trophies", {"easy": 0})
-	var best := "easy"
-	var best_at := -1
-	for d in table:
-		var at := int(table[d])
-		if t >= at and at > best_at:
-			best = String(d)
-			best_at = at
-	return best
+	var band := journey_band(t)
+	var span := maxi(int(band["to"]) - int(band["from"]), 1)
+	var tier := clampi((3 * (t - int(band["from"]))) / span, 0, 2)
+	return ["easy", "normal", "hard"][tier]
+
+
+## Trophies at which the 3 levels start inside the band of `t`: [easy_from, normal_from, hard_from].
+static func journey_tier_starts(t: int) -> Array:
+	var band := journey_band(t)
+	var a := int(band["from"])
+	var span := int(band["to"]) - a
+	return [a, a + int(ceil(span / 3.0)), a + int(ceil(2.0 * span / 3.0))]
 
 
 func journey_difficulty() -> String:
 	return difficulty_for_trophies(trophies())
+
+
+## The whole trophy ladder, one row per playable continent: {"id", "name", "easy": [lo, hi], "normal": [lo, hi], "hard": [lo, hi]}
+## (inclusive trophy ranges; the Hard range ends right before the next continent opens). Shown as a table in the Journey setup.
+static func journey_ladder() -> Array:
+	var rows: Array = []
+	for c in GameData.continents:
+		if not c.get("playable", false):
+			continue
+		var a := int(c.get("unlock_trophies", 0))
+		var band := journey_band(a)
+		var st := journey_tier_starts(a)
+		rows.append({"id": String(c["id"]), "name": String(c.get("name", c["id"])),
+			"easy": [int(st[0]), int(st[1]) - 1], "normal": [int(st[1]), int(st[2]) - 1], "hard": [int(st[2]), int(band["to"]) - 1]})
+	rows.sort_custom(func(x, y): return int(x["easy"][0]) < int(y["easy"][0]))
+	return rows
+
+
+## The Journey continent that ends the road: the playable one with the highest unlock_trophies (Eclipsia).
+func journey_last_continent() -> String:
+	var best := ""
+	for c in GameData.continents:
+		if c.get("playable", false) and (best == "" or continent_trophies(String(c["id"])) > continent_trophies(best)):
+			best = String(c["id"])
+	return best
+
+
+## Ids of the factions that have won a Journey match on `continent_id` (key "journey_wins").
+func journey_won_factions(continent_id: String) -> Array:
+	var all: Dictionary = data.get("journey_wins", {})
+	return (all.get(continent_id, []) as Array).duplicate()
+
+
+## The factions of the last continent that still have to win there (4 of them) before the difficulty is free.
+func journey_final_missing() -> Array:
+	var last := journey_last_continent()
+	var won := journey_won_factions(last)
+	var out: Array = []
+	for f in GameData.get_continent(last).get("factions", []):
+		if not won.has(String(f["id"])):
+			out.append(String(f["id"]))
+	return out
+
+
+## Trophies that finish the road: the end of the last continent's trophy range (Eclipsia 2200-2799 -> 2800), i.e. its Hard tier is done.
+func journey_final_trophy_goal() -> int:
+	var last := journey_last_continent()
+	return int(journey_band(continent_trophies(last))["to"])
+
+
+## True once the road is finished: the last continent is open, the trophies reached the end of its range (its Easy / Normal / Hard
+## tiers are all behind you) AND every one of its factions has won a Journey match on it.
+func journey_final_cleared() -> bool:
+	var last := journey_last_continent()
+	return last != "" and is_continent_unlocked(last) and trophies() >= journey_final_trophy_goal() and journey_final_missing().is_empty()
+
+
+func _note_journey_win(continent_id: String, faction_id: String) -> void:
+	if continent_id == "" or faction_id == "":
+		return
+	if not data.has("journey_wins") or not (data["journey_wins"] is Dictionary):
+		data["journey_wins"] = {}
+	var all: Dictionary = data["journey_wins"]
+	var list: Array = all.get(continent_id, [])
+	if not list.has(faction_id):
+		list.append(faction_id)
+	all[continent_id] = list
+
+
+## The Journey AI level is only free to choose after the road is FINISHED: the trophies are past the whole range of the last continent
+## (Eclipsia, 2800+) and the player has won there with each of its 4 factions. Until then it follows the trophies (see difficulty_for_trophies). The player then picks
+## Easy / Normal / Hard in the Journey setup, like in Arena.
+func journey_difficulty_free() -> bool:
+	return journey_final_cleared()
 
 
 ## Trophy change of a Journey result: the harder the AI, the more a win gives and the less a defeat takes.
@@ -348,15 +465,63 @@ static func trophy_delta(won: bool, difficulty: String) -> int:
 	return int(table.get(difficulty, 30 if won else -20))
 
 
-## Continents (ids) that the current trophies have opened but are still locked: opens them. Returns the newly opened ids.
+## The playable continent right before `id` on the trophy road (the highest unlock_trophies below it); "" for the first continent.
+func journey_prev_continent(id: String) -> String:
+	var at := continent_trophies(id)
+	var best := ""
+	for c in GameData.continents:
+		if not c.get("playable", false):
+			continue
+		var cid := String(c["id"])
+		var cat := continent_trophies(cid)
+		if cat < at and (best == "" or cat > continent_trophies(best)):
+			best = cid
+	return best
+
+
+## Factions of the PREVIOUS continent that still have to win a Journey match before `id` can open (same rule as the last
+## continent: win with each of its factions). Empty = the faction gate of `id` is cleared (the first continent has none).
+func journey_gate_missing(id: String) -> Array:
+	var prev := journey_prev_continent(id)
+	var out: Array = []
+	if prev == "":
+		return out
+	var won := journey_won_factions(prev)
+	for f in GameData.get_continent(prev).get("factions", []):
+		if not won.has(String(f["id"])):
+			out.append(String(f["id"]))
+	return out
+
+
+## A locked continent opens only when its trophies are reached AND every faction of the previous continent has won there.
+func can_unlock_continent(id: String) -> bool:
+	return trophies() >= continent_trophies(id) and journey_gate_missing(id).is_empty()
+
+
+## Continents (ids) that the current trophies AND the faction wins have opened but are still locked: opens them.
+## Returns the newly opened ids. Opens at most one continent per call chain step (the next one needs its own faction wins).
 func unlock_by_trophies() -> Array[String]:
 	var opened: Array[String] = []
-	for c in GameData.continents:
-		var id := String(c["id"])
-		if c.get("playable", false) and not is_continent_unlocked(id) and trophies() >= continent_trophies(id):
-			unlock_continent(id)
-			opened.append(id)
+	var changed := true
+	while changed:
+		changed = false
+		for c in GameData.continents:
+			var id := String(c["id"])
+			if c.get("playable", false) and not is_continent_unlocked(id) and can_unlock_continent(id):
+				unlock_continent(id)
+				grant_continent_kings(id)  # the new continent's Kings are a gift of the road (B1)
+				opened.append(id)
+				changed = true
 	return opened
+
+
+## Trophy ceiling while the next continent is locked by its faction gate: one below its unlock_trophies, so the AI level stays on
+## the Hard tier of the current continent until every faction has won. -1 = no ceiling (nothing locked, or the gate is cleared).
+func journey_trophy_cap() -> int:
+	var next := next_continent_goal()
+	if next == "" or journey_gate_missing(next).is_empty():
+		return -1
+	return continent_trophies(next) - 1
 
 
 ## The next locked playable continent in trophy order ("" when everything is open).
@@ -408,8 +573,14 @@ func record_match(won: bool, rounds: int, final_gold: int, continent_id: String 
 			EventHub.track("arena_wins")
 	if journey:  # Journey only: the trophy road. A win raises the score, a defeat lowers it (never below the floor of the open continents)
 		var before := trophies()
+		if won:
+			_note_journey_win(continent_id, faction_id)  # per-faction wins: every continent needs all its factions to open the next one (the last one frees the difficulty)
 		last_trophy_delta = trophy_delta(won, difficulty)
-		data["trophies"] = maxi(before + last_trophy_delta, trophy_floor())
+		var new_t := maxi(before + last_trophy_delta, trophy_floor())
+		var cap := journey_trophy_cap()  # faction gate not cleared: trophies wait one below the next continent
+		if cap >= 0 and new_t > cap:
+			new_t = maxi(cap, before)
+		data["trophies"] = new_t
 		last_trophy_delta = trophies() - before
 		last_opened_continents = unlock_by_trophies()
 	last_reward = ShopSystem.win_reward(difficulty) if won else ShopSystem.loss_reward(difficulty)
@@ -549,8 +720,10 @@ func ensure_collection() -> void:
 			if s.get("owned_default", false):
 				col[s["id"]] = 1
 		data["unit_cards_v"] = 2  # 2 = unit cards are locked (starter units only) and come from the Shop; a save without it owns every unit
-		col["champion_solvaris"] = 1  # Kings are cards too: only the default King is owned, the others come from the Shop
-		data["king_cards_v"] = 1
+		col["champion_solvaris"] = 1  # Kings are cards too: the Kings of the open continents are owned (Journey hands out the rest), extra copies come from the Shop
+		data["king_cards_v"] = 2
+		for cid0 in (data["unlocked_continents"] as Array):
+			grant_continent_kings(String(cid0))
 		changed = true
 	elif int(data.get("unit_cards_v", 1)) < 2:
 		# older save (every unit owned): keep what the player has, add the unit cards of continents that did not exist yet
@@ -577,6 +750,12 @@ func ensure_collection() -> void:
 				col[champ_id] = 1
 		col["champion_solvaris"] = maxi(int(col.get("champion_solvaris", 0)), 1)
 		data["king_cards_v"] = 1
+		changed = true
+	if int(data.get("king_cards_v", 0)) < 2:
+		# faction gate: every continent already open hands its Kings over as B1 (an owned King keeps its level)
+		for cid1 in (data["unlocked_continents"] as Array):
+			grant_continent_kings(String(cid1))
+		data["king_cards_v"] = 2
 		changed = true
 	if changed:
 		save_game()
@@ -634,6 +813,18 @@ func get_deck(continent_id: String = "") -> Deck:
 	deck.support_lineup = deck.valid_support_lineup()
 	deck.champion_id = player_champion_id()  # never a King of a locked faction
 	return deck
+
+
+## Continent whose deck Battle Chess uses. The map of a Battle Chess run is random, so the deck must NOT follow it:
+## the deck saved last in the Card Hub, else the continent of the player's King (its faction's default 15 units), else Aetherion.
+func battle_deck_continent() -> String:
+	var last := last_deck_continent()
+	if last != "":
+		return last
+	var home := String(GameData.get_champion(player_champion_id()).get("continent", ""))
+	if home != "" and GameData.get_continent(home).get("playable", false):
+		return home
+	return "aetherion"
 
 
 ## Continent of the deck the player saved last in the Card Hub ("" = none saved yet). Battle Chess plays on it so it matches that deck.

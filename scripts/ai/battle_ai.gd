@@ -156,18 +156,24 @@ static func build_enemy(difficulty: String, level: int, rng: RandomNumberGenerat
 
 ## AI player prepares for a duel with its PERSISTENT army: spends part of its real gold,
 ## may level up, deploys, and returns the side config for BattleEngine.setup().
-static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: int, terrain: Dictionary = {}) -> Dictionary:
+## `follow_level` > 0 = the level of the human player: the AI's shop level (capacity + shop rarity odds) follows OURS, like the Battle Chess
+## enemy (it still grows its army only through its budget). 0 = no human to follow (AI vs AI): the AI levels up on its own.
+static func prepare_ai_army(p: PlayerState, rng: RandomNumberGenerator, side: int, terrain: Dictionary = {}, follow_level: int = 0) -> Dictionary:
 	var ratios: Dictionary = GameData.b("ai_battle_budget_ratio")
 	var budget := int(float(p.gold) * float(ratios.get(p.difficulty, 0.35)))
-	var prep := BattlePrep.new(p.deck, rng, p.gold, budget, p.level, p.roster, p.battle_deck, p.hand)
+	var start_level := p.level
+	if follow_level > 0:
+		start_level = clampi(follow_level, 1, int(GameData.b("max_level")))
+	var prep := BattlePrep.new(p.deck, rng, p.gold, budget, start_level, p.roster, p.battle_deck, p.hand)
 	prep.price_mult = p.battle_price_mult()
 	prep.terrain = terrain
-	# Every difficulty (Easy too) levels up once its army fills the capacity; the battle budget ratio still limits how often Easy can afford it.
-	var total_cost := 0
-	for u in p.roster.units:
-		total_cost += CardDatabase.capacity_cost(u.chess())
-	if total_cost >= prep.capacity() - 1 and prep.level < 7 and prep.budget_left >= prep.level_up_cost() + 50:
-		prep.level_up()
+	if follow_level <= 0:
+		# Every difficulty (Easy too) levels up once its army fills the capacity; the battle budget ratio still limits how often Easy can afford it.
+		var total_cost := 0
+		for u in p.roster.units:
+			total_cost += CardDatabase.capacity_cost(u.chess())
+		if total_cost >= prep.capacity() - 1 and prep.level < 7 and prep.budget_left >= prep.level_up_cost() + 50:
+			prep.level_up()
 	_shop_loop(prep, p.difficulty, rng)
 	auto_deploy(prep, side)
 	prep.finish()

@@ -39,7 +39,7 @@ func _ready() -> void:
 	var cpanel := PanelContainer.new()
 	cpanel.custom_minimum_size = Vector2(280, 0)
 	body.add_child(cpanel)
-	var cscroll := ScrollContainer.new()
+	var cscroll := UiTheme.make_scroll()
 	cscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	cpanel.add_child(cscroll)
 	var cbox := VBoxContainer.new()
@@ -62,7 +62,7 @@ func _ready() -> void:
 	var spanel := PanelContainer.new()
 	spanel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(spanel)
-	var sscroll := ScrollContainer.new()
+	var sscroll := UiTheme.make_scroll()
 	sscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	spanel.add_child(sscroll)
 	var sbox := VBoxContainer.new()

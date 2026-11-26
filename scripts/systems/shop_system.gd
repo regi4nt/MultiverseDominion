@@ -480,19 +480,19 @@ static func convert_currency(exchange_id: String, packs: int) -> String:
 	return ""
 
 
-# ------------------------------------------------------------------ Auction (lelang): bid for locked cards with Aether Coins
+# ------------------------------------------------------------------ Auction (lelang): bid for locked cards with Crystals
 
 const AUCTION_LOTS := 4  # cards on offer at the same time
-const AUCTION_VALUE_MULT := 4  # market value in coins = fragment price x this
+const AUCTION_VALUE_MULT := 1  # market value in Crystals = the Crystal price of the card x this (Crystal prices are small: 1 / 2 / 4 / 10)
 const AUCTION_OPEN := 0.4  # the first bid is 40% of the value (same as the Auction on the board)
 const AUCTION_STEP := 0.10  # every raise is 10% of the value
 const AUCTION_RIVAL_MIN := 0.6  # a rival's hidden limit is between 60% ...
 const AUCTION_RIVAL_MAX := 1.3  # ... and 130% of the value
 
 
-## What a card is worth at the Auction, in Aether Coins.
+## What a card is worth at the Auction, in Crystals (its Buy-with-Crystals price: a lucky auction beats it, a bad one costs more).
 static func auction_value(card: Dictionary) -> int:
-	return fragment_price(card) * AUCTION_VALUE_MULT
+	return crystal_price(card) * AUCTION_VALUE_MULT
 
 
 static func auction_open(card: Dictionary) -> int:
@@ -503,8 +503,19 @@ static func auction_step(card: Dictionary) -> int:
 	return maxi(1, roundi(float(auction_value(card)) * AUCTION_STEP))
 
 
-## The lots of a day (ids): locked Support cards and unit cards the Shop sells, never Common. Same lots all day (`day` = unix day).
-static func auction_lots(day: int) -> Array:
+## The auction slot of now: the unix HOUR. The lots change every hour (the same for the whole hour).
+static func auction_slot() -> int:
+	return int(Time.get_unix_time_from_system() / 3600.0)
+
+
+## Seconds until the lots change.
+static func auction_seconds_left() -> int:
+	return 3600 - (int(Time.get_unix_time_from_system()) % 3600)
+
+
+## The lots of one hour (ids): random locked Support cards and unit cards the Shop sells, never Common. Same lots for the whole
+## hour (`slot` = unix hour, see auction_slot), a new random set every hour.
+static func auction_lots(slot: int) -> Array:
 	var pool: Array = []
 	for s in locked_supports():
 		if String(s.get("rarity", "common")) != "common":
@@ -513,7 +524,7 @@ static func auction_lots(day: int) -> Array:
 		pool.append(String(u["id"]))
 	pool.sort()
 	var rng := RandomNumberGenerator.new()
-	rng.seed = hash("auction_%d" % day)
+	rng.seed = hash("auction_%d" % slot)
 	var out: Array = []
 	while out.size() < AUCTION_LOTS and not pool.is_empty():
 		out.append(pool.pop_at(rng.randi_range(0, pool.size() - 1)))
@@ -538,8 +549,8 @@ static func auction_win(card_id: String, price: int) -> String:
 		return "Unknown card."
 	if SaveManager.owned_count(card_id) > 0:
 		return "You already own this card."
-	if not SaveManager.spend_coins(price):
-		return "Not enough Aether Coins."
+	if not SaveManager.spend_currency("crystals", price):
+		return "Not enough Crystals."
 	SaveManager.unlock_card(card_id)
 	SaveManager.save_game()
 	return ""

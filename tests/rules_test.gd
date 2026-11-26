@@ -851,8 +851,8 @@ func _test_combos() -> void:
 	check(ComboSystem.role_ultra({"Tank": 8}) == "Tank" and ComboSystem.role_ultra({"Tank": 7}) == "" and ComboSystem.role_ultra({"Tank": 8, "Mage": 1}) == "", "Ultra role: all units one role, 8+")
 	check(is_equal_approx(fxof.call("Tank", {"Tank": 8}, "armor"), 0.15 * 1.5) and is_equal_approx(fxof.call("Tank", {"Tank": 7, "Mage": 1}, "armor"), 0.15), "Ultra Iron Wall x1.5 only when ALL units are Tanks")
 	# Ultra special effects (flat, only in Ultra)
-	check(is_equal_approx(tfx.call("Fighter", "solvaris", 8, "lifesteal", true), 0.08) and is_equal_approx(tfx.call("Fighter", "solvaris", 8, "frenzy", true), 0.04) and tfx.call("Fighter", "solvaris", 6, "lifesteal") == 0.0, "Ultra Dominion: lifesteal + frenzy only in Faction Ultra")
-	check(String(ComboSystem.faction_tier("solvaris", 8, true)["special"]) == "Ultra Dominion" and String(ComboSystem.faction_tier("solvaris", 6)["special"]) == "" and ComboSystem.faction_tier_text(ComboSystem.faction_tier("solvaris", 8, true)).contains("Ultra Dominion"), "Faction Tier shows the Ultra special only in Ultra")
+	check(is_equal_approx(tfx.call("Fighter", "solvaris", 8, "lifesteal", true), 0.08) and is_equal_approx(tfx.call("Fighter", "solvaris", 8, "frenzy", true), 0.04) and tfx.call("Fighter", "solvaris", 6, "lifesteal") == 0.0, "Ultra: lifesteal + frenzy bonus only in Faction Ultra")
+	check(String(ComboSystem.faction_tier("solvaris", 8, true)["special"]) == "Ultra" and String(ComboSystem.faction_tier("solvaris", 6)["special"]) == "" and ComboSystem.faction_tier_text(ComboSystem.faction_tier("solvaris", 8, true)).contains("; Ultra: "), "Faction Tier shows the Ultra special only in Ultra")
 	check(is_equal_approx(fxof.call("Tank", {"Tank": 8}, "second_life"), 0.30) and fxof.call("Tank", {"Tank": 7, "Mage": 1}, "second_life") == 0.0, "Role Ultra special: Unbreakable (Tanks return once at 30% HP) only when ALL units are Tanks")
 	check(fxof.call("Assassin", {"Assassin": 8}, "evade") == 3.0 and fxof.call("Mage", {"Mage": 8}, "burn") > 0.0 and fxof.call("Marksman", {"Marksman": 8}, "execute") > 0.0 and fxof.call("Controller", {"Controller": 8}, "stun_proc") == 3.0 and ComboSystem.scaled_fx_value("evade", 4.0, 1.5) == 3.0, "Role Ultra specials: Phantom Rush / Arcane Overreach / Deadeye Volley / Grand Strategy")
 	for r in ComboSystem.ROLES:
@@ -913,6 +913,21 @@ func _test_combos() -> void:
 		cr_each_ok = cr_each_ok and not ComboSystem.unit_mods(String(cr_pairs[cid]), {}, "", 0, false, false, {}, cr_all, String(cid))["fx"].is_empty()
 	check(cr_each_ok and ComboSystem.unit_mods("Marksman", {}, "", 0, false, false, {}, cr_all, "thalassia")["fx"].is_empty(), "all 6 Continent Specialties give their units an effect; Marksmen get none (no combo)")
 	check(is_equal_approx(float(ComboSystem.unit_mods("Tank", {"Tank": 2}, "", 0, false, false, {}, [ComboSystem.continent_role_combo("aetherion", "Tank")], "aetherion")["fx"].get("thorns", 0.0)), 0.08) and is_equal_approx(float(ComboSystem.unit_mods("Tank", {"Tank": 4}, "", 0, false, false, {}, [ComboSystem.continent_role_combo("aetherion", "Tank")], "aetherion")["fx"].get("thorns", 0.0)), 0.18), "Continent Specialty stacks with the role trait (Iron Wall thorns + Royal Bulwark thorns)")
+	# Continent Formation: 4 units of ONE faction of the KING's continent give those units the effect of that continent
+	var fm_act := ComboSystem.formation_active({"solvaris": 4, "drakhan": 5, "nocthyr": 4}, "aetherion")
+	check(fm_act.size() == 2 and String(fm_act[0]["name"]) == "Crown Phalanx" and String(fm_act[1]["name"]) == "Crown Phalanx", "Continent Formation: only factions of the King's continent with 4+ units qualify (Drakhan of Drakmor does not)")
+	check(ComboSystem.formation_active({"solvaris": 3}, "aetherion").is_empty() and ComboSystem.formation_active({}, "aetherion").is_empty() and ComboSystem.formation_active({"solvaris": 9}, "").is_empty() and ComboSystem.formation_active({"drakhan": 9}, "aetherion").is_empty(), "Continent Formation: 3 units, no King or a foreign continent do not switch it on")
+	check(ComboSystem.formation_lacking(3) == 1 and ComboSystem.formation_lacking(4) == 0 and ComboSystem.formation_lacking(9) == 0, "Continent Formation: lacking counts down to 0")
+	check(ComboSystem.formation_effects_for("solvaris", 3, "aetherion").is_empty() and not ComboSystem.formation_effects_for("solvaris", 4, "aetherion").is_empty() and ComboSystem.formation_effects_for("solvaris", 9, "drakmor").is_empty() and ComboSystem.formation_effects_for("solvaris", 9, "").is_empty() and ComboSystem.formation_effects_for("", 9, "aetherion").is_empty(), "Continent Formation: effects only from 4 units of a faction of the King's continent")
+	var fm_all_ok := true
+	for cid in ComboSystem.CONTINENT_BONDS:
+		var fmd := ComboSystem.formation_of(String(cid))
+		fm_all_ok = fm_all_ok and not fmd.is_empty() and not ComboSystem.unit_mods("Tank", {}, "", 0, false, false, {}, [], "", fmd["effects"])["fx"].is_empty()
+	check(fm_all_ok and ComboSystem.CONTINENT_FORMATIONS.size() == ComboSystem.CONTINENT_BONDS.size() and ComboSystem.formation_of("nowhere").is_empty(), "Continent Formation: every continent has its own themed formation")
+	var fm_dr: Dictionary = ComboSystem.unit_mods("Fighter", {}, "", 0, false, false, {}, [], "", ComboSystem.formation_effects_for("drakhan", 4, "drakmor"))["fx"]
+	check(is_equal_approx(float(fm_dr.get("frenzy", 0.0)), 0.04) and is_equal_approx(float(fm_dr.get("rage", 0.0)), 0.06), "Warband Frenzy (Drakmor King, Drakhan units): +4% ATK per kill and +6% under half HP")
+	var fm_stack: Dictionary = ComboSystem.unit_mods("Tank", {}, "solvaris", 4, false, false, {}, [], "", ComboSystem.formation_effects_for("solvaris", 4, "aetherion"))["fx"]
+	check(is_equal_approx(float(fm_stack.get("armor", 0.0)), 0.04) and is_equal_approx(float(fm_stack.get("guard", 0.0)), 0.03) and float(fm_stack.get("mend_self", 0.0)) > 0.0, "Continent Formation stacks with, and does not replace, the faction trait")
 	# Faction Tier: Faction Banner + faction trait fused into one tier (numbers unchanged)
 	var ft_h := ComboSystem.faction_tier("solvaris", 6)
 	check(ComboSystem.faction_tier("solvaris", 1).is_empty() and String(ft_h["name"]) == "Host" and is_equal_approx(float(ft_h["bonus"]), 0.0) and String(ft_h["trait"]) == "Dawn Ward" and not (ft_h["trait_effects"] as Array).is_empty(), "Faction Tier: 6 units = Dawn Ward at full tier, no banner bonus")
@@ -1015,6 +1030,39 @@ func _test_continent_role_engine() -> void:
 	var no_f := BattleEngine.new()  # 6 Mages of mixed factions and nothing else: the faction half is missing
 	no_f.setup({"seed": 3, "sides": [{"units": _cr_line(mage_six), "champion": champ, "supports": []}, foes]})
 	check(not no_f.log_lines.any(func(l): return String(l).contains("Rune Cascade")), "Continent Specialty in the engine: 6 Mages without 6 units of one faction are not enough")
+	# Continent Formation in the engine: 4 units of one faction of the KING's continent give THOSE units its effect (King Astralis = Arcanum: Runic Circle)
+	var fm4 := BattleEngine.new()
+	fm4.setup({"seed": 3, "sides": [{"units": _cr_line(faction_six.slice(0, 4)), "champion": champ, "supports": []}, foes]})
+	var fm_ok := true
+	for u in fm4.units_of(0):
+		if not u.is_king:
+			fm_ok = fm_ok and float(u.fx.get("splash", 0.0)) >= 0.12 - 0.0001 and float(u.fx.get("burn", 0.0)) >= 0.05 - 0.0001
+	check(fm_ok and fm4.log_lines.any(func(l): return String(l).contains("synergy: Runic Circle")), "Continent Formation in the engine: 4 Astralis units under an Arcanum King get Runic Circle (splash + burn)")
+	var fm3 := BattleEngine.new()
+	fm3.setup({"seed": 3, "sides": [{"units": _cr_line(faction_six.slice(0, 3)), "champion": champ, "supports": []}, foes]})
+	check(not fm3.log_lines.any(func(l): return String(l).contains("Runic Circle")), "Continent Formation in the engine: 3 units of a faction are not enough")
+	var drakhan_units: Array = []
+	for cu in CardDatabase.units_of_continent("drakmor"):
+		if String(cu["chess"]) != "pawn" and String(cu["faction"]) == "drakhan":
+			drakhan_units.append(cu)
+	var fmf := BattleEngine.new()  # 4 Drakhan units (a foreign continent) under an Arcanum King: no formation, no Warband Frenzy
+	fmf.setup({"seed": 3, "sides": [{"units": _cr_line(drakhan_units.slice(0, 4)), "champion": champ, "supports": []}, foes]})
+	var fm_none := true
+	for u in fmf.units_of(0):
+		fm_none = fm_none and float(u.fx.get("frenzy", 0.0)) == 0.0 and float(u.fx.get("burn", 0.0)) == 0.0
+	check(fm_none and not fmf.log_lines.any(func(l): return String(l).contains("Warband Frenzy") or String(l).contains("Runic Circle")), "Continent Formation in the engine: 4 units of a faction of ANOTHER continent get nothing")
+	var other_arc := ""
+	for f in GameData.get_continent("arcanum").get("factions", []):
+		if String(f["id"]) != fac:
+			other_arc = String(f["id"])
+			break
+	var oa_units: Array = []
+	for cu in CardDatabase.units_of_continent("arcanum"):
+		if String(cu["chess"]) != "pawn" and String(cu["faction"]) == other_arc:
+			oa_units.append(cu)
+	var fmo := BattleEngine.new()  # 4 units of ANOTHER faction of the King's continent qualify too
+	fmo.setup({"seed": 3, "sides": [{"units": _cr_line(oa_units.slice(0, 4)), "champion": champ, "supports": []}, foes]})
+	check(fmo.log_lines.any(func(l): return String(l).contains("synergy: Runic Circle")), "Continent Formation in the engine: 4 units of another faction of the King's continent qualify")
 	# every pair switches on in the engine: 6 units of one faction of its continent + 6 units of its role
 	var all_ok := true
 	for c in ComboSystem.CONTINENT_ROLE_COMBOS:

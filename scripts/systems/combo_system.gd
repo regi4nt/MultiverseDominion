@@ -117,6 +117,30 @@ const CONTINENT_ROLE_COMBOS: Array = [
 		"effects": [{"to": ["Assassin"], "evade": 5, "opener": 0.30}]},
 ]
 
+## 8. Continent Formation: field FORMATION_UNITS (4) units of ONE faction that comes from the SAME continent as your King (the King's own faction or another faction of his continent;
+## factions of other continents never qualify) and the units of THAT faction gain the formation effect of the King's continent (CONTINENT_FORMATIONS, one themed effect pair per continent).
+## It is the small, early-game cousin of the Continent Alliance / Specialties: it reaches ONLY the units of the qualifying faction (other units of the army get nothing from it).
+## Two factions of the King's continent with 4 units each give each its own units the formation. A unit never gets a formation twice. Stacks with every other synergy.
+## `king_continent` = "" (no King) means no formation.
+const FORMATION_UNITS: int = 4
+const FORMATION_NAME: String = "Continent Formation"
+const CONTINENT_FORMATIONS: Dictionary = {
+	"aetherion": {"id": "formation_aetherion", "name": "Crown Phalanx", "blurb": "The crown's soldiers lock shields: the faction's units take 4% less damage and shield the allies within 2 cells for another 3%.",
+		"effects": [{"to": "all", "armor": 0.04, "guard": 0.03}]},
+	"arcanum": {"id": "formation_arcanum", "name": "Runic Circle", "blurb": "The faction draws a runic circle: its attacks splash 12% onto the neighbours and set the target alight (5% ATK every 4 ticks).",
+		"effects": [{"to": "all", "splash": 0.12, "burn": 0.05}]},
+	"machina": {"id": "formation_machina", "name": "Gear Lock", "blurb": "The faction's gears mesh: every unit opens with a +20% first strike and every 8th attack stuns the target for a tick.",
+		"effects": [{"to": "all", "opener": 0.20, "stun_proc": 8}]},
+	"sylvaris": {"id": "formation_sylvaris", "name": "Rootbound Ring", "blurb": "The faction's roots link up: every unit heals 3% HP every 8 ticks and, when it falls, heals the allies next to it for 5%.",
+		"effects": [{"to": "all", "mend_self": 0.03, "last_rites": 0.05}]},
+	"drakmor": {"id": "formation_drakmor", "name": "Warband Frenzy", "blurb": "The faction fights as a warband: every unit gains +4% ATK per kill and +6% ATK under half HP.",
+		"effects": [{"to": "all", "frenzy": 0.04, "rage": 0.06}]},
+	"thalassia": {"id": "formation_thalassia", "name": "Riptide Wall", "blurb": "The faction forms a wall of tide: its attacks slow the target for 2 ticks and every unit reflects 5% of the damage it takes.",
+		"effects": [{"to": "all", "chill": 2, "thorns": 0.05}]},
+	"eclipsia": {"id": "formation_eclipsia", "name": "Twilight Veil", "blurb": "The faction slips between moments: every unit dodges every 7th hit and hits enemies under 30% HP 6% harder.",
+		"effects": [{"to": "all", "evade": 7, "execute": 0.06}]},
+}
+
 const ROLES: Array[String] = ["Tank", "Support", "Assassin", "Mage", "Marksman", "Fighter", "Controller"]
 
 ## Faction Tiers: [units, flat HP and ATK bonus (0 = none), name]; the highest reached tier counts. The trait lists [Rally, Legion, Host] use the same index (0 / 1 / 2).
@@ -135,7 +159,7 @@ const ULTRA_NAME: String = "Ultra"
 
 ## ULTRA SPECIAL EFFECTS: on top of the scaled numbers, Ultra unlocks one special effect that no lower tier has (flat, NOT scaled).
 ## Faction Ultra: every unit of the faction gets it. Role Ultra: one special per role (the effect list is like a combo's).
-const ULTRA_FACTION_SPECIAL: Dictionary = {"name": "Ultra Dominion", "blurb": "The whole faction fights as one: every unit drains 8% of the damage it deals and gains +4% ATK per kill.",
+const ULTRA_FACTION_SPECIAL: Dictionary = {"name": "Ultra", "blurb": "The whole faction fights as one: every unit drains 8% of the damage it deals and gains +4% ATK per kill.",
 	"effects": [{"to": "all", "lifesteal": 0.08, "frenzy": 0.04}]}
 const ULTRA_ROLE_SPECIALS: Dictionary = {
 	"Tank": {"name": "Unbreakable", "blurb": "Tanks return once at 30% HP after falling.", "effects": [{"to": ["Tank"], "second_life": 0.30}]},
@@ -596,20 +620,22 @@ static func _add_continent_role_effects(m: Dictionary, combos: Array, role: Stri
 ## Summed modifiers for one unit of `role`: {"hp", "atk", "move", "shield", "range", "fx"}; "fx" = {special effect: value} (see FX_TYPES). The stat keys stay 0 / empty,
 ## because no synergy gives a stat bonus any more. `fac` / `fac_n` (the unit's faction and how many units of it are on the field) add the faction's own trait on top of the role and role pacts.
 ## `cont_combos` (the active Continent Specialties of the side) add the Continent Specialties (`unit_cont` is not used any more).
-static func unit_mods(role: String, counts: Dictionary, fac: String = "", fac_n: int = 0, fac_ultra: bool = false, fac_army: bool = false, bond: Dictionary = {}, cont_combos: Array = [], unit_cont: String = "") -> Dictionary:
+static func unit_mods(role: String, counts: Dictionary, fac: String = "", fac_n: int = 0, fac_ultra: bool = false, fac_army: bool = false, bond: Dictionary = {}, cont_combos: Array = [], unit_cont: String = "", formation: Array = []) -> Dictionary:
 	var m := _new_mods()
 	for a in active(counts):
 		_add_effects(m, a["effects"], role)
 	if fac != "":
 		_add_effects(m, faction_trait_effects(fac, fac_n, fac_ultra), role)
 		if fac_ultra:
-			_add_effects(m, ULTRA_FACTION_SPECIAL["effects"], role)  # Ultra special: Ultra Dominion
+			_add_effects(m, ULTRA_FACTION_SPECIAL["effects"], role)  # Ultra special (part of the Ultra tier, not a separate synergy)
 	if fac_army:
 		_add_effects(m, FACTION_ARMY["effects"], role)  # Grand Army (Faction)
 	if not bond.is_empty():
 		_add_effects(m, bond["effects"], role)  # Continent Alliance
 	if not cont_combos.is_empty():
 		_add_continent_role_effects(m, cont_combos, role, unit_cont)  # Continent Specialties (`cont_combos` = continent_role_active(...), `unit_cont` = continent of this unit)
+	if not formation.is_empty():
+		_add_effects(m, formation, role)  # Continent Formation (`formation` = formation_effects_for(this unit's faction, units of it on the field))
 	return m
 
 
@@ -674,6 +700,37 @@ static func continent_role_active(counts: Dictionary) -> Array:
 static func continent_role_lacking(combo: Dictionary, counts: Dictionary) -> Dictionary:
 	var have := continent_role_have(combo, counts)
 	return {"faction": maxi(0, CONTINENT_ROLE_FACTION_UNITS - int(have["faction"])), "role": maxi(0, CONTINENT_ROLE_UNITS - int(have["role"]))}
+
+
+## The Continent Formation of a continent ({} = unknown continent).
+static func formation_of(continent_id: String) -> Dictionary:
+	return CONTINENT_FORMATIONS.get(continent_id, {})
+
+
+## Units of one faction that are still missing for its Continent Formation (0 = active).
+static func formation_lacking(n: int) -> int:
+	return maxi(0, FORMATION_UNITS - n)
+
+
+## The Continent Formation effects of ONE faction with `n` units on the field: [] unless n >= FORMATION_UNITS and the faction comes from the King's continent (`king_continent`).
+static func formation_effects_for(fac: String, n: int, king_continent: String) -> Array:
+	if fac == "" or king_continent == "" or n < FORMATION_UNITS or GameData.continent_of_faction(fac) != king_continent:
+		return []
+	return formation_of(king_continent).get("effects", [])
+
+
+## Every active Continent Formation of a side: `fac_counts` = units per faction on the field (any faction), `king_continent` = continent of the King ("" = none, nothing active).
+## Only factions of the King's continent qualify. Returns [{"faction", "continent", "count", "name", "blurb", "effects"}], biggest faction first.
+static func formation_active(fac_counts: Dictionary, king_continent: String) -> Array:
+	var out: Array = []
+	for fac in fac_counts:
+		var n := int(fac_counts[fac])
+		var cid := GameData.continent_of_faction(String(fac))
+		if king_continent != "" and cid == king_continent and n >= FORMATION_UNITS and CONTINENT_FORMATIONS.has(cid):
+			var f: Dictionary = CONTINENT_FORMATIONS[cid]
+			out.append({"faction": String(fac), "continent": cid, "count": n, "name": f["name"], "blurb": f["blurb"], "effects": f["effects"]})
+	out.sort_custom(func(a, b): return int(a["count"]) > int(b["count"]))
+	return out
 
 
 ## Like unit_mods but ONLY from the role pacts (for tests and tooltips).

@@ -428,8 +428,16 @@ class BuyPanel extends VBoxContainer:
 		var next := SaveManager.next_continent_goal()
 		if next == "":
 			return "Every continent is open: all of its unit cards are in the Shop."
-		return "Journey trophies: %d. Reach %d to open %s and add its unit cards to the Shop." % [
-			SaveManager.trophies(), SaveManager.continent_trophies(next), String(GameData.get_continent(next)["name"]).capitalize()]
+		var miss: Array = SaveManager.journey_gate_missing(next)
+		var gate := ""
+		if not miss.is_empty():
+			var prev := SaveManager.journey_prev_continent(next)
+			var names: Array = []
+			for fid in miss:
+				names.append(String(fid).capitalize())
+			gate = " Also win a Journey match on %s with: %s." % [String(GameData.get_continent(prev)["name"]).capitalize(), ", ".join(names)]
+		return "Journey trophies: %d. Reach %d to open %s and add its unit cards to the Shop.%s" % [
+			SaveManager.trophies(), SaveManager.continent_trophies(next), String(GameData.get_continent(next)["name"]).capitalize(), gate]
 
 	func rebuild() -> void:
 		_build_kind_row()
@@ -878,14 +886,15 @@ class TradingPanel extends HBoxContainer:
 
 
 ## Auction (lelang) tab: a few locked cards are up for bids. Open at 40% of the value, raise 10% each time; a hidden rival bidder
-## answers every raise until their limit. Pass to give up a lot. The winner pays Aether Coins (ShopSystem.auction_*).
+## answers every raise until their limit. Pass to give up a lot. The winner pays Crystals (ShopSystem.auction_*).
 class AuctionPanel extends HBoxContainer:
 	signal changed
 
 	var rng: RandomNumberGenerator
 	var lots: Array = []  # {"id", "bid", "limit", "state": "open" | "won" | "lost"}
-	var day: int = -1
+	var slot: int = -1  # the hour the current lots belong to (ShopSystem.auction_slot)
 	var selected: int = -1
+	var timer_label: Label
 	var list_box: VBoxContainer
 	var detail: RichTextLabel
 	var msg: Label
@@ -909,9 +918,16 @@ class AuctionPanel extends HBoxContainer:
 		lbox.add_theme_constant_override("separation", 8)
 		left.add_child(lbox)
 		lbox.add_child(UiTheme.make_label("AUCTION (LELANG)", 26, UiTheme.COL_GOLD))
-		hint = UiTheme.make_label("Locked cards go to the highest bidder. Bids start at 40% of the value and rise 10% per raise. A rival bids against you; their limit is hidden. Pay with Aether Coins. New lots every day.", 15, UiTheme.COL_MUTED)
+		hint = UiTheme.make_label("Locked cards go to the highest bidder. Bids start at 40% of the value and rise 10% per raise. A rival bids against you; their limit is hidden. Pay with Crystals. New random lots every hour.", 15, UiTheme.COL_MUTED)
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbox.add_child(hint)
+		timer_label = UiTheme.make_label("", 17, UiTheme.COL_GOLD)
+		lbox.add_child(timer_label)
+		var tick := Timer.new()  # 1 s: the countdown, and the new lots when the hour turns
+		tick.wait_time = 1.0
+		tick.timeout.connect(_on_tick)
+		add_child(tick)
+		tick.start()
 		var scroll := UiTheme.make_scroll()
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -944,14 +960,14 @@ class AuctionPanel extends HBoxContainer:
 		fx = AuctionStage.new()  # last child of the panel = drawn on top
 		right.add_child(fx)
 
-	## Starts the day's lots (once per day, and again after the day changes). Lots won earlier are not offered again (they are owned).
+	## Starts this hour's lots (a new random set every hour, and again when the hour turns). Lots won earlier are not offered again (they are owned).
 	func rebuild() -> void:
-		var today := int(Time.get_unix_time_from_system() / 86400.0)
-		if today != day or lots.is_empty():
-			day = today
+		var now_slot := ShopSystem.auction_slot()
+		if now_slot != slot or lots.is_empty():
+			slot = now_slot
 			lots.clear()
 			selected = -1
-			for id in ShopSystem.auction_lots(day):
+			for id in ShopSystem.auction_lots(slot):
 				var card := ShopSystem.card_by_id(String(id))
 				lots.append({"id": id, "bid": 0, "limit": ShopSystem.auction_rival_limit(card, rng), "state": "open"})
 		else:
@@ -963,7 +979,20 @@ class AuctionPanel extends HBoxContainer:
 		_build_list()
 		_update_detail()
 
+	func _update_timer() -> void:
+		var left := ShopSystem.auction_seconds_left()
+		timer_label.text = "New lots in %02d:%02d" % [left / 60, left % 60]
+
+	func _on_tick() -> void:
+		if not is_visible_in_tree():
+			return
+		_update_timer()
+		if ShopSystem.auction_slot() != slot and not busy:  # the hour turned: fresh random lots
+			rebuild()
+			msg.text = "New lots are up!"
+
 	func _build_list() -> void:
+		_update_timer()
 		for c in list_box.get_children():
 			list_box.remove_child(c)
 			c.queue_free()
@@ -1001,22 +1030,22 @@ class AuctionPanel extends HBoxContainer:
 		var card := ShopSystem.card_by_id(String(l["id"]))
 		var kind := "Unit card" if ShopSystem.is_unit_card(card) else "Support card"
 		var t := "[b][font_size=26]%s[/font_size][/b]\n%s, %s\n\n" % [String(card["name"]), kind, String(card.get("rarity", "")).capitalize()]
-		t += "Value: [color=#d4af37]%d coins[/color]\nStep: %d coins per raise\n\n" % [ShopSystem.auction_value(card), ShopSystem.auction_step(card)]
+		t += "Value: [color=#d4af37]%d crystals[/color]\nStep: %d crystals per raise\n\n" % [ShopSystem.auction_value(card), ShopSystem.auction_step(card)]
 		match String(l["state"]):
 			"won":
-				t += "[color=#59cd90]You won this lot for %d coins.[/color]" % int(l["bid"])
+				t += "[color=#59cd90]You won this lot for %d crystals.[/color]" % int(l["bid"])
 			"lost":
 				t += "[color=#ff7b7b]A rival took this lot.[/color]"
 			_:
 				if int(l["bid"]) == 0:
-					t += "No bids yet. Opening bid: %d coins." % ShopSystem.auction_open(card)
+					t += "No bids yet. Opening bid: %d crystals." % ShopSystem.auction_open(card)
 				else:
-					t += "Rival leads with [color=#ff9f5a]%d coins[/color]. Raise to %d coins to stay in." % [int(l["bid"]), int(l["bid"]) + ShopSystem.auction_step(card)]
+					t += "Rival leads with [color=#ff9f5a]%d crystals[/color]. Raise to %d crystals to stay in." % [int(l["bid"]), int(l["bid"]) + ShopSystem.auction_step(card)]
 		detail.text = t
 		var open := String(l["state"]) == "open"
 		pass_btn.disabled = not open
-		bid_btn.disabled = not open or SaveManager.coins() < _next_bid(l)
-		bid_btn.text = "Bid  (%d coins)" % _next_bid(l) if open else "Closed"
+		bid_btn.disabled = not open or SaveManager.crystals() < _next_bid(l)
+		bid_btn.text = "Bid  (%d crystals)" % _next_bid(l) if open else "Closed"
 
 	func _next_bid(l: Dictionary) -> int:
 		var card := ShopSystem.card_by_id(String(l["id"]))
@@ -1028,8 +1057,8 @@ class AuctionPanel extends HBoxContainer:
 			return
 		var card := ShopSystem.card_by_id(String(l["id"]))
 		var mine := _next_bid(l)
-		if SaveManager.coins() < mine:
-			msg.text = "Not enough Aether Coins."
+		if SaveManager.crystals() < mine:
+			msg.text = "Not enough Crystals."
 			Sfx.play("error")
 			return
 		msg.text = ""

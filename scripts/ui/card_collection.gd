@@ -765,7 +765,13 @@ func _deck_errors() -> Array[String]:
 
 
 func _source_continent() -> String:
-	return _pool_source if _pool_source != "" else _deck_continent
+	if _pool_source != "":
+		return _pool_source
+	if not SaveManager.is_continent_unlocked(_deck_continent):  # editing the deck of a locked continent: show the cards you can actually use
+		for c in GameData.continents:
+			if c.get("playable", false) and SaveManager.is_continent_unlocked(String(c["id"])):
+				return String(c["id"])
+	return _deck_continent
 
 
 func _faction_name(faction_id: String) -> String:
@@ -855,21 +861,26 @@ func _new_grid(parent: Control, columns: int) -> GridContainer:
 	return g
 
 
-## Continent of the unit cards: only shown once a second continent is open.
+## Which continent's deck you are editing. ALL playable continents are listed, not only the ones unlocked in Journey:
+## Arena plays on every continent with that continent's deck, so it must be editable before the Journey is finished.
+## (A locked continent only has its own cards locked; the deck can still be filled from the open continents.)
 func _pool_continents() -> void:
-	var open: Array = GameData.continents.filter(func(c): return c.get("playable", false) and SaveManager.is_continent_unlocked(c["id"]))
-	if open.size() < 2:
+	var playable: Array = GameData.continents.filter(func(c): return c.get("playable", false))
+	if playable.size() < 2:
 		return
 	_continent_row.visible = true
 	var group := ButtonGroup.new()
-	for c in open:
-		_filter_chip(_continent_row, String(c["name"]), c["id"] == _deck_continent, _on_deck_continent.bind(String(c["id"])), group)
+	for c in playable:
+		var cname := String(c["name"])
+		if not SaveManager.is_continent_unlocked(String(c["id"])):
+			cname += " (locked)"
+		_filter_chip(_continent_row, cname, c["id"] == _deck_continent, _on_deck_continent.bind(String(c["id"])), group)
 
 
 func _pool_units() -> void:
 	var src := _source_continent()
 	var open: Array = GameData.continents.filter(func(c): return c.get("playable", false) and SaveManager.is_continent_unlocked(c["id"]))
-	if open.size() >= 2:  # a deck may take units from any open continent: pick which continent's cards the pool shows
+	if open.size() >= 2 or not SaveManager.is_continent_unlocked(_deck_continent):  # a deck may take units from any open continent: pick which continent's cards the pool shows
 		var sgroup := ButtonGroup.new()
 		for c in open:
 			_filter_chip(_pool_filter_row, "Cards: " + String(c["name"]), String(c["id"]) == src, _on_pool_source.bind(String(c["id"])), sgroup)
@@ -1299,7 +1310,7 @@ func _info_synergy() -> String:
 				out += "     %d units: %s\n" % [[2, 4, 6][ti], ComboSystem.faction_tier_text(ComboSystem.faction_tier(String(f["id"]), [2, 4, 6][ti]))]
 			out += "     Ultra: %s\n" % ComboSystem.faction_tier_text(ComboSystem.faction_tier(String(f["id"]), ComboSystem.ULTRA_MIN, true))
 	out += "\n"
-	out += "Ultra (top tier of the Faction Tier): it switches on when EVERY unit of your line-up (%d or more) is of your King's faction. The faction trait is x%s stronger (percentages and slow time grow, every-Nth counts get lower, never below %d) and it unlocks a SPECIAL effect no lower tier has: %s (%s)\n\n" % [ComboSystem.ULTRA_MIN, str(ComboSystem.ULTRA_SCALE), int(ComboSystem.FX_COUNT_MIN), ComboSystem.ULTRA_FACTION_SPECIAL["name"], ComboSystem.ULTRA_FACTION_SPECIAL["blurb"]]
+	out += "Ultra (top tier of the Faction Tier): it switches on when EVERY unit of your line-up (%d or more) is of your King's faction. The faction trait is x%s stronger (percentages and slow time grow, every-Nth counts get lower, never below %d) and it adds a bonus no lower tier has: %s\n\n" % [ComboSystem.ULTRA_MIN, str(ComboSystem.ULTRA_SCALE), int(ComboSystem.FX_COUNT_MIN), ComboSystem.ULTRA_FACTION_SPECIAL["blurb"]]
 	out += _info_head("Role traits") + "\nUnits of the same role on the field (2 / 4 / 6 units, then Ultra as the top tier). Each combo is named for what it does:\n"
 	for c in ComboSystem.ROLE_TRAITS:
 		out += "\n%s (%s): %s\n" % [c["name"], c["role"], c["blurb"]]
@@ -1314,6 +1325,10 @@ func _info_synergy() -> String:
 	out += "\n" + _info_head("Continent Specialties") + "\nSix synergies that pair a continent with the role that fits it. Field %d units of ONE faction of that continent AND %d units of that role (the role units can be of any faction; a unit of the faction with that role counts for both; a Pawn and the shared pieces count for your King's faction) and the units of that role gain the combo's special effect. Your King does not have to come from that continent. They stack with everything else:\n" % [ComboSystem.CONTINENT_ROLE_FACTION_UNITS, ComboSystem.CONTINENT_ROLE_UNITS]
 	for c in ComboSystem.CONTINENT_ROLE_COMBOS:
 		out += "\n%s (%s %s): %s\n  %s\n" % [c["name"], String(c["continent"]).capitalize(), c["role"], c["blurb"], ComboSystem.effects_text(c["effects"])]
+	out += "\n" + _info_head("Continent Formation") + "\nField %d units of ONE faction that comes from the SAME continent as your King (his own faction or another faction of his continent; a Pawn and the shared pieces count for your King's faction) and the units of THAT faction gain a special effect themed on that continent. Factions of other continents never qualify. It only reaches those %d+ units. Two factions of your King's continent with %d units each both get it. It stacks with everything else:\n" % [ComboSystem.FORMATION_UNITS, ComboSystem.FORMATION_UNITS, ComboSystem.FORMATION_UNITS]
+	for cid in ComboSystem.CONTINENT_FORMATIONS:
+		var fmn: Dictionary = ComboSystem.CONTINENT_FORMATIONS[cid]
+		out += "\n%s (%s): %s\n  %s\n" % [fmn["name"], String(cid).capitalize(), fmn["blurb"], ComboSystem.effects_text(fmn["effects"])]
 	out += "\n" + _info_head("Role Pacts") + "\nTwo roles side by side: a role pact needs %d units of EACH of its two roles (21 combos, one for every pair of the 7 roles). They stack with everything above:" % ComboSystem.DUO_UNITS + "\n"
 	for c in ComboSystem.DUO_COMBOS:
 		var needs: Array[String] = []

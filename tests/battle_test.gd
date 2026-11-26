@@ -73,9 +73,9 @@ func _test_terrain() -> void:
 	var t := Terrain.generate(rng)
 	var mirrored := true
 	for c in t:
-		if not t.has(Vector2i(c.x, 7 - c.y)) or c.y == 0 or c.y == 7:
+		if not t.has(Vector2i(7 - c.x, 7 - c.y)) or c.y == 0 or c.y == 7:
 			mirrored = false
-	check(t.size() >= 2 and mirrored, "terrain: highlands are mirrored and never on the back rows")
+	check(t.size() >= 2 and mirrored, "terrain: highlands are point-mirrored (180 deg) and never on the back rows")
 	rng.seed = 10
 	check(Terrain.generate(rng) != t, "terrain: a different duel draws different ground")
 	check(not Terrain.can_stand({Vector2i(2, 5): true}, 1, Vector2i(2, 5)) and Terrain.can_stand({Vector2i(2, 5): true}, 2, Vector2i(2, 5)), "terrain: highland is for ranged units only")

@@ -1776,14 +1776,26 @@ func duel_participants() -> Dictionary:
 
 
 ## Runs an AI-vs-AI duel instantly (no UI). Humans fight through the Battle scene instead.
+## Highest shop level among the human players (0 when nobody is human): the level the AI rulers follow in their duels.
+func human_level() -> int:
+	if not human_present:
+		return 0
+	var best := 0
+	for p in players:
+		if not p.is_ai:
+			best = maxi(best, p.level)
+	return best
+
+
 func auto_duel() -> void:
 	if state != State.AWAIT_DUEL or is_human_duel() or is_monster_battle():
 		return
 	var a := players[int(pending["attacker"])]
 	var d := players[int(pending["defender"])]
 	var ground := Terrain.generate(rng)  # every duel is fought on new random ground
-	var cfg_a := BattleAI.prepare_ai_army(a, rng, 0, ground)
-	var cfg_d := BattleAI.prepare_ai_army(d, rng, 1, ground)
+	var follow := human_level()  # AI rulers shop at the level of the human player (0 in an all-AI match)
+	var cfg_a := BattleAI.prepare_ai_army(a, rng, 0, ground, follow)
+	var cfg_d := BattleAI.prepare_ai_army(d, rng, 1, ground, follow)
 	var rounds := 1 if tutorial else ShopSystem.series_rounds(match_difficulty)  # like a human duel: Easy 5 / Normal 3 / Hard 1 rounds
 	var wins_a := 0
 	var wins_d := 0

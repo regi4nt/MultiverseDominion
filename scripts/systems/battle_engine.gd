@@ -119,13 +119,18 @@ func setup(cfg: Dictionary) -> void:
 		var cr_combos := ComboSystem.continent_role_active(_continent_role_counts(sc["units"], side_fac))
 		for cc in cr_combos:
 			_log("Side %d synergy: %s - %s %ss (%s)" % [side, cc["name"], String(cc["continent"]).capitalize(), cc["role"], ComboSystem.effects_text(cc["effects"])])
+		# Continent Formation: 4 units of ONE faction of the King's continent give the units of that faction the effect of that continent
+		var fac_all := _faction_unit_counts(sc["units"], side_fac)
+		var king_cont := GameData.continent_of_faction(side_fac) if side_fac != "" else ""
+		for fm in ComboSystem.formation_active(fac_all, king_cont):
+			_log("Side %d synergy: %s - %s x%d (%s)" % [side, fm["name"], String(fm["faction"]).capitalize(), int(fm["count"]), ComboSystem.effects_text(fm["effects"])])
 		var roles := role_counts(sc["units"])
 		for a in ComboSystem.active(roles):
 			_log("Side %d synergy: %s%s (%s)" % [side, a["name"], ((" x%d" % int(a["count"])) if String(a["kind"]) == "role" else "") + (" ULTRA" if bool(a.get("ultra", false)) else ""), ComboSystem.effects_text(a["effects"])])
 		for e in sc["units"]:
 			var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
 			var role := String(CardDatabase.get_unit(e["card_id"]).get("role", ""))
-			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), ComboSystem.unit_mods(role, roles, String(fac), int(synergy_counts.get(fac, 0)), String(fac) == ultra_fac, fac_army, bond, cr_combos, GameData.continent_of_faction(String(fac))))
+			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), ComboSystem.unit_mods(role, roles, String(fac), int(synergy_counts.get(fac, 0)), String(fac) == ultra_fac, fac_army, bond, cr_combos, GameData.continent_of_faction(String(fac)), ComboSystem.formation_effects_for(String(fac), int(fac_all.get(fac, 0)), king_cont)))
 	for side in range(2):  # wild monsters ("foes"): they are the regular units of a side that has no King (monster hunt)
 		var foes: Array = cfg["sides"][side].get("foes", [])
 		for i in range(foes.size()):
@@ -210,6 +215,16 @@ func _continent_role_counts(list: Array, side_fac: String = "") -> Dictionary:
 	var counts := {}
 	for c in ComboSystem.CONTINENT_ROLE_COMBOS:
 		counts[ComboSystem.continent_role_key(String(c["continent"]), String(c["role"]))] = {"faction": int(best.get(String(c["continent"]), 0)), "role": int(roles.get(String(c["role"]), 0))}
+	return counts
+
+
+## Units per faction on the field, ANY faction (shared pieces and slot Pawns count for the King's faction): the count the Continent Formation needs (it then keeps the King's continent only).
+func _faction_unit_counts(list: Array, side_fac: String = "") -> Dictionary:
+	var counts := {}
+	for e in list:
+		var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
+		if fac != "":
+			counts[fac] = int(counts.get(fac, 0)) + 1
 	return counts
 
 
