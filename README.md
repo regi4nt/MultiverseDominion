@@ -142,7 +142,7 @@ Perubahan terbaru (safe area notch, judul menu di kiri bawah, START di kanan baw
   - **Arcanum** (sihir): kacau & berisiko. Ley Line (warp portal), Wild Teleport (warp teritori acak), pasar +/-30%. Dadu: **Ritual** (token), Portal Spell, Mana Broker (swing besar), Binding, Oracle (fate), **Arcane Surge** (emas).
   - **Machina** (industri): Factory Inspection (-15 G/teritori), Factory Output (+15 G/teritori), Patent Sale (curi 50 G), Gear Jam. Dadu: Overclock, Piston, **Factory** (emas per teritori), **Ticker**, Saboteur, Spare Parts.
   - **Sylvaris** (alam): aman & menyembuhkan. Spring of Life (+2 Life), Bumper Harvest, Locust Swarm, tanpa kartu rugi emas langsung. Dadu: **Harvest**, **Healing Spring**, Vine, Seed Broker (stabil), Foraging, Spirit.
-  - **Drakmor** (perang): angka besar. Dragon's Hoard (+250 G), Demon's Toll (-150 G), Pillage (curi 80 G), Victory Revel (+50 G/rival). Dadu: **Warlord**, Charge, Pillager, **Blood Fate** (+/-250..350), Spoils, War Council.
+  - **Drakmor** (perang): angka besar. Dragon's Hoard (+250 G), Demon's Toll (-150 G), Pillage (curi 80 G), Victory Revel (+50 G/rival). Dadu: **Warlord**, Charge, Pillager, **Blood Fate** (+/-250..350), Spoils, Supply Line.
   - **Thalassia** (laut): gerak & badai. Fair Winds (+5), Tempest (-4), Whirlpool (warp portal), Becalmed (skip), Pirate Raid (-120 G). Dadu: **Tempest** (-2..+6), Whirlpool, Corsair, Merchant, **Treasure Dive**, Sea Charm.
   - **Eclipsia** (waktu): Time Loop (warp ke START + bonus), Echo Thief, Temporal Dividend (+8 G/teritori), 2 Reroll Token. Dadu: **Paradox** (START 2x), Epoch, **Fate Weave** (+/-150..400), Moment, **Futures** (swing -30..+100%), Chrono (-3..+6).
   Efek kartu baru: `gain_per_land`, `lose_per_land`, `steal_richest`, `heal`, `skip_turn`, `warp_portal`, `warp_land`, `warp_start`; jenis dadu baru: `land_gold`, `levy`, `tokens`, `gold`, `heal` (dadu `fate` boleh punya `fate_values` sendiri).
@@ -161,7 +161,7 @@ Satu scene (`scripts/ui/match_setup.gd`) dengan dua tampilan. Tombol Back / Esc 
   (bebas benua mana saja, bukan berurutan): setup Journey menampilkan "Tap to unlock" di benua terkunci, lalu konfirmasi. Satu hak = satu benua; benua baru itu harus di-master untuk hak berikutnya.
   Faksi dari benua lain tidak dihitung untuk mastery benua ini (hint di setup menjelaskannya). Baris benua menampilkan "Factions won 2 / 4" atau "Mastered"; layar hasil menulis kemajuannya.
   Logika di `SaveManager`: `journey_won_factions`, `is_journey_cleared` (= mastered), `journey_picks_available`, `choose_continent`, `journey_frontier`; key save `journey_wins` (continent -> faksi yang menang).
-- **Arena**: match bebas melawan AI di **semua benua playable (semuanya terbuka di Arena)**, termasuk yang belum dibuka lewat Journey. Players: **1 vs 1**, **2 vs 2**, **4 Player**. **Tidak membuka apa pun**: benua yang masih terkunci di Journey tetap terkunci, dan **King (faksi) serta Pawn benua itu tetap terkunci** di Card Hub (baris benua di setup menulis "Open  -  King & Pawn stay locked"). Kemenangan tetap memberi koin, statistik, dan peti (bukan kartu Support). Random map mengundi dari semua benua playable (`MatchSetup._open_continents`, `_is_continent_open`). **Musuh AI Arena** diundi dari faksi **seluruh benua playable** (bukan hanya 4 faksi benua map; faksi pemain dikecualikan, tiap faksi paling banyak satu kursi): config `any_continent_enemies` (`GameSession.to_match_config`, hanya kategori Arena) dibaca `MatchController.setup`. Journey dan Tutorial tetap melawan faksi benua yang sama. Buff King / kartu / Faction Synergy faksi asing tetap hanya aktif di benua asalnya.
+- **Arena**: match bebas melawan AI di **semua benua playable (semuanya terbuka di Arena)**, termasuk yang belum dibuka lewat Journey. Players: **1 vs 1**, **2 vs 2**, **4 Player**. **Tidak membuka apa pun**: benua yang masih terkunci di Journey tetap terkunci, dan **King (faksi) serta Pawn benua itu tetap terkunci** di Card Hub (baris benua di setup menulis "Open  -  King & Pawn stay locked"). Kemenangan tetap memberi koin, statistik, dan peti (bukan kartu Support). Random map mengundi dari semua benua playable (`MatchSetup._open_continents`, `_is_continent_open`). **Musuh AI Arena** diundi dari faksi **seluruh benua playable** (bukan hanya 4 faksi benua map; faksi pemain dikecualikan, tiap faksi paling banyak satu kursi): config `any_continent_enemies` (`GameSession.to_match_config`, hanya kategori Arena) dibaca `MatchController.setup`. Journey dan Tutorial tetap melawan faksi benua yang sama. Buff King / kartu / Faction Tier faksi asing tetap hanya aktif di benua asalnya.
   Flag `journey` ikut di config match (`GameSession.category`) dan di save/resume (`MatchController.journey`); `SaveManager.record_match(..., journey)` hanya membuka benua jika `journey` true.
 - **Faksi tidak dipilih di New Match.** Kolom kanan setup hanya menampilkan faksi + King dari Deck (read-only) dan tombol **Change faction in Deck**
   (membuka Card Hub -> Deck -> tab Faction; Back kembali ke New Match lewat `GameSession.collection_return`, `open_deck_tab`).
@@ -170,7 +170,7 @@ Satu scene (`scripts/ui/match_setup.gd`) dengan dua tampilan. Tombol Back / Esc 
   King pilihan = faksi pemain di setiap match dan di Battle Chess (`SaveManager.player_champion_id()` / `player_faction_id()`; King dari faksi terkunci di save lama jatuh kembali ke faksi terbuka pertama).
   Faksi pemain boleh dari benua lain daripada benua match. Lawan AI Arena (termasuk Chaos) diundi dari faksi SEMUA benua (`any_continent_enemies`); di Journey lawan tetap dari faksi benua match. `GameData.find_faction` mencari di semua benua.
 - **Aturan home-continent** (`GameData.is_home_faction`): faksi tidak dibatasi benua dan bisa dimainkan di benua lain (hanya di luar Journey, mis. Arena; faksi tetap harus sudah terbuka).
-  King asing = King yang faksinya bukan faksi benua match (`BattleEngine._home_bonus` = false). Yang tetap aktif untuk King asing: **passive King**, **Faction Tier**, **Grand Army (Faction)**, Role Synergy (trait role dan kombo duo), dan modifier benua.
+  King asing = King yang faksinya bukan faksi benua match (`BattleEngine._home_bonus` = false). Yang tetap aktif untuk King asing: **passive King**, **Faction Tier**, **Grand Army (Faction)**, Role Synergy (trait role dan Role Pact), dan modifier benua.
   Yang mati untuk King asing: **buff King** (`king_buffs.json`) dan **buff kartu unit** (`card_buffs.json`).
   Faction Tier hanya menghitung unit yang faksinya SAMA dengan King (`BattleEngine._synergy`, `_faction_counts`). Grand Army (Faction) memakai hitungan terpisah semua faksi (`_continent_counts`) dan dinilai terhadap benua King ATAU benua match (`_army_active`), lihat bagian "Sinergi".
   Pawn memakai id yang sama di semua benua; faksinya mengikuti slot Pawn di **benua King** (`CardDatabase.effective_faction`), jadi Pawn King asing ikut faksi benua King.
@@ -208,7 +208,7 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
   Tab: **Units n / 15** (filter per faksi), **Support n / 15** (filter per kategori), **Faction** (kartu faksi per benua dengan gaya yang sama; panel kiri menampilkan King terpilih + skill-nya; faksi terkunci diberi overlay LOCKED).
   Ketuk kartu koleksi untuk memasang (kartu yang sudah di deck tampak redup; ketuk lagi untuk melepas). Jika deck penuh, kartu itu "dipegang" dan semua slot menyala emas:
   ketuk satu kartu deck untuk menukarnya. Ketuk kartu di deck tanpa memegang kartu = melepasnya. Tooltip menampilkan skill/deskripsi.
-- **Kartu Unit boleh lintas benua**: di tab Units, chip benua (Cards: <benua>) memilih kartu benua mana yang ditampilkan di pool, sedangkan isi dek tetap tersimpan; yang bisa dipasang = 8 Pawn + bidak dari semua faksi benua terbuka. Faksi dan benua **boleh dicampur** (15 tipe unit), dan 2 unit dari satu faksi di setiap ke-7 benua sekaligus di lapangan mengaktifkan Continent Bond (efek benua King).
+- **Kartu Unit boleh lintas benua**: di tab Units, chip benua (Cards: <benua>) memilih kartu benua mana yang ditampilkan di pool, sedangkan isi dek tetap tersimpan; yang bisa dipasang = 8 Pawn + bidak dari semua faksi benua terbuka. Faksi dan benua **boleh dicampur** (15 tipe unit), dan 2 unit dari satu faksi di setiap ke-7 benua sekaligus di lapangan mengaktifkan Continent Alliance (efek benua King).
   Tiap benua map tetap punya susunan unit sendiri (disimpan per benua). Tiap tipe unit = 9 salinan (15 x 9 = 135).
 - **King tidak terikat benua** (semua 28 King bisa dipilih) dan Support dipakai bersama semua benua. Total dek tetap 151 kartu.
 - Save hanya aktif jika 15 unit + 15 support terisi. "Reset to default" mengembalikan unit bawaan faksi King.
@@ -251,7 +251,7 @@ Pilihan Players di Arena: **1 vs 1 (You vs 1 AI)**, **2 vs 2 (You + 1 AI vs 2 AI
 **Efek** (`ComboSystem.FX_TYPES`): armor (damage diterima -x), evade (setiap hit ke-N dihindari), thorns (memantulkan x damage), execute (+x damage ke musuh di bawah 30% HP), frenzy (+x ATK per kill, maks 5), rage (+x ATK di bawah setengah HP), aura_atk (unit di sebelahnya +x ATK), burn (x ATK tiap 4 tick selama 12 tick), stun_proc (setiap serangan ke-N membuat target pingsan 1 tick), splash (x damage ke musuh di sebelah target), lifesteal, chill (target diperlambat x tick), opener (serangan pertama +x), last_rites (saat mati menyembuhkan sekutu di sebelahnya x% HP), death_burst (saat mati meledak x ATK ke musuh di sebelahnya), mend_self (menyembuhkan diri x% HP tiap 8 tick), guard (sekutu dalam 2 petak -x damage), second_life (bangkit sekali dengan x% HP).
 Nilai berupa pecahan (0,10 = 10%), kecuali hitungan (evade, stun_proc: makin kecil makin kuat, tidak pernah di bawah `FX_COUNT_MIN` = 3) dan durasi (chill). Penumpukan: hitungan ambil yang terendah, chill dan second_life ambil yang tertinggi; batas atas di `FX_CAP` (armor 60%, guard 50%, second_life 90%, thorns 100%).
 
-**1. Faction Tier** (`faction_tier`): trait faksi per tier **Rally 2 / Legion 4 / Host 6** unit SEFAKSI dengan King (unit faksi lain tidak mendapat Faction Tier). Satu baris di panel COMBOS, log battle, dan tab Info; tanpa bonus HP / ATK flat. Tetap aktif di benua mana pun, juga untuk King asing. Pawn ikut faksi slot-nya di benua King. Trait tiap faksi (`FACTION_TRAITS`, nilai Rally / Legion / Host; hanya mengenai unit faksi itu):
+**1. Faction Tier** (`faction_tier`): trait faksi per tier **Rally 2 / Legion 4 / Host 6 / Ultra** unit SEFAKSI dengan King (unit faksi lain tidak mendapat Faction Tier). Satu baris di panel COMBOS, log battle, dan tab Info; tanpa bonus HP / ATK flat. Tetap aktif di benua mana pun, juga untuk King asing. Pawn ikut faksi slot-nya di benua King. Trait tiap faksi (`FACTION_TRAITS`, nilai Rally / Legion / Host; hanya mengenai unit faksi itu):
 
 | Faksi | Trait | Efek |
 |---|---|---|
@@ -259,7 +259,7 @@ Nilai berupa pecahan (0,10 = 10%), kecuali hitungan (evade, stun_proc: makin kec
 | Nocthyr | Nightfall | Assassin/Marksman: opener 15/30/50% |
 | Valdoria | Rally the Banner | Fighter: aura_atk 3/5/8%; Support: mend_self 2/3/5% |
 | Elarion | Moonlit Focus | Mage/Controller: chill 2/3/4 tick |
-| Astralis | Star Charts | Mage/Marksman: evade tiap ke-6/5/4; Mage: splash 0/0/20% |
+| Astralis | Astral Drift | Mage/Marksman: evade tiap ke-6/5/4; Mage: splash 0/0/20% |
 | Ignivar | Wildfire | semua: burn 5/8/12% |
 | Cryndel | Frost Armor | Tank/Fighter/Support: armor 4/7/10%; Tank/Fighter/Support: chill 0/2/3 tick |
 | Umbrael | Umbral Step | Assassin/Mage: evade tiap ke-6/5/4; Assassin: opener 0/0/40% |
@@ -284,7 +284,9 @@ Nilai berupa pecahan (0,10 = 10%), kecuali hitungan (evade, stun_proc: makin kec
 | Eternis | Eternal Bulwark | Tank/Support/Mage: armor 3/5/8%; Tank/Support/Mage: second_life 0/0/25% |
 | Oblivion | Void Hunger | Assassin/Mage: lifesteal 5/8/12%; Assassin/Mage: execute 5/10/15% |
 
-**2. Trait role** (`ROLE_TRAITS`): satu per role, tier 2 / 4 / 6 unit satu role (satu role tidak perlu satu faksi):
+**Tier Ultra (tier teratas Faction Tier)** (`ULTRA_MIN` = 8 unit, `ULTRA_SCALE` = 1,5): aktif bila SEMUA unit lineup (minimal 8) berasal dari faksi King. Trait faksi di kekuatan Host dibuat x1,5 (persentase dan durasi x1,5, hitungan dibagi 1,5 dan tidak di bawah 3). Ditambah **efek spesial Ultra** (flat, tidak ikut x1,5, hanya di Ultra): **Ultra Dominion**, semua unit lifesteal 8% dan frenzy 4%. Ultra tidak bersama Grand Army (Faction), karena Ultra butuh satu faksi saja.
+
+**2. Trait role** (`ROLE_TRAITS`): satu per role, tier 2 / 4 / 6 unit satu role dan tier **Ultra** (satu role tidak perlu satu faksi):
 
 | Role | Trait | 2 unit | 4 unit | 6 unit |
 |---|---|---|---|---|
@@ -292,11 +294,13 @@ Nilai berupa pecahan (0,10 = 10%), kecuali hitungan (evade, stun_proc: makin kec
 | Support | Guardian Aura | Support: mend_self 3% | Support: mend_self 5%; semua: armor 3% | Support: mend_self 7%; semua: armor 5% |
 | Assassin | Shadow Strike | Assassin: execute 15% | Assassin: execute 30%, opener 25% | Assassin: execute 50%, opener 50% |
 | Mage | Arcane Surge | Mage: splash 15% | Mage: splash 25% | Mage: splash 40%, burn 15% |
-| Marksman | Eagle Eye | Marksman: chill 3 tick | Marksman: chill 5 tick, frenzy 4% | Marksman: chill 6 tick, frenzy 6% |
+| Marksman | Pinning Shot | Marksman: chill 3 tick | Marksman: chill 5 tick, frenzy 4% | Marksman: chill 6 tick, frenzy 6% |
 | Fighter | Warband | Fighter: frenzy 4% | Fighter: frenzy 7%, rage 15% | Fighter: frenzy 10%, rage 30%, lifesteal 10% |
 | Controller | Tactician's Command | Controller: stun_proc tiap ke-5 | Controller: stun_proc tiap ke-4, aura_atk 5% | Controller: stun_proc tiap ke-3, aura_atk 8% |
 
-**3. Kombo duo** (`DUO_COMBOS`, 22 kombo): 6 unit dari KEDUA role (`DUO_UNITS` = 6); setiap pasangan dari 7 role punya kombo (21) + Grand Army. **Grand Army** adalah pengecualian: 2 unit dari tiap 7 role (14 unit, semua trait role aktif) karena 7 x 6 melebihi kapasitas 30.
+**Tier Ultra (tier teratas trait role)** (`ULTRA_MIN` = 8 unit, `ULTRA_SCALE` = 1,5): aktif bila SEMUA unit lineup (minimal 8) memakai role yang sama. Trait role di kekuatan 6 unit dibuat x1,5 (persentase dan durasi x1,5, hitungan dibagi 1,5 dan tidak di bawah 3). Ditambah **efek spesial Ultra** per role (flat, tidak ikut x1,5, hanya di Ultra): Tank **Unbreakable** (Tank bangkit sekali di 30% HP); Support **Sanctuary** (seluruh pasukan armor 5%); Assassin **Phantom Rush** (evade tiap hit ke-3, opener +50%); Mage **Arcane Overreach** (burn 20%, splash 20%); Marksman **Deadeye Volley** (execute +30%, chill 4 tick); Fighter **Berserk Charge** (rage +40%, lifesteal 12%); Controller **Grand Strategy** (setiap serangan ke-6 seluruh pasukan membuat target pingsan).
+
+**3. Role Pact** (`DUO_COMBOS`, 21 kombo): 6 unit dari KEDUA role (`DUO_UNITS` = 6); setiap pasangan dari 7 role punya kombo (21). **Grand Army (Role)** bukan Role Pact, ia bagian dari sinergi **Grand Army** (lihat **4**).
 
 | Kombo | Syarat | Efek |
 |---|---|---|
@@ -309,27 +313,29 @@ Nilai berupa pecahan (0,10 = 10%), kecuali hitungan (evade, stun_proc: makin kec
 | Vanguard Line | Tank + Fighter | Fighter: thorns 10%; Tank: guard 6% |
 | Command Post | Controller + Tank | Tank: armor 8% |
 | Field Medic | Support + Fighter | Fighter: mend_self 4% |
-| Covering Fire | Marksman + Support | Marksman: lifesteal 10% |
+| Lifeline | Marksman + Support | Marksman: lifesteal 10% |
 | Spellblade | Mage + Fighter | Mage/Fighter: burn 12% |
 | Crossfire | Marksman + Assassin | Marksman/Assassin: execute 20% |
 | Arcane Tactics | Controller + Mage | Mage: chill 3 tick; Controller: mend_self 4% |
 | Ambush Plan | Assassin + Controller | Assassin: opener 50% |
 | Spell Bastion | Tank + Mage | Mage: armor 8%; Tank: thorns 10% |
-| War Council | Support + Controller | semua: mend_self 2% |
+| Supply Line | Support + Controller | semua: mend_self 2% |
 | Bait and Strike | Tank + Assassin | Tank: thorns 15%; Assassin: opener 30% |
-| Venom Vial | Assassin + Support | Assassin: burn 20% |
+| Alchemist's Fire | Assassin + Support | Assassin: burn 20% |
 | Hold the Line | Fighter + Marksman | Fighter: armor 8%; Marksman: execute 15% |
 | Ranged Barrage | Mage + Marksman | Mage/Marksman: splash 15% |
 | Target Painting | Marksman + Controller | Marksman: execute 20%; Controller: chill 4 tick |
-| Grand Army | 7 role x 2 unit | semua: armor 5%, lifesteal 5% |
 
-**4. Grand Army (Faction)** (`FACTION_ARMY`): versi faksi dari Grand Army. Aktif bila SETIAP faksi dari satu benua punya minimal `FACTION_ARMY_MIN` = 2 unit di lapangan dan faksi-faksi itu berjumlah minimal `FACTION_ARMY_TOTAL` = 8 unit (4 faksi x 2). Efek: seluruh unit last_rites 10% dan mend_self 3%. Benua yang dinilai = benua King ATAU benua yang dimainkan (`BattleEngine._army_active`; panel Synergy menampilkan yang paling dekat terpenuhi), jadi King asing juga bisa mengaktifkannya. Bertumpuk dengan semua sinergi lain, tetapi **tidak** bersama Ultra (Ultra butuh satu faksi saja). Hitungan: `BattleEngine._continent_counts` (semua faksi benua, bukan hanya faksi King), `ComboSystem.faction_army_active / faction_army_lacking`.
+**4. Grand Army** (satu keluarga sinergi, dua versi): seluruh pasukan bertempur bersama. Keduanya **bukan** Role Pact dan masing-masing punya konstanta sendiri.
 
-**5. Ultra** (`ULTRA_MIN` = 8 unit, `ULTRA_SCALE` = 1,5): tier di atas Host. Aktif bila SEMUA unit lineup memakai sinergi yang sama: satu faksi asal (trait faksi di kekuatan Host dibuat x1,5) atau satu role (trait role di kekuatan 6 unit x1,5). Persentase dan durasi x1,5, hitungan dibagi 1,5 (tidak di bawah 3). Ditambah **efek spesial Ultra** (flat, tidak ikut x1,5, hanya di Ultra):
-- Faksi, **Ultra Dominion**: semua unit lifesteal 8% dan frenzy 4%.
-- Role: Tank **Unbreakable** (Tank bangkit sekali di 30% HP); Support **Sanctuary** (seluruh pasukan armor 5%); Assassin **Phantom Rush** (evade tiap hit ke-3, opener +50%); Mage **Arcane Overreach** (burn 20%, splash 20%); Marksman **Deadeye Volley** (execute +30%, chill 4 tick); Fighter **Berserk Charge** (rage +40%, lifesteal 12%); Controller **Grand Strategy** (setiap serangan ke-6 seluruh pasukan membuat target pingsan).
+| Versi | Konstanta | Syarat | Efek (seluruh unit) |
+|---|---|---|---|
+| Grand Army (Role) | `ROLE_ARMY` | 2 unit dari tiap 7 role (`ROLE_ARMY_UNITS` = 2, 14 unit), jadi semua trait role aktif sekaligus | armor 5%, lifesteal 5% |
+| Grand Army (Faction) | `FACTION_ARMY` | SETIAP faksi dari satu benua punya minimal `FACTION_ARMY_MIN` = 2 unit dan total faksi itu minimal `FACTION_ARMY_TOTAL` = 8 unit (4 faksi x 2), jadi semua Faction Tier aktif sekaligus | last_rites 10%, mend_self 3% |
 
-**6. Continent Bond** (`CONTINENT_BONDS`, `ComboSystem.bonds_for`, `bond_missing`): satu sinergi yang menyatukan ke-7 benua. Aktif bila di lapangan ada **2 unit dari SATU faksi di SETIAP benua** (`BOND_FACTION_UNITS` = 2; faksi mana pun dari benua itu, jadi 2 x 7 = 14 unit minimal; Pawn dan bidak bersama dihitung sebagai faksi King; unit tanpa faksi tidak dihitung). **Efeknya tergantung King**: seluruh unit mendapat efek bond **benua asal King** (hanya satu efek, lihat tabel), bukan efek benua lain. Contoh: King Drakhan (Drakmor) -> semua unit War Fever (rage 8%); King Solvaris (Aetherion) -> semua unit Royal Standard (armor 3%). Bertumpuk dengan semua sinergi lain, termasuk Ultra. Panel COMBOS menampilkan progres "Continent Bond: n / 7 continents" bila sudah ada 2+ benua yang tercukupi. **Dek boleh berisi kartu unit dari benua mana pun** (`Deck.validate`, `CardDatabase.any_unit_ids`): di tab Deck, baris chip "Cards: <benua>" memilih kartu benua mana yang ditampilkan di pool, dan isi dek tetap tersimpan. Bidak dari benua lain bertarung tanpa buff kartu benua map yang dimainkan (`BattleEngine._spawn_unit`). Efek per benua King:
+Versi Role dihitung dari role (`ComboSystem.active`, jenis `"army"`, `duo_mods` tidak memasukkannya) dan hanya 2 unit per role karena 7 x 6 melebihi kapasitas 30. Versi Faction dinilai terhadap benua King ATAU benua yang dimainkan (`BattleEngine._army_active`; panel Synergy menampilkan yang paling dekat terpenuhi), jadi King asing juga bisa mengaktifkannya. Hitungannya `BattleEngine._continent_counts` (semua faksi benua, bukan hanya faksi King) dan `ComboSystem.faction_army_active / faction_army_lacking`. Keduanya bertumpuk dengan semua sinergi lain, tetapi versi Faction **tidak** bersama tier Ultra (Faction Tier), karena Ultra butuh satu faksi saja.
+
+**5. Continent Alliance** (`CONTINENT_BONDS`, `ComboSystem.bonds_for`, `bond_missing`): satu sinergi yang menyatukan ke-7 benua. Aktif bila di lapangan ada **2 unit dari SATU faksi di SETIAP benua** (`BOND_FACTION_UNITS` = 2; faksi mana pun dari benua itu, jadi 2 x 7 = 14 unit minimal; Pawn dan bidak bersama dihitung sebagai faksi King; unit tanpa faksi tidak dihitung). **Efeknya tergantung King**: seluruh unit mendapat efek bond **benua asal King** (hanya satu efek, lihat tabel), bukan efek benua lain. Contoh: King Drakhan (Drakmor) -> semua unit War Fever (rage 8%); King Solvaris (Aetherion) -> semua unit Royal Standard (armor 3%). Bertumpuk dengan semua sinergi lain, termasuk tier Ultra. Panel COMBOS menampilkan progres "Continent Alliance: n / 7 continents" bila sudah ada 2+ benua yang tercukupi. **Dek boleh berisi kartu unit dari benua mana pun** (`Deck.validate`, `CardDatabase.any_unit_ids`): di tab Deck, baris chip "Cards: <benua>" memilih kartu benua mana yang ditampilkan di pool, dan isi dek tetap tersimpan. Bidak dari benua lain bertarung tanpa buff kartu benua map yang dimainkan (`BattleEngine._spawn_unit`). Efek per benua King:
 
 | Benua King | Nama | Efek (semua unit) |
 |---|---|---|
@@ -338,10 +344,25 @@ Nilai berupa pecahan (0,10 = 10%), kecuali hitungan (evade, stun_proc: makin kec
 | Machina | Clockwork Precision | opener 15% |
 | Sylvaris | Verdant Renewal | mend 2% |
 | Drakmor | War Fever | rage 8% |
-| Thalassia | Tidal Surge | chill 2 tick |
-| Eclipsia | Time Fold | evade tiap ke-8 |
+| Thalassia | Undertow | chill 2 tick |
+| Eclipsia | Time Slip | evade tiap ke-8 |
 
-Logika: `BattleEngine._continent_unit_counts` (log `combo: Continent Bond`), `ComboSystem.bonds_for`, panel Synergy dan tab Info. Tes: `rules_test`.
+Logika: `BattleEngine._continent_unit_counts` (log `synergy: Continent Alliance`), `ComboSystem.bonds_for`, panel Synergy dan tab Info. Tes: `rules_test`.
+
+**6. Continent Specialty** (`CONTINENT_ROLE_COMBOS`, 6 sinergi): satu benua dipasangkan dengan role yang cocok dengan temanya. Aktif bila **kedua syarat** ini terpenuhi di lapangan: **6 unit dari satu faksi milik benua itu** (`CONTINENT_ROLE_FACTION_UNITS` = 6) **dan 6 unit dari role yang cocok** (`CONTINENT_ROLE_UNITS` = 6, unit role boleh dari faksi mana saja). Unit faksi yang kebetulan memiliki role itu dihitung untuk kedua syarat sekaligus. Pawn dan bidak bersama dihitung sebagai faksi King (seperti Continent Alliance). **King tidak harus dari benua itu**, dan efeknya mengenai unit dengan role tersebut (bukan seluruh pasukan). Keduanya setara ukuran Host (6) pada Faction Tier dan trait role, jadi ini sinergi tahap akhir. Bertumpuk dengan semua sinergi lain (trait role, Role Pact, Faction Tier, Bond, Ultra). Semuanya efek spesial, bukan bonus stat:
+
+| Kombo | Benua + role | Efek (unit dengan role itu) |
+|---|---|---|
+| Royal Bulwark | Aetherion + Tank | guard 6% (sekutu dalam 2 petak), thorns 8% |
+| Rune Cascade | Arcanum + Mage | splash 20%, chill 2 tick |
+| Clockwork Command | Machina + Controller | aura_atk 6%, chill 3 tick |
+| Living Grove | Sylvaris + Support | mend_self 5%, last_rites 10% |
+| Dragonfire Horde | Drakmor + Fighter | rage 20%, death_burst 30% |
+| Rift Ambush | Eclipsia + Assassin | evade tiap ke-5, opener 30% |
+
+Thalassia dan role Marksman belum punya pasangan (ada 7 benua tetapi hanya 6 kombo); menambahnya cukup satu entri di `CONTINENT_ROLE_COMBOS`. Di panel COMBOS layar Battle kombo aktif tampil sebagai baris "Nama Benua xN + Role xM efek", dan kombo yang kurang paling banyak 3 unit (dengan progres di kedua syarat) masuk baris "Close". Tab Info > Synergies memuat bagian "Continent Specialties".
+
+Logika: `BattleEngine._continent_role_counts` (log `synergy: <nama> - <Benua> <Role>s`), `ComboSystem.continent_role_active / continent_role_lacking / continent_role_combo`, parameter `cont_combos` + `unit_cont` di `ComboSystem.unit_mods`. Tes: `rules_test` (`_test_combos`, `_test_continent_role_engine`).
 
 Angka-angka ini belum diseimbangkan lewat banyak simulasi; semuanya ada di `combo_system.gd`. Tab Info (Synergies) dan panel Synergy di layar Battle dibaca dari data yang sama.
 

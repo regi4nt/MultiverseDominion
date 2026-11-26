@@ -544,18 +544,18 @@ func _refresh_prep() -> void:
 
 
 ## Top-left panel: the named combos of the deployed units (ComboSystem): Faction Tier (unnamed tiers at 2 / 4 / 6 units: banner bonus + the faction's own trait in one row),
-## role traits (Iron Wall, Guardian Aura, ...) and duo combos (Frontline Shield, Glass Cannon, ...; 6 units of each of the two roles). Tap-and-hold a row for its effect.
+## Continent Specialties (Royal Bulwark, Rune Cascade, ...; 6 units of one faction of a continent + 6 units of its role), role traits (Iron Wall, Guardian Aura, ...) and role pacts (Frontline Shield, Glass Cannon, ...; 6 units of each of the two roles). Tap-and-hold a row for its effect.
 func _refresh_synergy() -> void:
 	for c in synergy_box.get_children():
 		synergy_box.remove_child(c)
 		c.queue_free()
-	synergy_box.add_child(UiTheme.make_label("COMBOS", 14, UiTheme.COL_GOLD))
+	synergy_box.add_child(UiTheme.make_label("SYNERGIES", 14, UiTheme.COL_GOLD))
 	var deployed := prep.deployed_units()
 	if deployed.is_empty():
-		synergy_box.add_child(UiTheme.make_label("Deploy units to see combos.", 12, UiTheme.COL_MUTED))
+		synergy_box.add_child(UiTheme.make_label("Deploy units to see synergies.", 12, UiTheme.COL_MUTED))
 		return
 	var fac_counts := {}
-	var bond_fac_counts := {}  # units per faction, any faction (Continent Bond: 2 units of one faction in every continent)
+	var bond_fac_counts := {}  # units per faction, any faction (Continent Alliance: 2 units of one faction in every continent)
 	var role_counts := {}
 	var unit_facs: Array = []  # home faction of every deployed unit ("" = none): ULTRA needs them all to be the same
 	for u in deployed:
@@ -608,21 +608,41 @@ func _refresh_synergy() -> void:
 	if ComboSystem.faction_army_active(fac_counts, cont_facs):
 		var al := _synergy_row("%s  %s" % [ComboSystem.FACTION_ARMY["name"], ComboSystem.effects_text(ComboSystem.FACTION_ARMY["effects"])])
 		al.tooltip_text = String(ComboSystem.FACTION_ARMY["blurb"])
-	var bond_best := {}  # per continent: units of its best-staffed faction (Continent Bond)
+	var bond_best := {}  # per continent: units of its best-staffed faction (Continent Alliance)
 	for bf in bond_fac_counts:
 		var bcid := GameData.continent_of_faction(String(bf))
 		if bcid != "":
 			bond_best[bcid] = maxi(int(bond_best.get(bcid, 0)), int(bond_fac_counts[bf]))
 	var bond_king := GameData.continent_of_faction(_own_faction) if _own_faction != "" else ""
-	var bond := ComboSystem.bonds_for(bond_best, bond_king)  # Continent Bond: 2 units of one faction in EVERY continent, the effect of the King's continent
+	var bond := ComboSystem.bonds_for(bond_best, bond_king)  # Continent Alliance: 2 units of one faction in EVERY continent, the effect of the King's continent
 	if not bond.is_empty():
-		var bl := _synergy_row("Continent Bond: %s  %s" % [", ".join(PackedStringArray(bond["names"])), ComboSystem.effects_text(bond["effects"])])
+		var bl := _synergy_row("Continent Alliance: %s  %s" % [", ".join(PackedStringArray(bond["names"])), ComboSystem.effects_text(bond["effects"])])
 		bl.tooltip_text = String(bond.get("names", [""])[0]) + ": " + String(ComboSystem.continent_bond(bond_king).get("blurb", ""))
 	else:
 		var have := ComboSystem.CONTINENT_BONDS.size() - ComboSystem.bond_missing(bond_best).size()
 		if have >= 2:
 			var pl := _synergy_row("%s: %d / %d continents" % [ComboSystem.BOND_NAME, have, ComboSystem.CONTINENT_BONDS.size()], false)
-			pl.tooltip_text = "Continent Bond: field %d units of one faction in EVERY continent. Every unit then gains the bond effect of your King's continent." % ComboSystem.BOND_FACTION_UNITS
+			pl.tooltip_text = "Continent Alliance: field %d units of one faction in EVERY continent. Every unit then gains the bond effect of your King's continent." % ComboSystem.BOND_FACTION_UNITS
+	var cr_near: Array = []  # Continent Specialties that lack at most 3 units (and have progress in both halves): [units lacking, text]
+	var cr_counts := {}  # per continent-role pairing: {"faction": units of the continent's best faction (bond_best), "role": units of that role}
+	for cc in ComboSystem.CONTINENT_ROLE_COMBOS:
+		cr_counts[ComboSystem.continent_role_key(String(cc["continent"]), String(cc["role"]))] = {"faction": int(bond_best.get(String(cc["continent"]), 0)), "role": int(role_counts.get(String(cc["role"]), 0))}
+	for cc in ComboSystem.CONTINENT_ROLE_COMBOS:
+		var crh := ComboSystem.continent_role_have(cc, cr_counts)
+		var cr_lack := ComboSystem.continent_role_lacking(cc, cr_counts)
+		var cr_cont := String(cc["continent"]).capitalize()
+		if int(cr_lack["faction"]) == 0 and int(cr_lack["role"]) == 0:
+			var crl := _synergy_row("%s  %s x%d + %s x%d  %s" % [cc["name"], cr_cont, int(crh["faction"]), cc["role"], int(crh["role"]), ComboSystem.effects_text(cc["effects"])])
+			crl.tooltip_text = "Continent Specialty (%s + %s): %d units of one %s faction AND %d %ss. %s" % [cr_cont, cc["role"], ComboSystem.CONTINENT_ROLE_FACTION_UNITS, cr_cont, ComboSystem.CONTINENT_ROLE_UNITS, cc["role"], cc["blurb"]]
+			crl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			crl.clip_text = false
+		elif int(crh["faction"]) > 0 and int(crh["role"]) > 0 and int(cr_lack["faction"]) + int(cr_lack["role"]) <= 3:
+			var cr_parts: Array[String] = []
+			if int(cr_lack["faction"]) > 0:
+				cr_parts.append("%d %s faction" % [int(cr_lack["faction"]), cr_cont])
+			if int(cr_lack["role"]) > 0:
+				cr_parts.append("%d %s" % [int(cr_lack["role"]), cc["role"]])
+			cr_near.append([int(cr_lack["faction"]) + int(cr_lack["role"]), "%s (add %s)" % [cc["name"], ", ".join(PackedStringArray(cr_parts))]])
 	for c in ComboSystem.ROLE_TRAITS:
 		var rn := int(role_counts.get(c["role"], 0))
 		if rn <= 0:
@@ -636,8 +656,8 @@ func _refresh_synergy() -> void:
 		var rl := _synergy_row("%s%s x%d  %s%s" % [c["name"], " ULTRA" if is_role_ultra else "", rn, ComboSystem.effects_text(ComboSystem.role_effects(c, rn, role_counts)), ("  (next at %d)" % nt) if nt > 0 else ""])
 		var sp := ComboSystem.role_ultra_special(String(c["role"]))
 		rl.tooltip_text = String(c["blurb"]) + (("  ULTRA special - %s: %s" % [sp.get("name", ""), sp.get("blurb", "")]) if is_role_ultra else "  ULTRA: field %d+ units that ALL have this role (special: %s)." % [ComboSystem.ULTRA_MIN, sp.get("name", "")])
-	var near: Array = []  # duo combos that lack at most 3 units: [units lacking, text]
-	for c in ComboSystem.DUO_COMBOS:
+	var near: Array = []  # role pacts (and Grand Army (Role)) that lack at most 3 units: [units lacking, text]
+	for c in ComboSystem.DUO_COMBOS + [ComboSystem.ROLE_ARMY]:  # Grand Army (Role) belongs to the Grand Army family, listed after the 21 role pacts
 		var lack := ComboSystem.missing_units(c, role_counts)
 		if lack.is_empty():
 			var dl := _synergy_row("%s  %s" % [c["name"], ComboSystem.effects_text(c["effects"])])
@@ -658,6 +678,7 @@ func _refresh_synergy() -> void:
 		army_parts.append("%d of any faction" % army_total)
 	if army_total > 0 and army_total <= 3 and not fac_counts.is_empty():
 		near.append([army_total, "%s (add %s)" % [ComboSystem.FACTION_ARMY["name"], ", ".join(army_parts)]])
+	near.append_array(cr_near)
 	near.sort_custom(func(x, y): return int(x[0]) < int(y[0]))
 	var near_text: Array[String] = []
 	for nr in near:

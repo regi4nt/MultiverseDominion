@@ -2,7 +2,7 @@ class_name Deck
 extends RefCounted
 ## Battle Deck configuration: 15 unit types x 9 copies + 1 Champion (King) + 15 chosen Support cards.
 ## The 15 unit types are chosen by the player from the unit cards of ANY continent (the 8 Pawns + the pieces of all 28 factions,
-## continents and factions can be mixed freely; a line-up with units of all 7 continents switches on the Continent Bond); the King and the Support cards are not tied to a continent.
+## continents and factions can be mixed freely; a line-up with units of all 7 continents switches on the Continent Alliance); the King and the Support cards are not tied to a continent.
 ## Without a custom list (`unit_ids` empty) the unit types are the default of the King's faction:
 ## the 8 Pawns of the continent + the 7 own pieces (2 Rook, 2 Knight, 2 Bishop, Queen).
 

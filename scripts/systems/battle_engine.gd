@@ -110,18 +110,22 @@ func setup(cfg: Dictionary) -> void:
 				_log("Side %d Faction Tier: %s%s x%d (%s)" % [side, String(fac).capitalize(), " ULTRA" if bool(ftier["ultra"]) else "", int(ftier["count"]), ComboSystem.faction_tier_text(ftier)])
 		var fac_army := _army_active(sc["units"], side_fac)  # Grand Army (Faction): the King's continent OR the played one, so a foreign King can have it too
 		if fac_army:
-			_log("Side %d combo: %s (%s)" % [side, ComboSystem.FACTION_ARMY["name"], ComboSystem.effects_text(ComboSystem.FACTION_ARMY["effects"])])
-		# Continent Bond: a faction group of 2 units in EVERY continent gives every unit the bond effect of the continent of its King
+			_log("Side %d synergy: %s (%s)" % [side, ComboSystem.FACTION_ARMY["name"], ComboSystem.effects_text(ComboSystem.FACTION_ARMY["effects"])])
+		# Continent Alliance: a faction group of 2 units in EVERY continent gives every unit the bond effect of the continent of its King
 		var bond := ComboSystem.bonds_for(_continent_best_faction(sc["units"], side_fac), GameData.continent_of_faction(side_fac) if side_fac != "" else "")
 		if not bond.is_empty():
-			_log("Side %d combo: Continent Bond - %s (%s)" % [side, ", ".join(PackedStringArray(bond["names"])), ComboSystem.effects_text(bond["effects"])])
+			_log("Side %d synergy: Continent Alliance - %s (%s)" % [side, ", ".join(PackedStringArray(bond["names"])), ComboSystem.effects_text(bond["effects"])])
+		# Continent Specialties: 6 units of one faction of a continent + 6 units of its role (Arcanum faction + 6 Mages, ...) give the units of that role a special effect
+		var cr_combos := ComboSystem.continent_role_active(_continent_role_counts(sc["units"], side_fac))
+		for cc in cr_combos:
+			_log("Side %d synergy: %s - %s %ss (%s)" % [side, cc["name"], String(cc["continent"]).capitalize(), cc["role"], ComboSystem.effects_text(cc["effects"])])
 		var roles := role_counts(sc["units"])
 		for a in ComboSystem.active(roles):
-			_log("Side %d combo: %s%s (%s)" % [side, a["name"], ((" x%d" % int(a["count"])) if String(a["kind"]) == "role" else "") + (" ULTRA" if bool(a.get("ultra", false)) else ""), ComboSystem.effects_text(a["effects"])])
+			_log("Side %d synergy: %s%s (%s)" % [side, a["name"], ((" x%d" % int(a["count"])) if String(a["kind"]) == "role" else "") + (" ULTRA" if bool(a.get("ultra", false)) else ""), ComboSystem.effects_text(a["effects"])])
 		for e in sc["units"]:
 			var fac := CardDatabase.effective_faction(CardDatabase.get_unit(e["card_id"]), side_fac)
 			var role := String(CardDatabase.get_unit(e["card_id"]).get("role", ""))
-			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), ComboSystem.unit_mods(role, roles, String(fac), int(synergy_counts.get(fac, 0)), String(fac) == ultra_fac, fac_army, bond))
+			_spawn_unit(side, e["card_id"], int(e["stars"]), e["cell"], float(synergy.get(fac, 0.0)), ComboSystem.unit_mods(role, roles, String(fac), int(synergy_counts.get(fac, 0)), String(fac) == ultra_fac, fac_army, bond, cr_combos, GameData.continent_of_faction(String(fac))))
 	for side in range(2):  # wild monsters ("foes"): they are the regular units of a side that has no King (monster hunt)
 		var foes: Array = cfg["sides"][side].get("foes", [])
 		for i in range(foes.size()):
@@ -169,7 +173,7 @@ func _continent_faction_ids(side_fac: String = "", cont: String = "") -> Array:
 	return out
 
 
-## Home-continent rule: card buffs (and Faction Synergy) apply only if the side's faction belongs to the continent
+## Home-continent rule: card buffs (and Faction Tier) apply only if the side's faction belongs to the continent
 ## being played. A side without a Champion keeps them (no faction to be foreign).
 func _home_bonus(side: int) -> bool:
 	var fac := _side_faction(side)
@@ -182,7 +186,7 @@ static func _faction_counts(fac: String, side_fac: String) -> bool:
 	return fac != "" and fac == side_fac
 
 
-## Per continent the units of its best-staffed faction on the side (a Pawn / shared piece counts for the King's faction): what the Continent Bond needs
+## Per continent the units of its best-staffed faction on the side (a Pawn / shared piece counts for the King's faction): what the Continent Alliance needs
 ## (2 units of one faction in EVERY continent). Units without a faction count for nobody.
 func _continent_best_faction(list: Array, side_fac: String = "") -> Dictionary:
 	var per_fac := {}
@@ -196,6 +200,17 @@ func _continent_best_faction(list: Array, side_fac: String = "") -> Dictionary:
 		if cid != "":
 			best[cid] = maxi(int(best.get(cid, 0)), int(per_fac[fac]))
 	return best
+
+
+## Per continent-role pairing of a Continent Specialty ({"arcanum|Mage": {"faction": 6, "role": 6}, ...}, keys from ComboSystem.continent_role_key): what the combos need.
+## "faction" = units of the best-staffed faction of that continent, "role" = units of that role (any faction). A Pawn / shared piece counts for the King's faction (like the Continent Alliance).
+func _continent_role_counts(list: Array, side_fac: String = "") -> Dictionary:
+	var best := _continent_best_faction(list, side_fac)
+	var roles := role_counts(list)
+	var counts := {}
+	for c in ComboSystem.CONTINENT_ROLE_COMBOS:
+		counts[ComboSystem.continent_role_key(String(c["continent"]), String(c["role"]))] = {"faction": int(best.get(String(c["continent"]), 0)), "role": int(roles.get(String(c["role"]), 0))}
+	return counts
 
 
 ## Grand Army (Faction): every faction of the King's continent OR of the continent being played fields 2+ units (a foreign King qualifies through the played continent).
@@ -217,7 +232,7 @@ func _continent_counts(list: Array, side_fac: String = "", cont: String = "") ->
 	return counts
 
 
-## Faction Tier, banner part (Faction Synergy): tiers at 2 / 4 / 6 units; the flat HP/ATK banner bonus is 0 now, so this only returns counts (ComboSystem).
+## Faction Tier, banner part (Faction Tier): tiers at 2 / 4 / 6 units; the flat HP/ATK banner bonus is 0 now, so this only returns counts (ComboSystem).
 ## Shared pieces (Rook, Knight, Bishop, Queen) count for the side's own faction; a side without a Champion has none.
 func _synergy(list: Array, side_fac: String = "", out_counts: Dictionary = {}) -> Dictionary:
 	var counts := {}

@@ -760,14 +760,14 @@ func _test_combos() -> void:
 	check(is_equal_approx(fxof.call("Tank", {"Tank": 2}, "armor"), 0.05) and is_equal_approx(fxof.call("Tank", {"Tank": 4}, "armor"), 0.10) and is_equal_approx(fxof.call("Tank", {"Tank": 6}, "armor"), 0.15), "Iron Wall: Tank armor -5% / -10% / -15% damage taken")
 	check(fxof.call("Tank", {"Tank": 2}, "thorns") == 0.0 and is_equal_approx(fxof.call("Tank", {"Tank": 4}, "thorns"), 0.10) and is_equal_approx(fxof.call("Tank", {"Tank": 6}, "thorns"), 0.20), "Iron Wall: thorns from 4 Tanks")
 	check(fxof.call("Tank", {"Tank": 1}, "armor") == 0.0 and ComboSystem.active({"Tank": 1}).is_empty(), "one unit of a role is no combo")
-	check(is_equal_approx(fxof.call("Marksman", {"Marksman": 2}, "chill"), 3.0) and is_equal_approx(fxof.call("Marksman", {"Marksman": 6}, "chill"), 6.0) and fxof.call("Marksman", {"Marksman": 2}, "frenzy") == 0.0 and fxof.call("Marksman", {"Marksman": 4}, "frenzy") > 0.0, "Eagle Eye: chill from 2 Marksmen, frenzy from 4")
+	check(is_equal_approx(fxof.call("Marksman", {"Marksman": 2}, "chill"), 3.0) and is_equal_approx(fxof.call("Marksman", {"Marksman": 6}, "chill"), 6.0) and fxof.call("Marksman", {"Marksman": 2}, "frenzy") == 0.0 and fxof.call("Marksman", {"Marksman": 4}, "frenzy") > 0.0, "Pinning Shot: chill from 2 Marksmen, frenzy from 4")
 	check(fxof.call("Mage", {"Support": 4}, "armor") > 0.0 and fxof.call("Mage", {"Support": 4}, "mend_self") == 0.0 and fxof.call("Support", {"Support": 4}, "mend_self") > 0.0, "Guardian Aura: only Supports mend, the whole army takes less damage from 4")
 	check(fxof.call("Assassin", {"Assassin": 4}, "execute") > 0.0 and fxof.call("Assassin", {"Assassin": 4}, "opener") > 0.0 and fxof.call("Tank", {"Assassin": 4}, "execute") == 0.0, "Shadow Strike: execute + opener for Assassins only")
 	check(fxof.call("Controller", {"Controller": 2}, "stun_proc") == 5.0 and fxof.call("Controller", {"Controller": 6}, "stun_proc") == 3.0 and fxof.call("Fighter", {"Controller": 6}, "stun_proc") == 0.0, "Tactician's Command: Controllers stun every 5th / 4th / 3rd attack")
 	for r in ComboSystem.ROLES:
 		var rm := ComboSystem.unit_mods(r, {r: 6})
 		check(float(rm["hp"]) == 0.0 and float(rm["atk"]) == 0.0 and float(rm["shield"]) == 0.0 and int(rm["move"]) == 0 and int(rm["range"]) == 0 and not (rm["fx"] as Dictionary).is_empty(), "role trait %s is a pure special effect (no stat bonus)" % r)
-	# duo combos fit their names
+	# role pacts fit their names
 	var gc := ComboSystem.duo_mods("Assassin", {"Assassin": 6, "Mage": 6})
 	check(float(gc["fx"].get("burn", 0.0)) > 0.0 and float(gc["fx"].get("death_burst", 0.0)) > 0.0 and ComboSystem.duo_mods("Tank", {"Assassin": 6, "Mage": 6})["fx"].is_empty(), "Glass Cannon: Assassin / Mage burn and explode on death, others unchanged")
 	check(is_equal_approx(float(ComboSystem.duo_mods("Controller", {"Tank": 6, "Support": 6, "Controller": 6})["fx"].get("armor", 0.0)), 0.06), "Frontline Shield: every unit takes 6% less damage")
@@ -775,40 +775,42 @@ func _test_combos() -> void:
 	var all7 := {}
 	for r in ComboSystem.ROLES:
 		all7[r] = 2
-	check(ComboSystem.active(all7).any(func(a): return a["name"] == "Grand Army") and float(ComboSystem.unit_mods("Controller", all7)["fx"].get("lifesteal", 0.0)) >= 0.05, "Grand Army: all 7 roles (2 units each) give every unit armor and lifesteal")
+	check(ComboSystem.active(all7).any(func(a): return a["name"] == "Grand Army (Role)") and float(ComboSystem.unit_mods("Controller", all7)["fx"].get("lifesteal", 0.0)) >= 0.05, "Grand Army (Role): all 7 roles (2 units each) give every unit armor and lifesteal")
 	var all7_one := {}
 	for r in ComboSystem.ROLES:
 		all7_one[r] = 1
-	check(not ComboSystem.active(all7_one).any(func(a): return a["name"] == "Grand Army"), "Grand Army needs 2 units of each role, 1 is not enough")
-	check(ComboSystem.active({"Tank": 5, "Mage": 6}).all(func(x): return x["kind"] != "duo") and ComboSystem.active({"Tank": 1, "Mage": 1}).is_empty(), "pair duo combos need 6 units of EACH role")
+	check(not ComboSystem.active(all7_one).any(func(a): return a["name"] == "Grand Army (Role)"), "Grand Army (Role) needs 2 units of each role, 1 is not enough")
+	check(ComboSystem.active({"Tank": 5, "Mage": 6}).all(func(x): return x["kind"] != "duo") and ComboSystem.active({"Tank": 1, "Mage": 1}).is_empty(), "pair role pacts need 6 units of EACH role")
 	check(ComboSystem.active({"Tank": 6, "Mage": 6}).any(func(x): return x["name"] == "Spell Bastion"), "6 Tanks + 6 Mages: Spell Bastion")
-	check(ComboSystem.missing_units(ComboSystem.DUO_COMBOS[0], {"Tank": 4}) == {"Tank": 2, "Support": 6}, "missing_units lists the units a duo combo still lacks")
-	check(ComboSystem.DUO_COMBOS.size() == 22, "22 duo combos: 21 role pairs + Grand Army")
+	check(ComboSystem.missing_units(ComboSystem.DUO_COMBOS[0], {"Tank": 4}) == {"Tank": 2, "Support": 6}, "missing_units lists the units a role pact still lacks")
+	check(ComboSystem.DUO_COMBOS.size() == 21, "21 role pacts: one per role pact (Grand Army is not one of them)")
+	check(ComboSystem.ROLE_ARMY_UNITS == 2 and (ComboSystem.ROLE_ARMY["needs"] as Dictionary).size() == 7 and ComboSystem.ROLE_ARMY["needs"].values().all(func(n): return int(n) == ComboSystem.ROLE_ARMY_UNITS) and not ComboSystem.DUO_COMBOS.any(func(c): return c["id"] == "grand_army"), "Grand Army (Role) is its own constant: 7 roles x 2 units, not in DUO_COMBOS")
+	check(ComboSystem.active(all7).any(func(a): return a["name"] == "Grand Army (Role)" and a["kind"] == "army") and not ComboSystem.active(all7).any(func(a): return a["kind"] == "duo") and ComboSystem.duo_mods("Controller", all7)["fx"].is_empty(), "Grand Army (Role) has its own kind \"army\" and is not counted as a role pact")
 	var seen_ids := {}
 	var seen_pairs := {}
 	for dc in ComboSystem.DUO_COMBOS:
-		check(not seen_ids.has(dc["id"]), "duo combo id unique: %s" % dc["id"])
+		check(not seen_ids.has(dc["id"]), "role pact id unique: %s" % dc["id"])
 		seen_ids[dc["id"]] = true
 		var keys: Array = dc["needs"].keys()
 		keys.sort()
-		check(not seen_pairs.has(str(keys)), "duo combo role set unique: %s" % dc["id"])
+		check(not seen_pairs.has(str(keys)), "role pact role set unique: %s" % dc["id"])
 		seen_pairs[str(keys)] = true
 		for r in keys:
-			check(ComboSystem.ROLES.has(r), "duo combo uses a known role: %s" % dc["id"])
+			check(ComboSystem.ROLES.has(r), "role pact uses a known role: %s" % dc["id"])
 	for i in range(ComboSystem.ROLES.size()):
 		for j in range(i + 1, ComboSystem.ROLES.size()):
 			var pr := {ComboSystem.ROLES[i]: 6, ComboSystem.ROLES[j]: 6}
-			check(ComboSystem.active(pr).any(func(a): return a["kind"] == "duo"), "every role pair has a duo combo: %s + %s" % [ComboSystem.ROLES[i], ComboSystem.ROLES[j]])
+			check(ComboSystem.active(pr).any(func(a): return a["kind"] == "duo"), "every role pact has a role pact: %s + %s" % [ComboSystem.ROLES[i], ComboSystem.ROLES[j]])
 	var dfx := func(role: String, counts: Dictionary, key: String) -> float: return float(ComboSystem.duo_mods(role, counts)["fx"].get(key, 0.0))
-	check(is_equal_approx(dfx.call("Marksman", {"Marksman": 6, "Controller": 6}, "execute"), 0.20) and is_equal_approx(dfx.call("Assassin", {"Assassin": 6, "Support": 6}, "burn"), 0.20), "Target Painting / Venom Vial values")
+	check(is_equal_approx(dfx.call("Marksman", {"Marksman": 6, "Controller": 6}, "execute"), 0.20) and is_equal_approx(dfx.call("Assassin", {"Assassin": 6, "Support": 6}, "burn"), 0.20), "Target Painting / Alchemist's Fire values")
 	check(is_equal_approx(dfx.call("Fighter", {"Tank": 6, "Fighter": 6}, "thorns"), 0.10) and is_equal_approx(dfx.call("Tank", {"Tank": 6, "Fighter": 6}, "guard"), 0.06) and dfx.call("Tank", {"Tank": 6, "Fighter": 6}, "thorns") == 0.0, "Vanguard Line: Fighters thorns, Tanks guard")
 	check(is_equal_approx(dfx.call("Fighter", {"Support": 6, "Fighter": 6}, "mend_self"), 0.04) and dfx.call("Mage", {"Support": 6, "Fighter": 6}, "mend_self") == 0.0, "Field Medic: only Fighters mend")
 	check(is_equal_approx(dfx.call("Assassin", {"Assassin": 6, "Controller": 6}, "opener"), 0.50) and dfx.call("Fighter", {"Assassin": 6, "Controller": 6}, "opener") == 0.0, "Ambush Plan: first strike for Assassins only")
-	check(is_equal_approx(dfx.call("Tank", {"Support": 6, "Controller": 6}, "mend_self"), 0.02), "War Council: every unit mends 2% HP")
-	for dc in ComboSystem.DUO_COMBOS:  # no duo combo is a stat bonus any more
+	check(is_equal_approx(dfx.call("Tank", {"Support": 6, "Controller": 6}, "mend_self"), 0.02), "Supply Line: every unit mends 2% HP")
+	for dc in ComboSystem.DUO_COMBOS:  # no role pact is a stat bonus any more
 		for e in dc["effects"]:
-			check(not (e.has("hp") or e.has("atk") or e.has("shield") or e.has("move") or e.has("range")), "duo combo %s has no stat bonus" % dc["id"])
-			check(ComboSystem.FX_TYPES.any(func(k): return e.has(k)), "duo combo %s has a special effect" % dc["id"])
+			check(not (e.has("hp") or e.has("atk") or e.has("shield") or e.has("move") or e.has("range")), "role pact %s has no stat bonus" % dc["id"])
+			check(ComboSystem.FX_TYPES.any(func(k): return e.has(k)), "role pact %s has a special effect" % dc["id"])
 	var all_facs: Array = []
 	for cont in GameData.continents:
 		for f in cont.get("factions", []):
@@ -831,7 +833,7 @@ func _test_combos() -> void:
 	check(tfx.call("Tank", "nocthyr", 6, "opener") == 0.0 and is_equal_approx(tfx.call("Assassin", "nocthyr", 4, "opener"), 0.30), "Nightfall only gives Assassin / Marksman the opener")
 	check(tfx.call("Marksman", "voltrix", 2, "stun_proc") == 6.0 and tfx.call("Marksman", "voltrix", 6, "stun_proc") == 4.0 and tfx.call("Marksman", "voltrix", 8, "stun_proc", true) == 3.0 and tfx.call("Tank", "voltrix", 8, "stun_proc", true) == 0.0, "Overcharge: Marksman stun every 6th / 4th attack, 3rd in Ultra (count / 1.5)")
 	check(tfx.call("Mage", "inferna", 2, "death_burst") > 0.0 and tfx.call("Mage", "inferna", 2, "atk") == 0.0 and float(ComboSystem.unit_mods("Mage", {}, "inferna", 2)["hp"]) == 0.0, "Hellfire: a death burst, no stat change")
-	check(tfx.call("Mage", "astralis", 4, "splash") == 0.0 and tfx.call("Mage", "astralis", 6, "splash") > 0.0, "Star Charts: splash only at 6 units")
+	check(tfx.call("Mage", "astralis", 4, "splash") == 0.0 and tfx.call("Mage", "astralis", 6, "splash") > 0.0, "Astral Drift: splash only at 6 units")
 	check(is_equal_approx(float(ComboSystem.unit_mods("Tank", {"Tank": 2}, "terragorn", 2)["fx"]["armor"]), 0.05 + 0.04), "faction trait stacks with role traits")
 	check(ComboSystem.unit_mods("Tank", {}, "", 6)["fx"].is_empty() and ComboSystem.faction_tier_index(1) == -1 and ComboSystem.faction_tier_index(2) == 0 and ComboSystem.faction_tier_index(4) == 1 and ComboSystem.faction_tier_index(7) == 2, "faction tier index")
 	var eight_same: Array = []
@@ -867,15 +869,50 @@ func _test_combos() -> void:
 	for cid in ["aetherion", "arcanum", "machina", "sylvaris", "drakmor", "thalassia", "eclipsia"]:
 		cb_ok = cb_ok and not ComboSystem.continent_bond(cid).is_empty() and not ComboSystem.unit_mods("Tank", {}, "", 0, false, false, ComboSystem.continent_bond(cid))["fx"].is_empty()
 		realms[cid] = 2
-	# Continent Bond: 2 units of one faction in EVERY continent; the effect is the one of the KING's continent only
-	cb_ok = cb_ok and ComboSystem.bonds_for(realms, "drakmor").get("names", []) == ["War Fever"] and ComboSystem.bonds_for(realms, "eclipsia").get("names", []) == ["Time Fold"] and ComboSystem.bonds_for(realms, "aetherion").get("names", []) == ["Royal Standard"]
+	# Continent Alliance: 2 units of one faction in EVERY continent; the effect is the one of the KING's continent only
+	cb_ok = cb_ok and ComboSystem.bonds_for(realms, "drakmor").get("names", []) == ["War Fever"] and ComboSystem.bonds_for(realms, "eclipsia").get("names", []) == ["Time Slip"] and ComboSystem.bonds_for(realms, "aetherion").get("names", []) == ["Royal Standard"]
 	var dr_fx: Dictionary = ComboSystem.unit_mods("Tank", {}, "", 0, false, false, ComboSystem.bonds_for(realms, "drakmor"))["fx"]
 	cb_ok = cb_ok and dr_fx.size() == 1 and is_equal_approx(float(dr_fx.get("rage", 0.0)), 0.08)
 	var six := realms.duplicate()
 	six["machina"] = 1  # one faction group short
 	cb_ok = cb_ok and ComboSystem.bonds_for(six, "drakmor").is_empty() and ComboSystem.bond_missing(six) == ["machina"] and ComboSystem.bonds_for({"arcanum": 9}, "arcanum").is_empty() and ComboSystem.bonds_for(realms, "").is_empty() and ComboSystem.bonds_for(realms, "unknown").is_empty() and ComboSystem.bond_missing(realms).is_empty()
-	check(cb_ok and ComboSystem.unit_mods("Tank", {})["fx"].is_empty(), "Continent Bond: 2 units of one faction in all 7 continents, the effect of the King's continent; one continent short is not enough")
+	check(cb_ok and ComboSystem.unit_mods("Tank", {})["fx"].is_empty(), "Continent Alliance: 2 units of one faction in all 7 continents, the effect of the King's continent; one continent short is not enough")
 	check(is_equal_approx(float(ComboSystem.unit_mods("Tank", {}, "", 0, false, true)["fx"]["last_rites"]), 0.10) and is_equal_approx(float(ComboSystem.unit_mods("Mage", {}, "", 0, false, true)["fx"]["mend_self"]), 0.03) and ComboSystem.unit_mods("Tank", {})["fx"].is_empty(), "Grand Army (Faction): last rites + mend for every unit")
+	# Continent Specialties: 6 synergies, each pairs a continent with the role that fits it (6 units of ONE faction of the continent AND 6 units of the role; the effect reaches the units of that role)
+	var cr_conts := {}
+	var cr_roles := {}
+	var cr_data_ok := ComboSystem.CONTINENT_ROLE_COMBOS.size() == 6 and ComboSystem.CONTINENT_ROLE_FACTION_UNITS == 6 and ComboSystem.CONTINENT_ROLE_UNITS == 6
+	for cc in ComboSystem.CONTINENT_ROLE_COMBOS:
+		cr_conts[String(cc["continent"])] = true
+		cr_roles[String(cc["role"])] = true
+		cr_data_ok = cr_data_ok and not GameData.get_continent(String(cc["continent"])).is_empty() and ComboSystem.ROLES.has(String(cc["role"])) and String(cc["blurb"]) != ""
+		for ce in cc["effects"]:
+			cr_data_ok = cr_data_ok and typeof(ce["to"]) == TYPE_ARRAY and (ce["to"] as Array).has(String(cc["role"])) and ComboSystem.FX_TYPES.any(func(k): return ce.has(k)) and not ComboSystem.STAT_KEYS.any(func(k): return ce.has(k))
+	check(cr_data_ok and cr_conts.size() == 6 and cr_roles.size() == 6, "6 Continent Specialties: 6 different continents x 6 different roles, special effects only")
+	var cr_pairs := {"aetherion": "Tank", "arcanum": "Mage", "machina": "Controller", "sylvaris": "Support", "drakmor": "Fighter", "eclipsia": "Assassin"}
+	var cr_pair_ok := true
+	for cid in cr_pairs:
+		cr_pair_ok = cr_pair_ok and String(ComboSystem.continent_role_combo(String(cid), String(cr_pairs[cid])).get("role", "")) == String(cr_pairs[cid])
+	check(cr_pair_ok and ComboSystem.continent_role_combo("arcanum", "Tank").is_empty() and ComboSystem.continent_role_combo("thalassia", "Marksman").is_empty(), "Continent Specialties: each continent is paired with the role that fits it")
+	var cr_arc := {"arcanum|Mage": {"faction": 6, "role": 6}}
+	var cr_act := ComboSystem.continent_role_active(cr_arc)
+	check(cr_act.size() == 1 and String(cr_act[0]["name"]) == "Rune Cascade", "Continent Specialty: 6 units of one Arcanum faction + 6 Mages switch it on")
+	check(ComboSystem.continent_role_active({"arcanum|Mage": {"faction": 5, "role": 6}}).is_empty() and ComboSystem.continent_role_active({"arcanum|Mage": {"faction": 6, "role": 5}}).is_empty() and ComboSystem.continent_role_active({"arcanum|Mage": {"faction": 12, "role": 0}}).is_empty() and ComboSystem.continent_role_active({"machina|Mage": {"faction": 9, "role": 9}, "arcanum|Tank": {"faction": 9, "role": 9}}).is_empty() and ComboSystem.continent_role_active({}).is_empty(), "Continent Specialty needs BOTH halves: 5 faction units or 5 role units, another continent / role pact do not switch it on")
+	var cr_l1 := ComboSystem.continent_role_lacking(cr_act[0], {"arcanum|Mage": {"faction": 4, "role": 5}})
+	var cr_l0 := ComboSystem.continent_role_lacking(cr_act[0], cr_arc)
+	var cr_le := ComboSystem.continent_role_lacking(cr_act[0], {})
+	check(int(cr_l1["faction"]) == 2 and int(cr_l1["role"]) == 1 and int(cr_l0["faction"]) == 0 and int(cr_l0["role"]) == 0 and int(cr_le["faction"]) == 6 and int(cr_le["role"]) == 6, "continent_role_lacking: units of the faction and of the role a Continent Specialty still needs")
+	var cr_mage: Dictionary = ComboSystem.unit_mods("Mage", {}, "", 0, false, false, {}, cr_act, "arcanum")["fx"]
+	check(is_equal_approx(float(cr_mage.get("splash", 0.0)), 0.20) and int(cr_mage.get("chill", 0)) == 2 and cr_mage.size() == 2, "Rune Cascade: Mages splash 20% and slow 2 ticks")
+	check(not ComboSystem.unit_mods("Mage", {}, "", 0, false, false, {}, cr_act, "machina")["fx"].is_empty() and ComboSystem.unit_mods("Tank", {}, "", 0, false, false, {}, cr_act, "arcanum")["fx"].is_empty(), "Continent Specialty reaches the units of its ROLE (any faction), a Tank gets nothing from Rune Cascade")
+	var cr_all: Array = []
+	for cid in cr_pairs:
+		cr_all.append(ComboSystem.continent_role_combo(String(cid), String(cr_pairs[cid])))
+	var cr_each_ok := true
+	for cid in cr_pairs:
+		cr_each_ok = cr_each_ok and not ComboSystem.unit_mods(String(cr_pairs[cid]), {}, "", 0, false, false, {}, cr_all, String(cid))["fx"].is_empty()
+	check(cr_each_ok and ComboSystem.unit_mods("Marksman", {}, "", 0, false, false, {}, cr_all, "thalassia")["fx"].is_empty(), "all 6 Continent Specialties give their units an effect; Marksmen get none (no combo)")
+	check(is_equal_approx(float(ComboSystem.unit_mods("Tank", {"Tank": 2}, "", 0, false, false, {}, [ComboSystem.continent_role_combo("aetherion", "Tank")], "aetherion")["fx"].get("thorns", 0.0)), 0.08) and is_equal_approx(float(ComboSystem.unit_mods("Tank", {"Tank": 4}, "", 0, false, false, {}, [ComboSystem.continent_role_combo("aetherion", "Tank")], "aetherion")["fx"].get("thorns", 0.0)), 0.18), "Continent Specialty stacks with the role trait (Iron Wall thorns + Royal Bulwark thorns)")
 	# Faction Tier: Faction Banner + faction trait fused into one tier (numbers unchanged)
 	var ft_h := ComboSystem.faction_tier("solvaris", 6)
 	check(ComboSystem.faction_tier("solvaris", 1).is_empty() and String(ft_h["name"]) == "Host" and is_equal_approx(float(ft_h["bonus"]), 0.0) and String(ft_h["trait"]) == "Dawn Ward" and not (ft_h["trait_effects"] as Array).is_empty(), "Faction Tier: 6 units = Dawn Ward at full tier, no banner bonus")
@@ -902,7 +939,7 @@ func _test_combos() -> void:
 		if not u.is_king and not u.fx.is_empty():
 			lone_ok = false
 	check(lone_ok, "a lone unit has no synergy effect")
-	# Continent Bond in the engine: 2 units of ONE faction in each of the 7 continents on one side (a mixed-continent line-up), King of Aetherion / Drakmor
+	# Continent Alliance in the engine: 2 units of ONE faction in each of the 7 continents on one side (a mixed-continent line-up), King of Aetherion / Drakmor
 	var fourteen: Array = []
 	var thirteen: Array = []
 	for ci in range(GameData.continents.size()):
@@ -920,14 +957,90 @@ func _test_combos() -> void:
 	var drak_champ := String(GameData.find_faction("drakhan").get("champion", ""))
 	var se := BattleEngine.new()
 	se.setup({"seed": 3, "sides": [{"units": fourteen, "champion": champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
-	check(fourteen.size() == 14 and se.log_lines.any(func(l): return String(l).contains("Continent Bond - Royal Standard")), "Continent Bond: 14 units (2 of one faction per continent) give every unit the effect of the Aetherion King")
+	check(fourteen.size() == 14 and se.log_lines.any(func(l): return String(l).contains("Continent Alliance - Royal Standard")), "Continent Alliance: 14 units (2 of one faction per continent) give every unit the effect of the Aetherion King")
 	var sd := BattleEngine.new()
 	sd.setup({"seed": 3, "sides": [{"units": fourteen, "champion": drak_champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
-	check(sd.log_lines.any(func(l): return String(l).contains("Continent Bond - War Fever")) and not sd.log_lines.any(func(l): return String(l).contains("Royal Standard")), "Continent Bond: a Drakmor King gets War Fever only (the effect follows the King's continent)")
+	check(sd.log_lines.any(func(l): return String(l).contains("Continent Alliance - War Fever")) and not sd.log_lines.any(func(l): return String(l).contains("Royal Standard")), "Continent Alliance: a Drakmor King gets War Fever only (the effect follows the King's continent)")
 	var s13 := BattleEngine.new()
 	s13.setup({"seed": 3, "sides": [{"units": thirteen, "champion": champ, "supports": []}, {"units": [], "champion": champ, "supports": []}]})
-	check(not s13.log_lines.any(func(l): return String(l).contains("Continent Bond")), "Continent Bond: one continent short (13 units) gives nothing")
+	check(not s13.log_lines.any(func(l): return String(l).contains("Continent Alliance")), "Continent Alliance: one continent short (13 units) gives nothing")
+	_test_continent_role_engine()
 	_test_synergy_fx_engine()
+
+
+## One line-up for the engine tests: cards laid out on rows 7 and 6 (8 per row).
+func _cr_line(cards: Array) -> Array:
+	var line: Array = []
+	for i in range(cards.size()):
+		line.append({"card_id": String(cards[i]["id"]), "stars": 1, "cell": Vector2i(i % 8, 7 - i / 8)})
+	return line
+
+
+## Continent Specialties in the engine: 6 units of one faction of the continent + 6 units of its role switch it on (and only the units of that role get the effect),
+## 5 of either half do not, and every pair fires for its own continent.
+func _test_continent_role_engine() -> void:
+	CardDatabase.set_continent("arcanum")
+	var fac := "astralis"
+	var champ := String(GameData.find_faction(fac).get("champion", ""))
+	var foes := {"units": [], "champion": champ, "supports": []}
+	var pieces: Array = CardDatabase.faction_pieces(fac)  # the 7 pieces of the faction, one per role
+	var non_mage: Array = []
+	for p in pieces:
+		if String(p["role"]) != "Mage":
+			non_mage.append(p)
+	var faction_six: Array = []  # 6 units of Astralis (no Mage among them: the role half comes from the other factions)
+	for i in range(6):
+		faction_six.append(non_mage[i % non_mage.size()])
+	var mages: Array = []  # Arcanum Mages of the OTHER factions (the role half can come from any faction)
+	for cu in CardDatabase.units_of_continent("arcanum"):
+		if String(cu["chess"]) != "pawn" and String(cu["role"]) == "Mage" and String(cu["faction"]) != fac:
+			mages.append(cu)
+	var mage_six: Array = []
+	for i in range(6):
+		mage_six.append(mages[i % mages.size()])
+	var line: Array = faction_six + mage_six
+	var en := BattleEngine.new()
+	en.setup({"seed": 3, "sides": [{"units": _cr_line(line), "champion": champ, "supports": []}, foes]})
+	var mage_ok := true
+	for u in en.units_of(0):
+		if not u.is_king and u.role == "Mage":
+			mage_ok = mage_ok and int(u.fx.get("chill", 0)) >= 2 and float(u.fx.get("splash", 0.0)) >= 0.20 - 0.0001
+	check(mage_ok and en.log_lines.any(func(l): return String(l).contains("synergy: Rune Cascade")), "Continent Specialty in the engine: 6 Astralis units + 6 Mages give the Mages Rune Cascade (splash + slow)")
+	var no5f := BattleEngine.new()  # only 5 units of the faction
+	no5f.setup({"seed": 3, "sides": [{"units": _cr_line(faction_six.slice(0, 5) + mage_six), "champion": champ, "supports": []}, foes]})
+	check(not no5f.log_lines.any(func(l): return String(l).contains("Rune Cascade")), "Continent Specialty in the engine: 5 units of the faction + 6 Mages are not enough")
+	var no5r := BattleEngine.new()  # only 5 Mages
+	no5r.setup({"seed": 3, "sides": [{"units": _cr_line(faction_six + mage_six.slice(0, 5)), "champion": champ, "supports": []}, foes]})
+	check(not no5r.log_lines.any(func(l): return String(l).contains("Rune Cascade")), "Continent Specialty in the engine: 6 units of the faction + 5 Mages are not enough")
+	var no_f := BattleEngine.new()  # 6 Mages of mixed factions and nothing else: the faction half is missing
+	no_f.setup({"seed": 3, "sides": [{"units": _cr_line(mage_six), "champion": champ, "supports": []}, foes]})
+	check(not no_f.log_lines.any(func(l): return String(l).contains("Rune Cascade")), "Continent Specialty in the engine: 6 Mages without 6 units of one faction are not enough")
+	# every pair switches on in the engine: 6 units of one faction of its continent + 6 units of its role
+	var all_ok := true
+	for c in ComboSystem.CONTINENT_ROLE_COMBOS:
+		var cid := String(c["continent"])
+		var role := String(c["role"])
+		CardDatabase.set_continent(cid)
+		var f_id := String(GameData.get_continent(cid)["factions"][0]["id"])
+		var f_champ := String(GameData.find_faction(f_id).get("champion", ""))
+		var f_cards: Array = []
+		for p in CardDatabase.faction_pieces(f_id):
+			if String(p["role"]) != role:
+				f_cards.append(p)
+		var r_cards: Array = []
+		for cu in CardDatabase.units_of_continent(cid):
+			if String(cu["chess"]) != "pawn" and String(cu["role"]) == role and String(cu["faction"]) != f_id:
+				r_cards.append(cu)
+		var ln: Array = []
+		for i in range(6):
+			ln.append(f_cards[i % f_cards.size()])
+		for i in range(6):
+			ln.append(r_cards[i % r_cards.size()])
+		var eg := BattleEngine.new()
+		eg.setup({"seed": 3, "sides": [{"units": _cr_line(ln), "champion": f_champ, "supports": []}, {"units": [], "champion": f_champ, "supports": []}]})
+		all_ok = all_ok and not f_cards.is_empty() and not r_cards.is_empty() and eg.log_lines.any(func(l): return String(l).contains("synergy: " + String(c["name"])))
+	check(all_ok, "Continent Specialties in the engine: every one of the 6 pairs switches on with 6 units of one faction + 6 units of its role")
+	CardDatabase.set_continent("aetherion")
 
 
 ## The engine really applies each synergy special effect in a fight (unit.fx -> _x() in the attack / damage / death hooks).

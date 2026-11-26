@@ -120,7 +120,7 @@ func get_faction(continent_id: String, faction_id: String) -> Dictionary:
 
 
 ## Home-continent rule: a faction may be played on any continent (outside Journey), but its faction bonuses
-## (Champion passive + Faction Synergy) only apply on the continent the faction belongs to.
+## (Champion passive + Faction Tier) only apply on the continent the faction belongs to.
 func is_home_faction(faction_id: String, continent_id: String) -> bool:
 	return faction_id != "" and not get_faction(continent_id, faction_id).is_empty()
 

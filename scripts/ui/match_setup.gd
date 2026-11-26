@@ -762,7 +762,7 @@ func _refresh_home_note() -> void:
 	var fid := SaveManager.player_faction_id()
 	var fname := String(GameData.find_faction(fid).get("name", fid.capitalize()))
 	if _is_home():
-		_home_note.text = "Home continent: %s bonuses (King Buff + unit buffs + Faction Synergy) are active on %s." % [fname, cname]
+		_home_note.text = "Home continent: %s bonuses (King Buff + unit buffs + Faction Tier) are active on %s." % [fname, cname]
 		_home_note.add_theme_color_override("font_color", UiTheme.COL_GOLD)
 	elif _kind == "journey":
 		_home_note.text = "Journey needs a faction of %s. Change faction in your Deck." % cname
