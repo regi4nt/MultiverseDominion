@@ -228,9 +228,13 @@ func _make_player(id: int, faction_id: String, is_ai: bool, difficulty: String, 
 	var champ := GameData.get_champion(p.champion_id)
 	p.passive = champ.get("passive", "")
 	p.passive_value = float(champ.get("passive_value", 0.0))
+	p.passive2 = String(champ.get("passive2", ""))
+	p.passive2_value = float(champ.get("passive2_value", 0.0))
 	if not is_ai and id == 0 and human_king_b < SaveManager.KING_MAX_COPIES:  # the human's King below B3 has no territory skill yet
 		p.passive = ""
 		p.passive_value = 0.0
+		p.passive2 = ""
+		p.passive2_value = 0.0
 	p.color = PLAYER_COLORS[id % PLAYER_COLORS.size()]
 	p.gold = int(GameData.b("start_gold")) if tutorial else GameData.gold_for(match_difficulty)  # by difficulty; the guided tutorial keeps the standard gold
 	# Life depends on the match difficulty (easy 5 / normal 3 / hard 1); the guided tutorial keeps the standard 3
@@ -239,7 +243,9 @@ func _make_player(id: int, faction_id: String, is_ai: bool, difficulty: String, 
 	p.level = int(GameData.b("start_level"))
 	p.capacity = p.level * int(GameData.b("capacity_per_level"))
 	if p.has_passive("fortune_weave"):
-		p.reroll_tokens = int(p.passive_value)
+		p.reroll_tokens = int(p.pv("fortune_weave"))
+	if p.has_passive("war_chest") and not tutorial:
+		p.gold += int(p.pv("war_chest"))
 	_init_army(p)
 	return p
 
@@ -290,7 +296,7 @@ func _init_army(p: PlayerState) -> void:
 				rares.append(id)
 		if rares.is_empty():
 			rares = deck_ids
-		for i in range(int(p.passive_value)):
+		for i in range(int(p.pv("vanguard"))):
 			var rid := rares[rng.randi() % rares.size()]
 			if p.battle_deck.take_card(rid):
 				p.roster.add_copy(rid)
@@ -481,12 +487,14 @@ func describe_tile(idx: int) -> String:
 
 
 func _corner_text(kind: String) -> String:
+	var base := ""
 	match kind:
 		"start": return "Pass or land: collect start bonus gold."
-		"sanctuary": return "Rest: receive a small amount of gold."
-		"rift": return "Trapped: skip your next turn."
-		"crossroads": return "Free warp to a random active portal." if not PortalSystem.active_indices(tiles).is_empty() else "Free warp to a random place on the board."
-	return ""
+		"sanctuary": base = "Rest: receive a small amount of gold."
+		"rift": base = "Trapped: skip your next turn."
+		"crossroads": base = "Free warp to a random active portal." if not PortalSystem.active_indices(tiles).is_empty() else "Free warp to a random place on the board."
+	var extra := String(WorldMods.corner_extra(kind).get("text", ""))
+	return base + ("\nContinent bonus: " + extra + "." if extra != "" else "")
 
 
 # ------------------------------------------------------------------ turn API
@@ -780,7 +788,9 @@ func _random_warp_dest(p: PlayerState) -> int:
 func _give_start_bonus(p: PlayerState) -> void:
 	var bonus := int(GameData.b("chaos_start_bonus") if chaos else GameData.b("start_bonus")) + WorldMods.start_bonus_extra  # Chaos: the Gate is passed 2.5x as often, so it pays less
 	if p.has_passive("royal_treasury"):
-		bonus = int(bonus * (1.0 + p.passive_value))
+		bonus = int(bonus * (1.0 + p.pv("royal_treasury")))
+	if p.has_passive("interest"):  # a share of the gold in hand (capped)
+		bonus += mini(int(GameData.b("interest_cap", 120)), int(p.gold * p.pv("interest")))
 	if _is_human(p):
 		bonus += int(random_ingame().get("start_gold_extra", 0))
 	p.gold += bonus
@@ -850,6 +860,7 @@ func _resolve_landing(p: PlayerState) -> void:
 
 
 func _resolve_corner(p: PlayerState, t: BoardTile) -> void:
+	var extra: Dictionary = WorldMods.corner_extra(t.corner_kind)  # continent bonus on top of the corner's own effect
 	match t.corner_kind:
 		"start":
 			_log("%s stands at the Dominion Gate." % p.display_name)
@@ -857,10 +868,25 @@ func _resolve_corner(p: PlayerState, t: BoardTile) -> void:
 			var g := int(GameData.b("sanctuary_bonus"))
 			p.gold += g
 			_log("%s rests at the Sanctuary: +%d G." % [p.display_name, g])
+			_apply_corner_bonus(p, extra)
 		"rift":
 			p.skip_turns += 1
 			_log("%s is trapped in the Rift (skips next turn)." % p.display_name)
+			_apply_corner_bonus(p, extra)
 		"crossroads":
+			_apply_corner_bonus(p, extra)
+			if bool(extra.get("choose_portal", false)) and not PortalSystem.active_indices(tiles).is_empty():
+				_log("%s may choose any active portal." % p.display_name)  # Thalassia: the Crossroads works like a portal tile (the player picks, or stays)
+				_set_pending({"type": "portal", "options": PortalSystem.active_indices(tiles)})
+				players_changed.emit()
+				return
+			var dest := _corner_warp_dest(p, extra)
+			if dest >= 0:
+				_warp(p, dest, "Crossroads")
+				if not PortalSystem.active_indices(tiles).has(dest):  # landing on a portal only warps (as before); every other tile is resolved
+					_nested_resolve(p)
+				players_changed.emit()
+				return
 			var actives := PortalSystem.active_indices(tiles)
 			if actives.is_empty():  # no portals on this board (Chaos): the Crossroads warps to a random place instead
 				var rd := _random_warp_dest(p)
@@ -872,17 +898,81 @@ func _resolve_corner(p: PlayerState, t: BoardTile) -> void:
 	players_changed.emit()
 
 
+## Continent bonus of a corner (data/continents.json -> corner_bonus). Effect keys (all optional, combined):
+## gold, gold_per_land, reroll_token, special_die, stock_pct, upgrade_free, skip_cancel. Movement keys (warp_to, shift, choose_portal)
+## are read by _corner_warp_dest and _resolve_corner.
+func _apply_corner_bonus(p: PlayerState, b: Dictionary) -> void:
+	if b.is_empty():
+		return
+	var gain := int(b.get("gold", 0))
+	if b.has("gold_per_land"):
+		var lands := 0
+		for t in tiles:
+			if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id:
+				lands += 1
+		gain += lands * int(b["gold_per_land"])
+	if gain > 0:
+		p.gold += gain
+		_log("Continent bonus: %s gains %d G." % [p.display_name, gain])
+	if int(b.get("reroll_token", 0)) > 0:
+		p.reroll_tokens += int(b["reroll_token"])
+		_log("Continent bonus: %s gains %d Reroll Token." % [p.display_name, int(b["reroll_token"])])
+	if int(b.get("special_die", 0)) > 0 and not GameData.special_dice.is_empty():
+		_give_special_die(p)
+	if float(b.get("stock_pct", 0.0)) > 0.0 and p.stock_value > 0:
+		var up := int(round(float(p.stock_value) * float(b["stock_pct"])))
+		p.stock_value += up
+		_log("Continent bonus: %s's portfolio grows by %d G." % [p.display_name, up])
+	if bool(b.get("skip_cancel", false)) and p.skip_turns > 0:
+		p.skip_turns -= 1
+		_log("Continent bonus: %s is not held by the Rift." % p.display_name)
+	if int(b.get("upgrade_free", 0)) > 0:
+		var cands: Array[BoardTile] = []
+		for t in tiles:
+			if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id and t.lease_left <= 0 and not t.is_landmark():
+				cands.append(t)
+		if not cands.is_empty():
+			var ut: BoardTile = cands[rng.randi() % cands.size()]
+			_log("Continent bonus: a free upgrade for %s." % p.display_name)
+			_do_upgrade(p, ut, 0)
+
+
+## Destination of a Crossroads warp chosen by the continent bonus ("warp_to": owned / free_land / shop, or "shift": n tiles
+## forward or back). -1 = no bonus warp (or nothing fits), the caller uses the normal Crossroads warp.
+func _corner_warp_dest(p: PlayerState, b: Dictionary) -> int:
+	var cands: Array[int] = []
+	match String(b.get("warp_to", "")):
+		"owned":
+			for t in tiles:
+				if t.type == BoardTile.Type.TERRITORY and t.owner_id == p.id:
+					cands.append(t.index)
+		"free_land":
+			for t in tiles:
+				if t.type == BoardTile.Type.TERRITORY and t.owner_id == -1:
+					cands.append(t.index)
+		"shop":
+			for t in tiles:
+				if t.type == BoardTile.Type.SHOP:
+					cands.append(t.index)
+	if not cands.is_empty():
+		return cands[rng.randi() % cands.size()]
+	var n := int(b.get("shift", 0))
+	if n > 0:
+		var dir := 1 if rng.randi() % 2 == 0 else -1
+		return posmod(p.position + dir * n, BoardBuilder.tiles_total)
+	return -1
+
+
 func _price_for(p: PlayerState, t: BoardTile) -> int:
 	var price := t.price
 	if p.has_passive("landlord"):
-		price = int(price * (1.0 - p.passive_value))
+		price = int(price * (1.0 - p.pv("landlord")))
 	return price
 
 
-func _apply_tax_passive(p: PlayerState, amount: int) -> int:
-	if p.has_passive("shadow_ledger"):
-		return int(amount * (1.0 - p.passive_value))
-	return amount
+func _apply_tax_passive(p: PlayerState, amount: int, is_rent: bool = false) -> int:
+	var cut := p.pv("shadow_ledger") + p.pv("rent_cut" if is_rent else "tax_cut")  # Shadow Ledger cuts both, the others only one of them
+	return int(amount * (1.0 - minf(cut, 0.8)))
 
 
 func _resolve_territory(p: PlayerState, t: BoardTile) -> void:
@@ -901,6 +991,8 @@ func _resolve_territory(p: PlayerState, t: BoardTile) -> void:
 			_log("%s visits their leased land %s (%d rounds left; buying it out costs %d G)." % [p.display_name, t.name, t.lease_left, rcost])
 	elif t.owner_id == p.id:
 		var ucost := EconomySystem.upgrade_cost(t)
+		if ucost > 0 and p.has_passive("upgrader"):
+			ucost = maxi(5, int(round(float(ucost) * (1.0 - p.pv("upgrader")) / 5.0)) * 5)
 		if ucost < 0:
 			_log("%s visits their own Landmark %s." % [p.display_name, t.name])
 		elif p.gold >= ucost:
@@ -913,8 +1005,8 @@ func _resolve_territory(p: PlayerState, t: BoardTile) -> void:
 		var owner_p := players[t.owner_id]
 		var base_rent := EconomySystem.rent_of(t, tiles)
 		if owner_p.has_passive("toll_keeper"):
-			base_rent = int(base_rent * (1.0 + owner_p.passive_value))
-		var rent := _apply_tax_passive(p, base_rent)
+			base_rent = int(base_rent * (1.0 + owner_p.pv("toll_keeper")))
+		var rent := _apply_tax_passive(p, base_rent, true)
 		_log("Territory Encounter at %s: %s must face the owner %s." % [t.name, p.display_name, owner_p.display_name])
 		_set_pending({"type": "encounter", "actor": owner_p.id, "tile": t.index, "rent": rent, "attacker": p.id})
 
@@ -1175,8 +1267,8 @@ func _auction_end() -> void:
 
 func _resolve_event(p: PlayerState) -> void:
 	if p.has_passive("treasure_hunter"):
-		p.gold += int(p.passive_value)
-		_log("%s's Treasure Hunter finds %d G." % [p.display_name, int(p.passive_value)])
+		p.gold += int(p.pv("treasure_hunter"))
+		_log("%s's Treasure Hunter finds %d G." % [p.display_name, int(p.pv("treasure_hunter"))])
 	var ev := EventSystem.draw(rng)
 	var value := int(ev.get("value", 0))
 	_log("Event: %s - %s" % [ev.get("title", "?"), ev.get("description", "")])
@@ -1863,14 +1955,14 @@ func finish_duel(result: Dictionary) -> void:
 		bonus += int(random_ingame().get("duel_win_gold", 0))
 	if int(result.get("winner", -1)) != attacker.id:
 		stats["defender_wins"] += 1
-		defender.gold += bonus + (int(defender.passive_value) if defender.has_passive("spoils") else 0)
+		defender.gold += bonus + int(defender.pv("spoils"))
 		_log("DEFENDER WINS: %s keeps %s." % [defender.display_name, t.name])
 		pending = {}
 		_lose_life(attacker, "lost the duel")
 		_finish_landing()
 		return
 	stats["attacker_wins"] += 1
-	attacker.gold += bonus + (int(attacker.passive_value) if attacker.has_passive("spoils") else 0)
+	attacker.gold += bonus + int(attacker.pv("spoils"))
 	_log("ATTACKER WINS: %s defeats %s!" % [attacker.display_name, defender.display_name])
 	if bool(GameData.b("defender_loses_life")):
 		_lose_life(defender, "lost the duel")
@@ -1895,7 +1987,7 @@ func _lose_life(p: PlayerState, reason: String) -> void:
 func heal_price_for(p: PlayerState) -> int:
 	var price := float(GameData.b("heal_price"))
 	if p.has_passive("mender"):
-		price *= 1.0 - p.passive_value
+		price *= 1.0 - p.pv("mender")
 	return int(round(price))
 
 
@@ -1911,7 +2003,7 @@ func _player_to_dict(p: PlayerState) -> Dictionary:
 		units.append({"id": u.card_id, "stars": u.stars, "cell": [u.cell.x, u.cell.y]})
 	return {
 		"id": p.id, "name": p.display_name, "is_ai": p.is_ai, "difficulty": p.difficulty, "faction": p.faction_id,
-		"champion": p.champion_id, "passive": p.passive, "passive_value": p.passive_value, "color": p.color.to_html(),
+		"champion": p.champion_id, "passive": p.passive, "passive_value": p.passive_value, "passive2": p.passive2, "passive2_value": p.passive2_value, "color": p.color.to_html(),
 		"position": p.position, "gold": p.gold, "life": p.life, "max_life": p.max_life, "level": p.level, "capacity": p.capacity,
 		"tokens": p.reroll_tokens, "skip": p.skip_turns, "alive": p.alive, "team": p.team, "dice": p.special_dice.duplicate(), "move_bonus": p.move_bonus,
 		"cstar": p.commander_star, "mprog": p.mission_progress, "stock": p.stock_value, "sbasis": p.stock_basis,
@@ -1977,6 +2069,8 @@ static func from_dict(d: Dictionary) -> MatchController:
 		p.champion_id = String(pd["champion"])
 		p.passive = String(pd["passive"])
 		p.passive_value = float(pd["passive_value"])
+		p.passive2 = String(pd.get("passive2", ""))
+		p.passive2_value = float(pd.get("passive2_value", 0.0))
 		p.color = Color(String(pd["color"]))
 		p.position = int(pd["position"])
 		p.gold = int(pd["gold"])

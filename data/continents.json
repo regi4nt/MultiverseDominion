@@ -12,6 +12,11 @@
 				"description": "Passing START grants +50 extra Dominion Gold.",
 				"start_bonus_extra": 50
 			},
+			"corner_bonus": {
+				"sanctuary": {"text": "+5 G per territory you own", "gold_per_land": 5},
+				"rift": {"text": "+1 Reroll Token", "reroll_token": 1},
+				"crossroads": {"text": "Warp to one of your territories", "warp_to": "owned"}
+			},
 			"regions": [
 				{
 					"name": "Crown Reach",
@@ -114,6 +119,11 @@
 				"name": "Arcane Markets",
 				"description": "Enchanted exchanges: the stock market of the Banks gains +10% every round.",
 				"stock_bias": 0.1
+			},
+			"corner_bonus": {
+				"sanctuary": {"text": "A free Special Die", "special_die": 1},
+				"rift": {"text": "Your stock portfolio grows +5%", "stock_pct": 0.05},
+				"crossroads": {"text": "+1 Reroll Token", "reroll_token": 1}
 			},
 			"factions": [
 				{
@@ -220,6 +230,11 @@
 				"rent_mult": 1.25,
 				"unit_price_mult": 0.8
 			},
+			"corner_bonus": {
+				"sanctuary": {"text": "Free upgrade of one of your territories", "upgrade_free": 1},
+				"rift": {"text": "Consolation: +40 G", "gold": 40},
+				"crossroads": {"text": "Warp to a Shop", "warp_to": "shop"}
+			},
 			"factions": [
 				{
 					"id": "ferrum",
@@ -323,6 +338,11 @@
 				"name": "Bountiful Harvest",
 				"description": "At the end of each round every territory you own yields 6 G.",
 				"harvest_per_land": 6
+			},
+			"corner_bonus": {
+				"sanctuary": {"text": "+6 G per territory you own", "gold_per_land": 6},
+				"rift": {"text": "Free upgrade of one of your territories", "upgrade_free": 1},
+				"crossroads": {"text": "Warp to a free territory", "warp_to": "free_land"}
 			},
 			"factions": [
 				{
@@ -430,6 +450,11 @@
 				"atk_mult": 1.15,
 				"duel_win_gold": 60
 			},
+			"corner_bonus": {
+				"sanctuary": {"text": "War spoils: +40 G", "gold": 40},
+				"rift": {"text": "Consolation: +30 G", "gold": 30},
+				"crossroads": {"text": "Spoils of the road: +30 G", "gold": 30}
+			},
 			"factions": [
 				{
 					"id": "drakhan",
@@ -535,6 +560,11 @@
 				"tax_mult": 0.5,
 				"shop_reroll_price": 40
 			},
+			"corner_bonus": {
+				"sanctuary": {"text": "Sea bounty: +40 G", "gold": 40},
+				"rift": {"text": "Washed-up treasure: +40 G", "gold": 40},
+				"crossroads": {"text": "Choose any active portal", "choose_portal": true}
+			},
 			"factions": [
 				{
 					"id": "abyssal",
@@ -639,6 +669,11 @@
 				"description": "Passing START grants a Reroll Token; doubles allow up to 3 bonus rolls.",
 				"start_token": 1,
 				"bonus_rolls_extra": 1
+			},
+			"corner_bonus": {
+				"sanctuary": {"text": "+1 Reroll Token", "reroll_token": 1},
+				"rift": {"text": "The Rift cannot hold you: no turn is skipped", "skip_cancel": true},
+				"crossroads": {"text": "Jump 3 tiles forward or back", "shift": 3}
 			},
 			"factions": [
 				{

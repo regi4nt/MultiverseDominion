@@ -35,6 +35,9 @@ const PARAM_KEYS := {
 const BUFF_TYPES: Array[String] = [
 	"armor", "evade", "thorns", "execute", "frenzy", "aura_atk", "burn", "stun_proc", "ward", "splash", "lifesteal", "chill",
 	"opener", "rage", "last_rites", "death_burst", "mend_self", "swift", "guard", "opening_shield", "regen", "second_life"]
+## Extra buff types that only Kings (battle buff) and Monsters (Plus trait) carry; implemented in BattleEngine like the card buffs.
+const KING_BUFF_TYPES: Array[String] = [
+	"crit", "chain", "vengeance", "siphon", "bastion", "undying", "momentum", "shatter", "rally_cry", "weaken", "feast", "quickkill"]
 const SUPPORT_CATEGORIES: Array[String] = ["Creation", "Transformation", "Magic", "Artifact", "Skill", "Blessing", "Contract"]
 
 

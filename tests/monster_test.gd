@@ -346,14 +346,16 @@ func _test_skill_data() -> void:
 	var king_skills := {}
 	for cid in GameData.champions:
 		king_skills[String(GameData.champions[cid]["skill_id"])] = true
+	var mon_skills := {}
 	var ok := true
 	var count := 0
 	for cid in CONTS:
 		for m in GameData.get_monsters(cid):
 			count += 1
-			ok = ok and king_skills.has(String(m.get("skill_id", ""))) and String(m.get("active_name", "")) != "" \
+			mon_skills[String(m.get("skill_id", ""))] = true
+			ok = ok and GameData.skills.has(String(m.get("skill_id", ""))) and not king_skills.has(String(m.get("skill_id", ""))) and String(m.get("active_name", "")) != "" and not (m.get("plus", {}) as Dictionary).is_empty() \
 					and String(m.get("active_desc", "")) != "" and float(m.get("active_value", 0.0)) > 0.0
-	check(ok and count == 28, "all 28 monsters have an active skill (a King skill mechanic, name, desc, value)")
+	check(ok and count == 28 and mon_skills.size() == 28, "all 28 monsters have their OWN active skill (not a King skill), a King+ trait, name, desc, value")
 	check(MonsterSystem.summary("crownstone_golem").contains("Crownstone Bulwark"), "the monster summary shows the active skill")
 
 
@@ -361,7 +363,7 @@ func _test_manual_monster_skill() -> void:
 	var e := BattleEngine.new()
 	e.setup(_skill_cfg("sunscorch_manticore", true))  # Sunfire Eruption: enemies within 3 cells
 	var mu := e.ally_monster(0)
-	check(mu != null and mu.active_id == "inferno_burst" and e.monster_unit[0] == mu, "the Monster joins and carries its active skill")
+	check(mu != null and mu.active_id == "sunfire_eruption" and e.monster_unit[0] == mu, "the Monster joins and carries its active skill")
 	var cost := e.monster_energy_cost()
 	check(cost > 0 and not e.monster_skill_used[0], "the Monster skill has an energy cost and starts unused")
 	check(not e.can_use_monster_skill(0) and e.use_monster_skill(0) != "" and not e.monster_skill_used[0], "an unaffordable Monster skill is refused")
@@ -444,7 +446,7 @@ func _test_wild_monster_skill() -> void:
 	for u in e.units:
 		if u.is_monster:
 			wild = u
-	check(wild != null and wild.active_id == "banner_of_iron" and not wild.active_used, "the wild monster carries its active skill")
+	check(wild != null and wild.active_id == "behemoth_overclock" and not wild.active_used, "the wild monster carries its active skill")
 	check(wild.max_hp == 490 and wild.base_atk == int(round(28.0 * WorldMods.atk_mult)), "without a foe_star the wild monster has its plain Lv 1 stats")
 	var guard := 0
 	while not e.finished and guard < 400 and not wild.active_used:

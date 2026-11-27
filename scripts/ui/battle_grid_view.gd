@@ -17,6 +17,7 @@ var _lunge: Dictionary = {}  # uid -> {"dir": Vector2, "t": float}: attack lunge
 var _floaters: Array = []  # floating damage numbers {"cell": Vector2, "text": String, "t": float}
 var _ghosts: Array = []  # fading rings where a unit fell
 var _banner: Dictionary = {}  # {"text", "color", "t"}: big centre text (LAST STAND / CHECK / CHECKMATE / LAST PIECE)
+var _mate_floor: Dictionary = {}  # {"color": Color}: CHECKMATE etched on the board floor (drawn under the tokens, stays until the next battle)
 var terrain: Dictionary = {}  # highland cells (Terrain); drawn as raised peak tiles
 var inspect_unit: BattleUnit  # battle: the unit whose move / attack area is shown (tap a unit)
 var _cell: float = 10.0
@@ -30,6 +31,8 @@ func show_prep(p: BattlePrep) -> void:
 	terrain = p.terrain
 	inspect_unit = null
 	engine = null
+	_banner = {}
+	_mate_floor = {}
 	queue_redraw()
 
 
@@ -42,6 +45,8 @@ func show_engine(e: BattleEngine) -> void:
 	_lunge.clear()
 	_floaters.clear()
 	_ghosts.clear()
+	_banner = {}
+	_mate_floor = {}
 	for u in e.units:
 		_vis[u.uid] = Vector2(u.cell)
 	queue_redraw()
@@ -70,8 +75,8 @@ func notify_tick() -> void:
 					_show_banner("LAST PIECE", Color("e8c547"))
 			"check":
 				_show_banner("CHECK!", Color("ff4a4a") if int(ev["side"]) == 0 else Color("ffd35a"))
-			"mate":
-				_show_banner("CHECKMATE", Color("ff4a4a") if int(ev["side"]) == 0 else Color("59cd90"))
+			"mate":  # no banner over the fight: CHECKMATE is a floor skin of the board, under the pieces
+				_mate_floor = {"color": Color("ff4a4a") if int(ev["side"]) == 0 else Color("59cd90")}
 	set_process(true)
 
 
@@ -206,6 +211,9 @@ func _draw() -> void:
 			if terrain.has(Vector2i(x, y)):
 				_draw_highland(r)
 	MapSkin.draw_watermark(self, CardDatabase.active_continent, Rect2(_origin + Vector2(_cell * 1.5, _cell * 1.5), Vector2(_cell * 5.0, _cell * 5.0)), sk, sk["frame_bg"])
+	if not _mate_floor.is_empty():
+		_draw_mate_floor(font)
+	_draw_banner(font)
 	# deploy line: dashed gold
 	var ly := _origin.y + _cell * 4.0
 	var dash := _cell * 0.3
@@ -232,7 +240,6 @@ func _draw() -> void:
 				"fx":
 					for c in ev["cells"]:
 						draw_rect(Rect2(_origin + Vector2(c.x, c.y) * _cell, Vector2(_cell, _cell)), Color(1, 0.6, 0.1, 0.45))
-		_draw_banner(font)
 		for g in _ghosts:
 			var gt := float(g["t"])
 			draw_arc(_center(g["cell"]), _cell * (0.25 + 0.35 * gt), 0.0, TAU, 24, Color(1, 0.3, 0.25, 1.0 - gt), 4.0)
@@ -282,7 +289,9 @@ func _draw_areas(font: Font, gap: float) -> void:
 	var mv := 1
 	var rng := 1
 	var side := 0
+	var moved := false
 	var blocked: Callable
+	var hit_blocked: Callable  # what stops a slide of an attack: units and walls (never the ground)
 	if engine != null and inspect_unit != null and inspect_unit.alive:
 		var u := inspect_unit
 		chess = u.chess
@@ -290,7 +299,9 @@ func _draw_areas(font: Font, gap: float) -> void:
 		mv = u.move
 		rng = u.atk_range
 		side = u.side
+		moved = u.moved
 		var ur := u.atk_range
+		hit_blocked = func(c: Vector2i) -> bool: return c != u.cell and (engine.grid.has(c) or engine.walls.has(c))
 		blocked = func(c: Vector2i) -> bool: return engine.grid.has(c) or engine.walls.has(c) or not Terrain.can_stand(terrain, ur, c)
 	elif prep != null and selected != null and selected.cell.x >= 0:
 		chess = selected.chess()
@@ -301,14 +312,15 @@ func _draw_areas(font: Font, gap: float) -> void:
 		for o in prep.deployed_units():
 			occupied[o.cell] = true
 		blocked = func(c: Vector2i) -> bool: return occupied.has(c) or not Terrain.can_stand(terrain, rng, c)
+		hit_blocked = func(c: Vector2i) -> bool: return occupied.has(c) and c != from
 	else:
 		return
 	var atk_col := Color("ff5a4a")
 	var mov_col := Color("4fd6ff")
-	for c in ChessMove.attack_cells(from, rng):
+	for c in ChessMove.capture_cells(chess, from, side, hit_blocked):
 		var r := Rect2(_origin + Vector2(c.x, c.y) * _cell, Vector2(_cell, _cell)).grow(-gap)
 		_rr(r, Color(atk_col, 0.16), _cell * 0.12, Color(atk_col, 0.55), 2.0)
-	for c in ChessMove.move_cells(chess, from, mv, side, blocked):
+	for c in ChessMove.move_cells(chess, from, ChessMove.steps_for(chess, mv, moved), side, blocked):
 		var r2 := Rect2(_origin + Vector2(c.x, c.y) * _cell, Vector2(_cell, _cell)).grow(-gap)
 		_rr(r2, Color(mov_col, 0.28), _cell * 0.12, Color(mov_col, 0.9), 2.0)
 		draw_circle(_center(Vector2(c)), _cell * 0.1, Color(mov_col, 0.95))
@@ -361,25 +373,33 @@ func _draw_check(gap: float) -> void:
 			draw_rect(br, Color(red, 0.25 + 0.45 * pulse), false, 4.0)
 
 
+## Every banner (CHECKMATE, CHECK!, LAST STAND, LAST PIECE) is a floor skin: a translucent stripe and big etched letters across
+## the middle of the board, drawn BEFORE the tokens, so pieces stand on top of it and the fight stays fully visible.
+func _draw_floor_text(font: Font, text: String, col: Color, a: float) -> void:
+	var h := _cell * 1.2
+	var cy := _origin.y + _cell * 4.0
+	var stripe := Rect2(_origin.x, cy - h * 0.5, _cell * 8, h)
+	draw_rect(stripe, Color(col, 0.16 * a))
+	draw_rect(Rect2(stripe.position, Vector2(stripe.size.x, 2.0)), Color(col, 0.45 * a))
+	draw_rect(Rect2(stripe.position + Vector2(0, stripe.size.y - 2.0), Vector2(stripe.size.x, 2.0)), Color(col, 0.45 * a))
+	var fs := int(_cell * 0.95)
+	if text.length() > 11:
+		fs = int(fs * 11.0 / float(text.length()))  # "ENEMY LAST STAND" still fits the 8 cells
+	var p := Vector2(_origin.x, cy + fs * 0.35)
+	draw_string_outline(font, p, text, HORIZONTAL_ALIGNMENT_CENTER, _cell * 8, fs, 4, Color(0, 0, 0, 0.35 * a))
+	draw_string(font, p, text, HORIZONTAL_ALIGNMENT_CENTER, _cell * 8, fs, Color(col.lightened(0.2), 0.6 * a))
+
+
+func _draw_mate_floor(font: Font) -> void:
+	_draw_floor_text(font, "CHECKMATE", _mate_floor["color"], 1.0)
+
+
 func _draw_banner(font: Font) -> void:
-	if _banner.is_empty():
+	if _banner.is_empty() or String(_banner["text"]) == "CHECKMATE":
 		return
 	var t := float(_banner["t"])
-	var col: Color = _banner["color"]
-	var mate := String(_banner["text"]) == "CHECKMATE"
-	var a := 1.0 if mate else clampf(minf(t * 6.0, (1.0 - t) * 3.0), 0.0, 1.0)  # quick fade in, fade out near the end
-	var board := Rect2(_origin, Vector2(_cell * 8, _cell * 8))
-	draw_rect(board, Color(0, 0, 0, 0.38 * a))  # dim the board behind the text
-	var h := _cell * 1.3
-	var band := Rect2(board.position.x, board.position.y + (board.size.y - h) * 0.5, board.size.x, h)
-	draw_rect(band, Color(col.darkened(0.75), 0.82 * a))
-	draw_rect(Rect2(band.position, Vector2(band.size.x, 3)), Color(col, a))
-	draw_rect(Rect2(band.position + Vector2(0, band.size.y - 3), Vector2(band.size.x, 3)), Color(col, a))
-	var fs := int(_cell * (0.78 + 0.12 * (1.0 - minf(t * 5.0, 1.0))))  # a small "pop" on entry
-	var txt := String(_banner["text"])
-	var p := Vector2(band.position.x, band.position.y + band.size.y * 0.5 + fs * 0.35)
-	draw_string_outline(font, p, txt, HORIZONTAL_ALIGNMENT_CENTER, band.size.x, fs, 6, Color(0, 0, 0, a))
-	draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_CENTER, band.size.x, fs, Color(col.lightened(0.25), a))
+	var a := clampf(minf(t * 6.0, (1.0 - t) * 3.0), 0.0, 1.0)  # quick fade in, fade out near the end
+	_draw_floor_text(font, String(_banner["text"]), _banner["color"], a)
 
 
 ## Highland: a raised, lighter tile with two small peaks and a bright rim.

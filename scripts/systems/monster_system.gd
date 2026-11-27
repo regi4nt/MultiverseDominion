@@ -61,6 +61,9 @@ static func summary(monster_id: String, star: int = 1) -> String:
 	var s := stats(monster_id, star)
 	var bf: Dictionary = m.get("buff", {})
 	var line := "%s (Lv %d, HP %d, ATK %d) - %s: %s" % [m["name"], clampi(star, 1, CommanderSystem.max_star()), int(s["hp"]), int(s["atk"]), bf.get("name", ""), bf.get("desc", "")]
+	var plus: Dictionary = m.get("plus", {})
+	if not plus.is_empty():
+		line += "\nKing+ - %s: %s" % [plus.get("name", ""), plus.get("desc", "")]
 	if String(m.get("skill_id", "")) != "":
 		line += "\nSkill - %s: %s" % [m.get("active_name", ""), m.get("active_desc", "")]
 	return line

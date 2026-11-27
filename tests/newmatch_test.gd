@@ -129,8 +129,8 @@ func _test_config() -> void:
 		var mg := MatchController.new()
 		mg.setup({"continent_id": "aetherion", "faction_id": "solvaris", "ai_count": 1, "seed": 5, "difficulty": dd[0]})
 		for pl in mg.players:
-			gold_ok = gold_ok and pl.gold == int(dd[1])
-	check(gold_ok, "starting gold follows the difficulty: Easy 2000 / Normal 1500 / Hard 1000 (every seat)")
+			gold_ok = gold_ok and pl.gold - int(pl.pv("war_chest")) == int(dd[1])  # a War Chest King starts with extra gold
+	check(gold_ok, "starting gold follows the difficulty: Easy 2000 / Normal 1500 / Hard 1000 (every seat, War Chest aside)")
 	check(foreign and own_only, "Arena AI rulers can come from other continents; without the flag they stay on the map's continent")
 	GameSession.start_tutorial()
 	check(not GameSession.to_match_config().has("journey") or GameSession.to_match_config()["journey"] == false, "the tutorial is never a Journey match")
@@ -214,7 +214,8 @@ func _test_faction_rules() -> void:
 	check(not CardDatabase.king_buff("champion_astralis").is_empty(), "the King buff is on at the King's home continent")
 	var ok28 := true
 	for cid in GameData.champions:
-		ok28 = ok28 and CardDatabase.BUFF_TYPES.has(String(GameData.king_buffs.get(cid, {}).get("type", "")))
+		var kt := String(GameData.king_buffs.get(cid, {}).get("type", ""))
+		ok28 = ok28 and (CardDatabase.BUFF_TYPES.has(kt) or CardDatabase.KING_BUFF_TYPES.has(kt))
 	check(ok28, "every King has a valid buff")
 	CardDatabase.set_continent("aetherion")
 	var all_ok := m.players.size() == 4

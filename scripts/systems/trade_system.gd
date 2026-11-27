@@ -7,6 +7,9 @@ extends RefCounted
 
 const FEE := 0.02  # taken from the value when selling
 const BUYS: Array[int] = [50, 100, 250, 500]
+const BUY_MIN := 50  # the Trading slider runs BUY_MIN .. BUY_MAX chips in steps of BUY_STEP (buy() itself accepts any amount)
+const BUY_MAX := 10000
+const BUY_STEP := 50
 const RANGES := [["1m", 60.0], ["5m", 300.0], ["30m", 1800.0]]  # chart windows (label, seconds)
 const ASSETS := [
 	{"id": "aeth", "tag": "AETH", "name": "Aetherion Crown", "base": 120.0, "vol": 1.0, "seed": 1101, "color": Color("d4af37")},

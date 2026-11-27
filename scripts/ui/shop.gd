@@ -1,5 +1,5 @@
 extends Control
-## Shop (one screen, six tabs): Card Gacha (Support + unit cards), Buy Card (Support + unit cards in one list), Auction (lelang), Gamble (judi), Trading (Chips market) and Exchange (penukaran).
+## Shop (one screen, six tabs): Card Gacha (Support + unit cards), Buy Card (Support + unit cards in one list), Auction, Gamble (judi), Trading (Chips market) and Exchange (penukaran).
 ## Gacha pulls cards with Aether Coins or Gacha Tickets (duplicates turn into Card Fragments, pity timer). Buy pays a locked card with
 ## Crystals, or exchanges Card Fragments for it. Exchange converts the currencies into each other (ShopSystem.EXCHANGES).
 ## Unit cards are locked at the start: the Shop sells the ones of the continents opened on the Journey trophy road.
@@ -9,6 +9,7 @@ const GamblePanel := preload("res://scripts/ui/gamble_panel.gd")
 const GachaStage := preload("res://scripts/ui/gacha_stage.gd")
 const AuctionStage := preload("res://scripts/ui/auction_stage.gd")
 const TradeChart := preload("res://scripts/ui/trade_chart.gd")
+const BetSlider := preload("res://scripts/ui/bet_slider.gd")
 const TABS := [["gacha", "Card Gacha"], ["buy_card", "Buy Card"], ["auction", "Auction"], ["gamble", "Gamble"], ["trading", "Trading"], ["exchange", "Exchange"]]
 
 var _wallet_labels: Dictionary = {}
@@ -45,8 +46,8 @@ class GachaPanel extends HBoxContainer:
 	var _info: Label
 	var pull1: Button
 	var pull10: Button
-	var pity_labels: Dictionary = {}  # rarity -> Label
-	var pity_bars: Dictionary = {}  # rarity -> ProgressBar
+	var pity_bar: ProgressBar  # ONE bar: the guarantee that comes first (Rare+ / Epic+ / Legendary), coloured like that rarity
+	var pity_label: Label  # its text, written on the bar
 	var result_flow: HFlowContainer
 	var result_banner: Label
 	var stage: PanelContainer
@@ -75,20 +76,19 @@ class GachaPanel extends HBoxContainer:
 		_info = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
 		_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbox.add_child(_info)
-		for pr in ["rare", "epic", "legendary"]:  # one pity bar per rarity
-			var pc := UiTheme.rarity_color(pr)
-			var bar := ProgressBar.new()
-			bar.show_percentage = false
-			bar.custom_minimum_size = Vector2(0, 14)
-			bar.max_value = int(ShopSystem.PITY_LIMITS[pr])
-			bar.add_theme_stylebox_override("fill", UiTheme.make_box(pc, pc, 0, 7))
-			bar.add_theme_stylebox_override("background", UiTheme.make_box(Color("111629"), Color("2e3350"), 1, 7))
-			lbox.add_child(bar)
-			var pl := UiTheme.make_label("", 15, UiTheme.COL_MUTED)
-			pl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			lbox.add_child(pl)
-			pity_bars[pr] = bar
-			pity_labels[pr] = pl
+		pity_bar = ProgressBar.new()  # one line: the next guaranteed pull, its text written on the bar
+		pity_bar.show_percentage = false
+		pity_bar.custom_minimum_size = Vector2(0, 30)
+		lbox.add_child(pity_bar)
+		pity_label = UiTheme.make_label("", 15, Color.WHITE)
+		pity_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		pity_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		pity_label.clip_text = true
+		pity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pity_label.add_theme_color_override("font_outline_color", Color.BLACK)
+		pity_label.add_theme_constant_override("outline_size", 4)
+		pity_bar.add_child(pity_label)
 		var sp := Control.new()
 		sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		lbox.add_child(sp)
@@ -282,11 +282,27 @@ class GachaPanel extends HBoxContainer:
 		pull10.text = "Pull x10  (%d tickets)" % ShopSystem.ticket_price(10)
 		pull1.disabled = tix < ShopSystem.ticket_price(1)
 		pull10.disabled = tix < ShopSystem.ticket_price(10)
+		_refresh_pity()
+
+
+	## The bar shows the guarantee that is closest (fewest pulls left; a tie goes to the rarer one) in the colour of its rarity.
+	## The tooltip lists all three.
+	func _refresh_pity() -> void:
+		var best := "rare"
+		var tip: Array[String] = []
 		for pr in ["rare", "epic", "legendary"]:
 			var left := ShopSystem.pulls_to_pity(pr)
-			(pity_bars[pr] as ProgressBar).value = ShopSystem.pity(pr)
-			(pity_labels[pr] as Label).text = "%s+ guaranteed in %d pull%s" % [String(pr).capitalize(), left, "" if left == 1 else "s"]
-
+			tip.append("%s+ guaranteed in %d pull%s" % [String(pr).capitalize(), left, "" if left == 1 else "s"])
+			if left <= ShopSystem.pulls_to_pity(best):
+				best = pr
+		var pc := UiTheme.rarity_color(best)
+		pity_bar.max_value = int(ShopSystem.PITY_LIMITS[best])
+		pity_bar.value = ShopSystem.pity(best)
+		pity_bar.add_theme_stylebox_override("fill", UiTheme.make_box(Color(pc, 0.6), pc, 0, 8))
+		pity_bar.add_theme_stylebox_override("background", UiTheme.make_box(Color("111629"), pc.darkened(0.3), 1, 8))
+		var n := ShopSystem.pulls_to_pity(best)
+		pity_label.text = "%s+ guaranteed in %d pull%s" % [String(best).capitalize(), n, "" if n == 1 else "s"]
+		pity_bar.tooltip_text = "\n".join(tip)
 
 ## Buy Card tab: Support and unit cards in one list. Two filter rows: type (All / Unit / Support) and, under Unit or Support,
 ## the continents opened on the trophy road or the Support categories. A grid of locked cards, a detail panel, buy with crystals, or exchange fragments.
@@ -477,9 +493,9 @@ class BuyPanel extends VBoxContainer:
 			return "[color=#d4af37][b]%s[/b][/color]\n%s - %s\nUses per battle: %d\n\n%s\n\n%s" % [
 				s["name"], s["category"], String(s["rarity"]).capitalize(), int(s["uses"]), s["description"], cost]
 		var skill: Dictionary = s.get("skill", {})
-		return "[color=#d4af37][b]%s[/b][/color]\n%s %s - %s\nHP %d   ATK %d   Range %d   Move %d\n\n[b]%s[/b]: %s\n\nAdds all %d copies to the deck pool.\n\n%s" % [
+		return "[color=#d4af37][b]%s[/b][/color]\n%s %s - %s\nHP %d   ATK %d   %s\n\n[b]%s[/b]: %s\n\nAdds all %d copies to the deck pool.\n\n%s" % [
 			s["name"], String(s["role"]), String(s["chess"]).capitalize(), String(s["rarity"]).capitalize(),
-			int(s["hp"]), int(s["atk"]), int(s["range"]), int(s["move"]), String(skill.get("name", "")), String(skill.get("desc", "")),
+			int(s["hp"]), int(s["atk"]), ChessMove.tag(String(s["chess"])), String(skill.get("name", "")), String(skill.get("desc", "")),
 			int(GameData.b("unit_copies")), cost]
 
 	## King card detail: stats, the B level reached and what the next copy unlocks (the two King skills are locked behind B2 / B3).
@@ -675,7 +691,8 @@ class TradingPanel extends HBoxContainer:
 	var buy_btn: Button
 	var half_btn: Button
 	var all_btn: Button
-	var amount_row: HFlowContainer
+	var amount_slider: Control  # BetSlider: how many chips to put in
+	var est_label: Label  # "about 0.83 AETH at 120.40"
 	var hold_label: Label
 	var msg: Label
 	var title_label: Label
@@ -705,6 +722,7 @@ class TradingPanel extends HBoxContainer:
 		lbox.add_child(hint)
 		var scroll := UiTheme.make_scroll()
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.custom_minimum_size.y = 110  # always at least two asset rows, even with the slider below
 		lbox.add_child(scroll)
 		var list := VBoxContainer.new()
 		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -720,18 +738,16 @@ class TradingPanel extends HBoxContainer:
 			list.add_child(b)
 			asset_buttons[String(a["id"])] = b
 		lbox.add_child(UiTheme.make_label("Amount (chips)", 15, UiTheme.COL_MUTED))
-		amount_row = HFlowContainer.new()
-		amount_row.add_theme_constant_override("h_separation", 6)
-		lbox.add_child(amount_row)
-		var ag := ButtonGroup.new()
-		for n in TradeSystem.BUYS:
-			var ab := UiTheme.make_toggle(str(n), ag, 44)
-			ab.custom_minimum_size.x = 76
-			ab.button_pressed = (n == amount)
-			ab.pressed.connect(func():
-				amount = int(n)
-				refresh())
-			amount_row.add_child(ab)
+		amount_slider = BetSlider.new({"unit": "chips", "min": TradeSystem.BUY_MIN, "max": TradeSystem.BUY_MAX, "step": TradeSystem.BUY_STEP,
+				"start": amount, "balance": func() -> int: return SaveManager.chips(), "font": 30, "accent": Color("59cd90")})
+		amount = amount_slider.value
+		amount_slider.value_changed.connect(func(v: int):
+			amount = v
+			refresh())
+		lbox.add_child(amount_slider)
+		est_label = UiTheme.make_label("", 14, UiTheme.COL_MUTED)
+		est_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbox.add_child(est_label)
 		hold_label = UiTheme.make_label("", 15, UiTheme.COL_TEXT)
 		hold_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbox.add_child(hold_label)
@@ -832,6 +848,8 @@ class TradingPanel extends HBoxContainer:
 			price_label.add_theme_color_override("font_color", tick_col)
 			price_label.create_tween().tween_method(func(k: float): price_label.add_theme_color_override("font_color", tick_col.lerp(UiTheme.COL_TEXT, k)), 0.0, 1.0, 0.45)
 		_last_price = p
+		if est_label != null:
+			est_label.text = "About %.3f %s at %.2f" % [float(amount) / p, String(cur["tag"]), p]
 		_update_holding(t)
 
 	func _update_holding(t: float) -> void:
@@ -880,12 +898,16 @@ class TradingPanel extends HBoxContainer:
 		changed.emit()
 
 	func refresh() -> void:
+		amount_slider.refresh()  # the balance may have changed (buy / sell / exchange): the track follows
+		amount = amount_slider.value
 		buy_btn.text = "Buy  (%d chips)" % amount
 		buy_btn.disabled = SaveManager.chips() < amount
+		var pr := TradeSystem.price(asset_id, TradeSystem.now())
+		est_label.text = "About %.3f %s at %.2f" % [float(amount) / pr, String(TradeSystem.asset(asset_id)["tag"]), pr]
 		_update_holding(TradeSystem.now())
 
 
-## Auction (lelang) tab: a few locked cards are up for bids. Open at 40% of the value, raise 10% each time; a hidden rival bidder
+## Auction tab: a few locked cards are up for bids. Open at 40% of the value, raise 10% each time; a hidden rival bidder
 ## answers every raise until their limit. Pass to give up a lot. The winner pays Crystals (ShopSystem.auction_*).
 class AuctionPanel extends HBoxContainer:
 	signal changed
@@ -917,7 +939,7 @@ class AuctionPanel extends HBoxContainer:
 		var lbox := VBoxContainer.new()
 		lbox.add_theme_constant_override("separation", 8)
 		left.add_child(lbox)
-		lbox.add_child(UiTheme.make_label("AUCTION (LELANG)", 26, UiTheme.COL_GOLD))
+		lbox.add_child(UiTheme.make_label("AUCTION", 26, UiTheme.COL_GOLD))
 		hint = UiTheme.make_label("Locked cards go to the highest bidder. Bids start at 40% of the value and rise 10% per raise. A rival bids against you; their limit is hidden. Pay with Crystals. New random lots every hour.", 15, UiTheme.COL_MUTED)
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbox.add_child(hint)

@@ -112,7 +112,7 @@ func _draw() -> void:
 	else:
 		draw_string(font, Vector2(8, 142), "%s - %s" % [String(card["chess"]).capitalize(), card["role"]], HORIZONTAL_ALIGNMENT_CENTER, size.x - 16, 14, UiTheme.COL_GOLD)
 		draw_string(font, Vector2(8, 164), "HP %d  ATK %d" % [int(card["hp"]), int(card["atk"])], HORIZONTAL_ALIGNMENT_CENTER, size.x - 16, 15, UiTheme.COL_TEXT)
-		draw_string(font, Vector2(8, 184), "Rng %d  Mov %d" % [int(card["range"]), int(card["move"])], HORIZONTAL_ALIGNMENT_CENTER, size.x - 16, 13, UiTheme.COL_MUTED)
+		draw_string(font, Vector2(8, 184), ChessMove.tag(String(card["chess"])), HORIZONTAL_ALIGNMENT_CENTER, size.x - 16, 13, UiTheme.COL_MUTED)
 	draw_string(font, Vector2(8, size.y - 8), "x%d" % owned, HORIZONTAL_ALIGNMENT_RIGHT, size.x - 16, 14, UiTheme.COL_TEXT)
 	if owned <= 0:
 		draw_rect(rect, Color(0, 0, 0, 0.62))

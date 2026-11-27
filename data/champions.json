@@ -9,12 +9,14 @@
 		"capacity": 6,
 		"passive": "royal_treasury",
 		"passive_value": 0.25,
-		"passive_name": "Royal Treasury",
-		"passive_desc": "+25% Dominion Gold from passing START.",
-		"skill_id": "sun_judgment",
-		"active_value": 1.5,
-		"active_name": "Sun Judgment",
-		"active_desc": "Manual, once: deals 150% ATK to all enemies."
+		"passive_name": "Dawn Tithe",
+		"passive_desc": "+25% Dominion Gold from passing START. Passing START also pays 3% interest on your gold (max 120 G).",
+		"skill_id": "dawnbreak_decree",
+		"active_value": 1.2,
+		"active_name": "Dawnbreak Decree",
+		"active_desc": "Manual, once: deals 120% ATK to all enemies and heals every ally for 10% of its max HP.",
+		"passive2": "interest",
+		"passive2_value": 0.03
 	},
 	"champion_nocthyr": {
 		"name": "Vesper Nightcrown",
@@ -27,11 +29,13 @@
 		"passive": "shadow_ledger",
 		"passive_value": 0.35,
 		"passive_name": "Shadow Ledger",
-		"passive_desc": "Pay 35% less Tax and territory rent.",
-		"skill_id": "eclipse_veil",
-		"active_value": 0.2,
-		"active_name": "Eclipse Veil",
-		"active_desc": "Manual, once: takes 50% less damage for 12 ticks and heals 20% HP."
+		"passive_desc": "Pay 35% less Tax and territory rent. Start the match with +60 G.",
+		"skill_id": "umbral_pact",
+		"active_value": 2.2,
+		"active_name": "Umbral Pact",
+		"active_desc": "Manual, once: teleports to the weakest enemy and hits it for 220% ATK and takes 50% less damage for 10 ticks.",
+		"passive2": "war_chest",
+		"passive2_value": 60
 	},
 	"champion_valdoria": {
 		"name": "Lord Valdric Ironbanner",
@@ -44,11 +48,13 @@
 		"passive": "landlord",
 		"passive_value": 0.1,
 		"passive_name": "Landlord",
-		"passive_desc": "Territories and auction lots cost 10% less.",
-		"skill_id": "banner_of_iron",
-		"active_value": 0.4,
-		"active_name": "Banner of Iron",
-		"active_desc": "Manual, once: gains a shield worth 40% of max HP."
+		"passive_desc": "Territories cost 10% less to buy. Territory upgrades cost 15% less.",
+		"skill_id": "ironbound_rampart",
+		"active_value": 0.2,
+		"active_name": "Ironbound Rampart",
+		"active_desc": "Manual, once: every ally gains a shield worth 20% of its max HP and gains a shield worth 30% of max HP.",
+		"passive2": "upgrader",
+		"passive2_value": 0.15
 	},
 	"champion_elarion": {
 		"name": "Queen Elarael Starweaver",
@@ -61,11 +67,13 @@
 		"passive": "fortune_weave",
 		"passive_value": 2,
 		"passive_name": "Fortune Weave",
-		"passive_desc": "Starts the match with 2 Reroll Tokens.",
-		"skill_id": "starfall_decree",
-		"active_value": 3.0,
-		"active_name": "Starfall Decree",
-		"active_desc": "Manual, once: hits 3 random enemies for 300% ATK."
+		"passive_desc": "Start with 2 Reroll Token(s). Event tiles pay +10 G.",
+		"skill_id": "stardust_snare",
+		"active_value": 2.0,
+		"active_name": "Stardust Snare",
+		"active_desc": "Manual, once: hits 3 random enemies for 200% ATK and slows all enemies for 8 ticks.",
+		"passive2": "treasure_hunter",
+		"passive2_value": 10
 	},
 	"champion_astralis": {
 		"name": "Seraphine Starcaller",
@@ -78,11 +86,13 @@
 		"passive": "treasure_hunter",
 		"passive_value": 25,
 		"passive_name": "Treasure Hunter",
-		"passive_desc": "+25 G whenever you land on an Event tile.",
-		"skill_id": "starfall_decree",
-		"active_value": 3.0,
-		"active_name": "Starfall Decree",
-		"active_desc": "Manual, once: hits 3 random enemies for 300% ATK."
+		"passive_desc": "Event tiles pay +25 G. Start with 1 Reroll Token(s).",
+		"skill_id": "starfall_execution",
+		"active_value": 3.2,
+		"active_name": "Starfall Execution",
+		"active_desc": "Manual, once: enemies below 40% HP take 320% ATK.",
+		"passive2": "fortune_weave",
+		"passive2_value": 1
 	},
 	"champion_ignivar": {
 		"name": "Pyrrhus Emberlord",
@@ -95,11 +105,13 @@
 		"passive": "spoils",
 		"passive_value": 40,
 		"passive_name": "Spoils of War",
-		"passive_desc": "+40 G whenever you win a duel.",
-		"skill_id": "inferno_burst",
-		"active_value": 2.0,
-		"active_name": "Inferno Burst",
-		"active_desc": "Manual, once: enemies within 3 cells take 200% ATK."
+		"passive_desc": "+40 G for every Duel won or defended. Battle Shop prices are 10% lower.",
+		"skill_id": "emberlord_pyre",
+		"active_value": 0.35,
+		"active_name": "Emberlord's Pyre",
+		"active_desc": "Manual, once: burns all enemies for 35% ATK every 4 ticks for 12 ticks and enemies within 3 cells take 120% ATK.",
+		"passive2": "quartermaster",
+		"passive2_value": 0.1
 	},
 	"champion_cryndel": {
 		"name": "Glacia Frostweaver",
@@ -111,12 +123,14 @@
 		"capacity": 6,
 		"passive": "mender",
 		"passive_value": 0.55,
-		"passive_name": "Mender",
-		"passive_desc": "Restoring Life costs 55% less.",
-		"skill_id": "frost_veil",
-		"active_value": 10,
-		"active_name": "Frost Veil",
-		"active_desc": "Manual, once: slows all enemies for 10 ticks."
+		"passive_name": "Frostweaver's Mercy",
+		"passive_desc": "Healing costs 55% less. Pay 10% less Tax.",
+		"skill_id": "absolute_zero",
+		"active_value": 12,
+		"active_name": "Absolute Zero",
+		"active_desc": "Manual, once: slows all enemies for 12 ticks and enemies take 15% more damage for 12 ticks.",
+		"passive2": "tax_cut",
+		"passive2_value": 0.1
 	},
 	"champion_umbrael": {
 		"name": "Morrowen the Hollow",
@@ -128,12 +142,14 @@
 		"capacity": 6,
 		"passive": "shadow_ledger",
 		"passive_value": 0.25,
-		"passive_name": "Shadow Ledger",
-		"passive_desc": "Pay 25% less Tax and territory rent.",
-		"skill_id": "soul_drain",
-		"active_value": 2.5,
-		"active_name": "Soul Drain",
-		"active_desc": "Manual, once: hits the toughest enemy for 250% ATK and heals the same amount."
+		"passive_name": "Hollow Accounts",
+		"passive_desc": "Pay 25% less Tax and territory rent. +15 G for every Duel won or defended.",
+		"skill_id": "hollow_communion",
+		"active_value": 2.0,
+		"active_name": "Hollow Communion",
+		"active_desc": "Manual, once: hits the toughest enemy for 200% ATK and heals 100% of the damage and gains a shield worth 15% of max HP.",
+		"passive2": "spoils",
+		"passive2_value": 15
 	},
 	"champion_ferrum": {
 		"name": "Ironclad Goliath-7",
@@ -146,11 +162,13 @@
 		"passive": "quartermaster",
 		"passive_value": 0.2,
 		"passive_name": "Quartermaster",
-		"passive_desc": "Battle Shop units cost 20% less.",
-		"skill_id": "banner_of_iron",
-		"active_value": 0.5,
-		"active_name": "Banner of Iron",
-		"active_desc": "Manual, once: gains a shield worth 50% of max HP."
+		"passive_desc": "Battle Shop prices are 20% lower. Territory upgrades cost 10% less.",
+		"skill_id": "goliath_protocol",
+		"active_value": 0.45,
+		"active_name": "Goliath Protocol",
+		"active_desc": "Manual, once: gains a shield worth 45% of max HP and gains +30% ATK for 12 ticks.",
+		"passive2": "upgrader",
+		"passive2_value": 0.1
 	},
 	"champion_voltrix": {
 		"name": "Tesla Voltarine",
@@ -163,11 +181,13 @@
 		"passive": "toll_keeper",
 		"passive_value": 0.25,
 		"passive_name": "Toll Keeper",
-		"passive_desc": "Rent collected from visitors +25%.",
-		"skill_id": "overcharge",
-		"active_value": 0.6,
-		"active_name": "Overcharge",
-		"active_desc": "Manual, once: +60% ATK for 12 ticks."
+		"passive_desc": "Rent collected on your land is 25% higher. Passing START also pays 2% interest on your gold (max 120 G).",
+		"skill_id": "overload_pulse",
+		"active_value": 1.8,
+		"active_name": "Overload Pulse",
+		"active_desc": "Manual, once: enemies in its row take 180% ATK and stuns the 2 highest-ATK enemies for 2 ticks.",
+		"passive2": "interest",
+		"passive2_value": 0.02
 	},
 	"champion_chronex": {
 		"name": "Horologe Chronarch",
@@ -179,12 +199,14 @@
 		"capacity": 6,
 		"passive": "royal_treasury",
 		"passive_value": 0.2,
-		"passive_name": "Royal Treasury",
-		"passive_desc": "+20% Dominion Gold from passing START.",
-		"skill_id": "chrono_stasis",
-		"active_value": 3,
-		"active_name": "Chrono Stasis",
-		"active_desc": "Manual, once: stuns all enemies for 3 ticks."
+		"passive_name": "Chrono Treasury",
+		"passive_desc": "+20% Dominion Gold from passing START. Start with 1 Reroll Token(s).",
+		"skill_id": "stasis_field",
+		"active_value": 4,
+		"active_name": "Stasis Field",
+		"active_desc": "Manual, once: stuns enemies within 3 cells for 4 ticks and allies attack faster for 10 ticks.",
+		"passive2": "fortune_weave",
+		"passive2_value": 1
 	},
 	"champion_nexaris": {
 		"name": "Nexus Prime Arbiter",
@@ -197,11 +219,13 @@
 		"passive": "vanguard",
 		"passive_value": 1,
 		"passive_name": "Vanguard",
-		"passive_desc": "Starts with 1 extra rare unit(s).",
-		"skill_id": "sun_judgment",
-		"active_value": 1.3,
-		"active_name": "Sun Judgment",
-		"active_desc": "Manual, once: deals 130% ATK to all enemies."
+		"passive_desc": "Start with 1 extra Rare unit(s). Battle Shop prices are 10% lower.",
+		"skill_id": "arbiters_verdict",
+		"active_value": 2.4,
+		"active_name": "Arbiter's Verdict",
+		"active_desc": "Manual, once: hits the 2 highest-ATK enemies for 240% ATK and every ally gains a shield worth 10% of its max HP.",
+		"passive2": "quartermaster",
+		"passive2_value": 0.1
 	},
 	"champion_verdantia": {
 		"name": "Elder Thornwarden",
@@ -213,12 +237,14 @@
 		"capacity": 6,
 		"passive": "mender",
 		"passive_value": 0.5,
-		"passive_name": "Mender",
-		"passive_desc": "Restoring Life costs 50% less.",
-		"skill_id": "life_surge",
-		"active_value": 0.35,
-		"active_name": "Life Surge",
-		"active_desc": "Manual, once: heals 35% max HP and gains +25% ATK for 16 ticks."
+		"passive_name": "Thornwarden's Mercy",
+		"passive_desc": "Healing costs 50% less. Pay 10% less territory rent.",
+		"skill_id": "verdant_renewal",
+		"active_value": 0.2,
+		"active_name": "Thornwarden's Renewal",
+		"active_desc": "Manual, once: heals every ally for 20% of its max HP and cleanses allies of stun, slow and burn.",
+		"passive2": "rent_cut",
+		"passive2_value": 0.1
 	},
 	"champion_besthara": {
 		"name": "Fangmother Besthara",
@@ -230,12 +256,14 @@
 		"capacity": 6,
 		"passive": "vanguard",
 		"passive_value": 2,
-		"passive_name": "Vanguard",
-		"passive_desc": "Starts with 2 extra rare unit(s).",
-		"skill_id": "overcharge",
+		"passive_name": "Pack Vanguard",
+		"passive_desc": "Start with 2 extra Rare unit(s). +15 G for every Duel won or defended.",
+		"skill_id": "alphas_hunt",
 		"active_value": 0.5,
-		"active_name": "Overcharge",
-		"active_desc": "Manual, once: +50% ATK for 12 ticks."
+		"active_name": "Alpha's Hunt",
+		"active_desc": "Manual, once: gains +50% ATK for 12 ticks and teleports to the weakest enemy and hits it for 180% ATK.",
+		"passive2": "spoils",
+		"passive2_value": 15
 	},
 	"champion_floralis": {
 		"name": "Lilith Bloomweaver",
@@ -247,12 +275,14 @@
 		"capacity": 6,
 		"passive": "treasure_hunter",
 		"passive_value": 20,
-		"passive_name": "Treasure Hunter",
-		"passive_desc": "+20 G whenever you land on an Event tile.",
-		"skill_id": "eclipse_veil",
-		"active_value": 0.3,
-		"active_name": "Eclipse Veil",
-		"active_desc": "Manual, once: takes 50% less damage for 12 ticks and heals 30% HP."
+		"passive_name": "Bloom Bounty",
+		"passive_desc": "Event tiles pay +20 G. Healing costs 20% less.",
+		"skill_id": "bloom_sanctuary",
+		"active_value": 0.6,
+		"active_name": "Bloom Sanctuary",
+		"active_desc": "Manual, once: heals the most wounded ally for 60% of its max HP and every ally takes 50% less damage for 8 ticks.",
+		"passive2": "mender",
+		"passive2_value": 0.2
 	},
 	"champion_terragorn": {
 		"name": "Terragorn the Mountain",
@@ -264,12 +294,14 @@
 		"capacity": 6,
 		"passive": "landlord",
 		"passive_value": 0.08,
-		"passive_name": "Landlord",
-		"passive_desc": "Territories and auction lots cost 8% less.",
-		"skill_id": "banner_of_iron",
-		"active_value": 0.45,
-		"active_name": "Banner of Iron",
-		"active_desc": "Manual, once: gains a shield worth 45% of max HP."
+		"passive_name": "Rootholder",
+		"passive_desc": "Territories cost 8% less to buy. Pay 10% less territory rent.",
+		"skill_id": "mountains_wrath",
+		"active_value": 1.6,
+		"active_name": "Mountain's Wrath",
+		"active_desc": "Manual, once: enemies within 2 cells take 160% ATK and gains a shield worth 35% of max HP.",
+		"passive2": "rent_cut",
+		"passive2_value": 0.1
 	},
 	"champion_drakhan": {
 		"name": "Drakhan Wyrmlord",
@@ -281,12 +313,14 @@
 		"capacity": 6,
 		"passive": "spoils",
 		"passive_value": 50,
-		"passive_name": "Spoils of War",
-		"passive_desc": "+50 G whenever you win a duel.",
-		"skill_id": "inferno_burst",
-		"active_value": 2.2,
-		"active_name": "Inferno Burst",
-		"active_desc": "Manual, once: enemies within 3 cells take 220% ATK."
+		"passive_name": "Dragon Hoard",
+		"passive_desc": "+50 G for every Duel won or defended. Start the match with +80 G.",
+		"skill_id": "dragonbreath",
+		"active_value": 2.6,
+		"active_name": "Dragonbreath",
+		"active_desc": "Manual, once: enemies in its column take 260% ATK and burns all enemies for 25% ATK every 4 ticks for 8 ticks.",
+		"passive2": "war_chest",
+		"passive2_value": 80
 	},
 	"champion_inferna": {
 		"name": "Inferna Hellbride",
@@ -298,12 +332,14 @@
 		"capacity": 6,
 		"passive": "toll_keeper",
 		"passive_value": 0.4,
-		"passive_name": "Toll Keeper",
-		"passive_desc": "Rent collected from visitors +40%.",
-		"skill_id": "sun_judgment",
-		"active_value": 1.6,
-		"active_name": "Sun Judgment",
-		"active_desc": "Manual, once: deals 160% ATK to all enemies."
+		"passive_name": "Hellbride's Toll",
+		"passive_desc": "Rent collected on your land is 40% higher. +10 G for every Duel won or defended.",
+		"skill_id": "hellbride_wedding",
+		"active_value": 1.3,
+		"active_name": "Hellbride's Wedding",
+		"active_desc": "Manual, once: deals 130% ATK to all enemies and burns all enemies for 20% ATK every 4 ticks for 8 ticks.",
+		"passive2": "spoils",
+		"passive2_value": 10
 	},
 	"champion_bloodfang": {
 		"name": "Bloodfang Reaver",
@@ -315,12 +351,14 @@
 		"capacity": 6,
 		"passive": "quartermaster",
 		"passive_value": 0.15,
-		"passive_name": "Quartermaster",
-		"passive_desc": "Battle Shop units cost 15% less.",
-		"skill_id": "soul_drain",
-		"active_value": 3.0,
-		"active_name": "Soul Drain",
-		"active_desc": "Manual, once: hits the toughest enemy for 300% ATK and heals the same amount."
+		"passive_name": "Reaver's Armory",
+		"passive_desc": "Battle Shop prices are 15% lower. Start with 1 extra Rare unit(s).",
+		"skill_id": "blood_harvest",
+		"active_value": 2.6,
+		"active_name": "Blood Harvest",
+		"active_desc": "Manual, once: hits the toughest enemy for 260% ATK and heals 100% of the damage and gains +25% ATK for 12 ticks.",
+		"passive2": "vanguard",
+		"passive2_value": 1
 	},
 	"champion_warborn": {
 		"name": "Warborn Thane Krogg",
@@ -332,12 +370,14 @@
 		"capacity": 6,
 		"passive": "fortune_weave",
 		"passive_value": 2,
-		"passive_name": "Fortune Weave",
-		"passive_desc": "Starts the match with 2 Reroll Tokens.",
-		"skill_id": "overcharge",
-		"active_value": 0.7,
-		"active_name": "Overcharge",
-		"active_desc": "Manual, once: +70% ATK for 12 ticks."
+		"passive_name": "Warlord's Wager",
+		"passive_desc": "Start with 2 Reroll Token(s). Territories cost 5% less to buy.",
+		"skill_id": "warcry_of_krogg",
+		"active_value": 0.3,
+		"active_name": "Warcry of Krogg",
+		"active_desc": "Manual, once: every ally gains +30% ATK for 12 ticks and gains a shield worth 20% of max HP.",
+		"passive2": "landlord",
+		"passive2_value": 0.05
 	},
 	"champion_abyssal": {
 		"name": "Leviathan Caller Nerith",
@@ -349,12 +389,14 @@
 		"capacity": 6,
 		"passive": "shadow_ledger",
 		"passive_value": 0.4,
-		"passive_name": "Shadow Ledger",
-		"passive_desc": "Pay 40% less Tax and territory rent.",
-		"skill_id": "frost_veil",
+		"passive_name": "Tidal Contracts",
+		"passive_desc": "Pay 40% less Tax and territory rent. Passing START also pays 2% interest on your gold (max 120 G).",
+		"skill_id": "crushing_depths",
 		"active_value": 10,
-		"active_name": "Frost Veil",
-		"active_desc": "Manual, once: slows all enemies for 10 ticks."
+		"active_name": "Crushing Depths",
+		"active_desc": "Manual, once: slows all enemies for 10 ticks and deals 90% ATK to all enemies.",
+		"passive2": "interest",
+		"passive2_value": 0.02
 	},
 	"champion_pelagia": {
 		"name": "Pelagia Tidemother",
@@ -366,12 +408,14 @@
 		"capacity": 6,
 		"passive": "mender",
 		"passive_value": 0.6,
-		"passive_name": "Mender",
-		"passive_desc": "Restoring Life costs 60% less.",
-		"skill_id": "life_surge",
-		"active_value": 0.4,
-		"active_name": "Life Surge",
-		"active_desc": "Manual, once: heals 40% max HP and gains +25% ATK for 16 ticks."
+		"passive_name": "Tidemother's Mercy",
+		"passive_desc": "Healing costs 60% less. Event tiles pay +10 G.",
+		"skill_id": "tidemother_tide",
+		"active_value": 0.15,
+		"active_name": "Tidemother's Tide",
+		"active_desc": "Manual, once: heals every ally for 15% of its max HP and every ally gains a shield worth 10% of its max HP.",
+		"passive2": "treasure_hunter",
+		"passive2_value": 10
 	},
 	"champion_tempestra": {
 		"name": "Tempestra Stormlord",
@@ -383,12 +427,14 @@
 		"capacity": 6,
 		"passive": "treasure_hunter",
 		"passive_value": 30,
-		"passive_name": "Treasure Hunter",
-		"passive_desc": "+30 G whenever you land on an Event tile.",
-		"skill_id": "chrono_stasis",
-		"active_value": 2,
-		"active_name": "Chrono Stasis",
-		"active_desc": "Manual, once: stuns all enemies for 2 ticks."
+		"passive_name": "Storm Salvage",
+		"passive_desc": "Event tiles pay +30 G. Rent collected on your land is 10% higher.",
+		"skill_id": "storm_barrage",
+		"active_value": 1.8,
+		"active_name": "Storm Surge Barrage",
+		"active_desc": "Manual, once: hits 4 random enemies for 180% ATK and stuns the highest-ATK enemy for 2 ticks.",
+		"passive2": "toll_keeper",
+		"passive2_value": 0.1
 	},
 	"champion_corsaria": {
 		"name": "Captain Redtide Corsa",
@@ -400,12 +446,14 @@
 		"capacity": 6,
 		"passive": "landlord",
 		"passive_value": 0.08,
-		"passive_name": "Landlord",
-		"passive_desc": "Territories and auction lots cost 8% less.",
-		"skill_id": "rift_strike",
-		"active_value": 3.0,
-		"active_name": "Rift Strike",
-		"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 300% ATK."
+		"passive_name": "Plunder Rights",
+		"passive_desc": "Territories cost 8% less to buy. Start the match with +60 G.",
+		"skill_id": "broadside_boarding",
+		"active_value": 2.8,
+		"active_name": "Broadside Boarding",
+		"active_desc": "Manual, once: teleports to the weakest enemy and hits it for 280% ATK and enemies within 1 cells take 120% ATK.",
+		"passive2": "war_chest",
+		"passive2_value": 60
 	},
 	"champion_solstice": {
 		"name": "Helion Solstice",
@@ -417,12 +465,14 @@
 		"capacity": 6,
 		"passive": "royal_treasury",
 		"passive_value": 0.3,
-		"passive_name": "Royal Treasury",
-		"passive_desc": "+30% Dominion Gold from passing START.",
-		"skill_id": "sun_judgment",
-		"active_value": 1.5,
-		"active_name": "Sun Judgment",
-		"active_desc": "Manual, once: deals 150% ATK to all enemies."
+		"passive_name": "Solar Treasury",
+		"passive_desc": "+30% Dominion Gold from passing START. Territory upgrades cost 10% less.",
+		"skill_id": "eclipse_corona",
+		"active_value": 1.1,
+		"active_name": "Eclipse Corona",
+		"active_desc": "Manual, once: deals 110% ATK to all enemies and every ally gains +20% ATK for 10 ticks.",
+		"passive2": "upgrader",
+		"passive2_value": 0.1
 	},
 	"champion_paradox": {
 		"name": "Paradox Wanderer",
@@ -434,12 +484,14 @@
 		"capacity": 6,
 		"passive": "fortune_weave",
 		"passive_value": 3,
-		"passive_name": "Fortune Weave",
-		"passive_desc": "Starts the match with 3 Reroll Tokens.",
-		"skill_id": "rift_strike",
-		"active_value": 3.5,
-		"active_name": "Rift Strike",
-		"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 350% ATK."
+		"passive_name": "Paradox Gambit",
+		"passive_desc": "Start with 3 Reroll Token(s). Passing START also pays 2% interest on your gold (max 120 G).",
+		"skill_id": "paradox_cascade",
+		"active_value": 2.5,
+		"active_name": "Paradox Cascade",
+		"active_desc": "Manual, once: teleports to the weakest enemy and hits it for 250% ATK and grants 2 energy.",
+		"passive2": "interest",
+		"passive2_value": 0.02
 	},
 	"champion_eternis": {
 		"name": "Eternis the Unending",
@@ -451,12 +503,14 @@
 		"capacity": 6,
 		"passive": "shadow_ledger",
 		"passive_value": 0.3,
-		"passive_name": "Shadow Ledger",
-		"passive_desc": "Pay 30% less Tax and territory rent.",
-		"skill_id": "life_surge",
-		"active_value": 0.5,
-		"active_name": "Life Surge",
-		"active_desc": "Manual, once: heals 50% max HP and gains +25% ATK for 16 ticks."
+		"passive_name": "Eternal Ledger",
+		"passive_desc": "Pay 30% less Tax and territory rent. Healing costs 25% less.",
+		"skill_id": "unending_cycle",
+		"active_value": 0.35,
+		"active_name": "Unending Cycle",
+		"active_desc": "Manual, once: heals 35% of its max HP, revives the last fallen ally at 40% HP, and cleanses allies of stun, slow and burn.",
+		"passive2": "mender",
+		"passive2_value": 0.25
 	},
 	"champion_oblivion": {
 		"name": "Oblivion Harbinger",
@@ -468,11 +522,13 @@
 		"capacity": 6,
 		"passive": "spoils",
 		"passive_value": 45,
-		"passive_name": "Spoils of War",
-		"passive_desc": "+45 G whenever you win a duel.",
-		"skill_id": "soul_drain",
-		"active_value": 3.0,
-		"active_name": "Soul Drain",
-		"active_desc": "Manual, once: hits the toughest enemy for 300% ATK and heals the same amount."
+		"passive_name": "Void Plunder",
+		"passive_desc": "+45 G for every Duel won or defended. Pay 15% less Tax.",
+		"skill_id": "oblivion_edict",
+		"active_value": 2.6,
+		"active_name": "Oblivion's Edict",
+		"active_desc": "Manual, once: enemies below 50% HP take 260% ATK and drains 3 energy from the enemy side.",
+		"passive2": "tax_cut",
+		"passive2_value": 0.15
 	}
 }

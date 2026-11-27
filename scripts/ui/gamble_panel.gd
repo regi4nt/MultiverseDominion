@@ -2,10 +2,11 @@ extends HBoxContainer
 ## Gamble panel: quick mini games (Coin Flip, Dice, Slots) with a drawn coin / dice / reels stage.
 ## Used by the Shop > Gamble tab (bets and winnings in Chips, the default) and by the Territory Casino (Dominion Gold).
 ## The panel only asks `play_fn` for a round and plays the result back; the money is moved by whoever owns the currency.
-## Config keys (all optional): "unit" (name shown after amounts), "bets" (Array of ints), "balance" (Callable -> int),
+## Config keys (all optional): "unit" (name shown after amounts), "bets" (Array of ints: fixed stakes; without it the Shop slider runs GAMBLE_MIN..GAMBLE_MAX), "balance" (Callable -> int),
 ## "compact" (bool: simple floating card), "games" (Array of game ids that can be picked), "play" (Callable(game, choice, bet) -> round dictionary of ShopSystem.gamble), "hint" (text), "title" (header text).
 
 const GambleStage := preload("res://scripts/ui/gamble_stage.gd")
+const BetSlider := preload("res://scripts/ui/bet_slider.gd")
 
 signal changed
 signal round_done(result: Dictionary)
@@ -17,7 +18,7 @@ var choice: String = "heads"
 var bet: int = 100
 var game_row: HBoxContainer
 var choice_row: HFlowContainer
-var bet_row: HFlowContainer
+var bet_slider: Control  # BetSlider: slide to set the stake
 var rules: Label
 var play_btn: Button
 var stage: PanelContainer
@@ -36,6 +37,8 @@ var gfx: Control  # GambleStage: the drawn coin / dice / reels
 var compact := false  # true = the small floating card of the Territory Casino (one column, no side panel)
 var footer: VBoxContainer  # compact only: the owner adds its own buttons here (e.g. Leave)
 var bal_label: Label  # compact only: current balance
+var _scroll: ScrollContainer  # compact only: the card content scrolls when the screen is too short to show it all
+var _box: VBoxContainer  # compact only: the content of the card
 
 const GAME_NAMES := {"coin": "Coin Flip", "dice": "Dice", "slots": "Slots"}
 const CHOICES := {
@@ -49,8 +52,8 @@ func _init(r: RandomNumberGenerator, cfg: Dictionary = {}) -> void:
 	unit = String(cfg.get("unit", "chips"))
 	games = cfg.get("games", ShopSystem.GAMBLE_GAMES)
 	game = String(games[0])
-	bets = cfg.get("bets", ShopSystem.GAMBLE_BETS)
-	bet = int(bets[0])
+	bets = cfg.get("bets", [])  # empty = free slider range (Shop), otherwise only these stakes (Casino)
+	bet = int(bets[0]) if not bets.is_empty() else ShopSystem.GAMBLE_BETS[0]
 	_balance_fn = cfg.get("balance", func() -> int: return SaveManager.chips())
 	_play_fn = cfg.get("play", func(g: String, c: String, b: int) -> Dictionary: return ShopSystem.gamble(g, c, b, rng))
 	_hint = String(cfg.get("hint", "Fast money, real risk. Bets and winnings are Chips only: get Chips in the Exchange tab and turn winnings back into coins there."))
@@ -70,14 +73,21 @@ func _build() -> void:
 	var lbox := VBoxContainer.new()
 	lbox.add_theme_constant_override("separation", 10)
 	left.add_child(lbox)
-	lbox.add_child(UiTheme.make_label(_title, 26, UiTheme.COL_GOLD))
+	var scr := UiTheme.make_scroll()  # short screens scroll the settings; the Play button below stays in view
+	scr.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lbox.add_child(scr)
+	var inner := VBoxContainer.new()
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.add_theme_constant_override("separation", 10)
+	scr.add_child(inner)
+	inner.add_child(UiTheme.make_label(_title, 26, UiTheme.COL_GOLD))
 	var hint := UiTheme.make_label(_hint, 15, UiTheme.COL_MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbox.add_child(hint)
-	lbox.add_child(UiTheme.make_label("Game", 16, UiTheme.COL_MUTED))
+	inner.add_child(hint)
+	inner.add_child(UiTheme.make_label("Game", 16, UiTheme.COL_MUTED))
 	game_row = HBoxContainer.new()
 	game_row.add_theme_constant_override("separation", 6)
-	lbox.add_child(game_row)
+	inner.add_child(game_row)
 	var gg := ButtonGroup.new()
 	for g in games:
 		var b := UiTheme.make_toggle(String(GAME_NAMES[g]), gg, 46)
@@ -87,27 +97,14 @@ func _build() -> void:
 		game_row.add_child(b)
 	rules = UiTheme.make_label("", 15, UiTheme.COL_MUTED)
 	rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbox.add_child(rules)
-	lbox.add_child(UiTheme.make_label("Your pick", 16, UiTheme.COL_MUTED))
+	inner.add_child(rules)
+	lbox.add_child(UiTheme.make_label("Your pick", 16, UiTheme.COL_MUTED))  # pick, stake and Play stay pinned below the scroll
 	choice_row = HFlowContainer.new()
 	choice_row.add_theme_constant_override("h_separation", 6)
 	lbox.add_child(choice_row)
 	lbox.add_child(UiTheme.make_label("Bet (%s)" % unit, 16, UiTheme.COL_MUTED))
-	bet_row = HFlowContainer.new()
-	bet_row.add_theme_constant_override("h_separation", 6)
-	lbox.add_child(bet_row)
-	var bg := ButtonGroup.new()
-	for amount in bets:
-		var bb := UiTheme.make_toggle(str(amount), bg, 46)
-		bb.custom_minimum_size.x = 68
-		bb.button_pressed = (amount == bet)
-		bb.pressed.connect(func():
-			bet = int(amount)
-			refresh())
-		bet_row.add_child(bb)
-	var sp := Control.new()
-	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	lbox.add_child(sp)
+	bet_slider = _make_bet_slider(34)
+	lbox.add_child(bet_slider)
 	play_btn = UiTheme.make_primary("Play", 72)
 	play_btn.pressed.connect(_on_play)
 	lbox.add_child(play_btn)
@@ -145,11 +142,17 @@ func _build_compact() -> void:
 	stage.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_set_stage_color(UiTheme.COL_GOLD_DIM)
 	add_child(stage)
-	var m := UiTheme.make_margin(18)
+	var m := UiTheme.make_margin(14)
 	stage.add_child(m)
+	_scroll = ScrollContainer.new()  # safety net: a short screen scrolls the card instead of cutting it off
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	m.add_child(_scroll)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
-	m.add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 6)
+	_scroll.add_child(box)
+	_box = box
 	# header: CASINO - Game ........ 1200 G
 	var head := HBoxContainer.new()
 	box.add_child(head)
@@ -160,7 +163,7 @@ func _build_compact() -> void:
 	head.add_child(bal_label)
 	# the drawn coin / dice / reels
 	gfx = GambleStage.new()
-	gfx.custom_minimum_size = Vector2(0, 150)
+	gfx.custom_minimum_size = Vector2(0, 120)
 	gfx.sound.connect(func(n: String): Sfx.play(n))
 	box.add_child(gfx)
 	# result (one short block)
@@ -184,28 +187,48 @@ func _build_compact() -> void:
 	choice_row.alignment = FlowContainer.ALIGNMENT_CENTER
 	choice_row.add_theme_constant_override("h_separation", 6)
 	box.add_child(choice_row)
-	bet_row = HFlowContainer.new()
-	bet_row.alignment = FlowContainer.ALIGNMENT_CENTER
-	bet_row.add_theme_constant_override("h_separation", 6)
-	box.add_child(bet_row)
-	var bg := ButtonGroup.new()
-	for amount in bets:
-		var bb := UiTheme.make_toggle(str(amount), bg, 44)
-		bb.custom_minimum_size.x = 64
-		bb.button_pressed = (amount == bet)
-		bb.pressed.connect(func():
-			bet = int(amount)
-			refresh())
-		bet_row.add_child(bb)
+	bet_slider = _make_bet_slider(26)
+	box.add_child(bet_slider)
 	game_row = HBoxContainer.new()  # kept so _set_busy works; the Casino has one game, so it is never shown
 	game_row.visible = false
 	box.add_child(game_row)
-	play_btn = UiTheme.make_primary("Play", 56)
+	play_btn = UiTheme.make_primary("Play", 48)
 	play_btn.pressed.connect(_on_play)
 	box.add_child(play_btn)
 	footer = VBoxContainer.new()
 	box.add_child(footer)
 	_pick_game(game)
+	tree_entered.connect(_fit_compact.call_deferred)
+	resized.connect(_fit_compact.call_deferred)
+
+
+## Compact card: the scroll area is as tall as its content, but never taller than the screen, so the card always fits
+## (the Leave / Continue button stays reachable by scrolling on very short screens).
+func _fit_compact() -> void:
+	if _scroll == null or _box == null or not is_inside_tree():
+		return
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_fit_compact):
+		vp.size_changed.connect(_fit_compact)
+	var max_h := get_viewport_rect().size.y * 0.9 - 56.0  # card margins + stage border + a little air
+	_scroll.custom_minimum_size.y = minf(_box.get_combined_minimum_size().y, maxf(max_h, 160.0))
+
+
+## The stake slider. Shop: free range in Chips; Casino: only the fixed bets of the board (slider snaps between them).
+func _make_bet_slider(font: int) -> Control:
+	var cfg := {"unit": unit, "balance": _balance_fn, "start": bet, "font": font, "presets": not compact}
+	if bets.is_empty():
+		cfg["min"] = ShopSystem.GAMBLE_MIN
+		cfg["max"] = ShopSystem.GAMBLE_MAX
+		cfg["step"] = ShopSystem.GAMBLE_STEP
+	else:
+		cfg["values"] = bets
+	var bs: Control = BetSlider.new(cfg)
+	bet = bs.value
+	bs.value_changed.connect(func(v: int):
+		bet = v
+		refresh())
+	return bs
 
 
 func _set_stage_color(c: Color) -> void:
@@ -244,7 +267,8 @@ func _pick_game(g: String) -> void:
 ## Locks / unlocks the pickers while an animation plays.
 func _set_busy(b: bool) -> void:
 	busy = b
-	for row in [game_row, choice_row, bet_row]:
+	bet_slider.set_locked(b or locked)
+	for row in [game_row, choice_row]:
 		for c in row.get_children():
 			(c as Button).disabled = b or locked
 	if b:
@@ -332,6 +356,8 @@ func _on_play() -> void:
 	if not FxMode.is_lite():
 		_celebrate(net, String(d.get("kind", "")) == "jackpot")
 		gfx.celebrate(net > 0, String(d.get("kind", "")) == "jackpot")
+	if compact:
+		_fit_compact.call_deferred()  # the result lines changed the content height
 	_set_busy(false)
 	round_done.emit(r)
 	changed.emit()
@@ -343,6 +369,14 @@ func lock() -> void:
 
 
 func refresh() -> void:
+	if compact:
+		_fit_compact.call_deferred()
+	if bet_slider != null and bet_slider.value != bet:
+		bet_slider.set_value(bet)  # bet was set from outside (tests, balance change): the handle follows
+	elif bet_slider != null:
+		bet_slider.refresh()
+	if bet_slider != null:
+		bet = bet_slider.value
 	play_btn.text = "Play  (%d %s)" % [bet, unit]
 	if bal_label != null:
 		bal_label.text = "%d %s" % [int(_balance_fn.call()), unit]

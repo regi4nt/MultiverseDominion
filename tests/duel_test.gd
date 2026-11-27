@@ -328,6 +328,8 @@ func _test_chaos_mode() -> void:
 	var gate_pay: int = int(GameData.b("chaos_start_bonus")) + chaos_world_extra
 	if p.has_passive("royal_treasury"):  # Solvaris: Royal Treasury raises what the Gate pays
 		gate_pay = int(gate_pay * (1.0 + p.passive_value))
+	if p.has_passive("interest"):  # Solvaris' second Territory skill: interest on the gold in hand
+		gate_pay += mini(int(GameData.b("interest_cap", 120)), int(gold * p.pv("interest")))
 	check(p.gold - gold == gate_pay, "Chaos Mode: the Gate pays the reduced Chaos bonus (%d)" % (p.gold - gold))
 	var first_lot: BoardTile = c.tiles[1]
 	check(first_lot.type == BoardTile.Type.TERRITORY and first_lot.price == int(round(float(int(GameData.b("territory_base_price"))) * float(GameData.b("chaos_price_mult")))), "Chaos Mode: Territory prices are scaled up")

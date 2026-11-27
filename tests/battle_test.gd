@@ -65,6 +65,24 @@ func _test_chess_moves() -> void:
 	check(ChessMove.move_cells("pawn", from, 1, 0, free).has(Vector2i(3, 2)), "pawn of side 0 moves up")
 	check(ChessMove.move_cells("pawn", from, 1, 1, free).has(Vector2i(3, 4)), "pawn of side 1 moves down")
 	check(ChessMove.attack_cells(Vector2i(0, 0), 2).size() == 8, "attack area is clipped to the board")
+	# attack: near (8 cells around) for every piece, plus far along the chess pattern for Rook, Knight, Bishop and Queen
+	var none := func(_c: Vector2i) -> bool: return false
+	var mid := Vector2i(3, 4)
+	var near := 0
+	for c in ChessMove.capture_cells("pawn", mid, 0, none):
+		if maxi(absi(c.x - mid.x), absi(c.y - mid.y)) == 1:
+			near += 1
+	check(ChessMove.capture_cells("pawn", mid, 0, none).size() == 8 and near == 8, "pawn hits near only (the 8 cells around it)")
+	check(ChessMove.capture_cells("king", mid, 0, none).size() == 8, "king hits near only")
+	check(ChessMove.capture_cells("rook", mid, 0, none).size() == 18, "rook hits near (8) + its whole row and column")
+	check(ChessMove.capture_cells("bishop", mid, 0, none).size() == ChessMove.move_cells("bishop", mid, ChessMove.SLIDE, 0, none).size() + 4, "bishop hits near + its whole diagonals")
+	check(ChessMove.capture_cells("queen", mid, 0, none).size() == 14 + ChessMove.move_cells("bishop", mid, ChessMove.SLIDE, 0, none).size(), "queen hits near + every line")
+	check(ChessMove.capture_cells("knight", mid, 0, none).size() == 16 and ChessMove.capture_cells("knight", mid, 0, none).has(Vector2i(4, 2)) and ChessMove.capture_cells("knight", mid, 0, none).has(Vector2i(3, 3)), "knight hits near (8) + its 8 jump cells")
+	var wall_fn := func(c: Vector2i) -> bool: return c == Vector2i(3, 2)
+	check(ChessMove.can_capture("rook", mid, Vector2i(3, 2), 0, wall_fn) and not ChessMove.can_capture("rook", mid, Vector2i(3, 1), 0, wall_fn), "a slide stops at the first unit: the unit is hit, the one behind it is covered")
+	check(ChessMove.steps_for("rook", 2, true) == ChessMove.SLIDE and ChessMove.steps_for("pawn", 1, false) == 2 and ChessMove.steps_for("pawn", 1, true) == 1, "sliders go the whole board; a pawn steps 2 on its first move only")
+	check(not ChessMove.move_cells("pawn", mid, 1, 0, none).has(Vector2i(2, 3)), "a pawn never moves diagonally (it only hits that way)")
+	check(ChessMove.move_cells("pawn", mid, 1, 0, wall_fn).size() == 0 or ChessMove.move_cells("pawn", mid, 1, 0, func(c: Vector2i) -> bool: return c == Vector2i(3, 3)).has(Vector2i(2, 4)), "a pawn whose way is shut sidesteps instead of locking up")
 
 
 func _test_terrain() -> void:

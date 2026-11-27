@@ -10,6 +10,8 @@ var faction_id: String = ""
 var champion_id: String = ""
 var passive: String = ""
 var passive_value: float = 0.0
+var passive2: String = ""  # the King's second Territory skill (data/champions.json passive2): every King has a different pair
+var passive2_value: float = 0.0
 var color: Color = Color.WHITE
 
 var position: int = 0
@@ -48,9 +50,20 @@ func consume_supports(used: Array) -> void:
 
 
 func has_passive(passive_id: String) -> bool:
-	return passive == passive_id
+	return passive_id != "" and (passive == passive_id or passive2 == passive_id)
+
+
+## Strength of a Territory skill of this King (0 when he does not have it).
+func pv(passive_id: String) -> float:
+	if passive_id == "":
+		return 0.0
+	if passive == passive_id:
+		return passive_value
+	if passive2 == passive_id:
+		return passive2_value
+	return 0.0
 
 
 ## Quartermaster passive: Battle Shop discount.
 func battle_price_mult() -> float:
-	return (1.0 - passive_value if passive == "quartermaster" else 1.0) * extra_price_mult
+	return (1.0 - pv("quartermaster")) * extra_price_mult

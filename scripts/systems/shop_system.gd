@@ -480,9 +480,9 @@ static func convert_currency(exchange_id: String, packs: int) -> String:
 	return ""
 
 
-# ------------------------------------------------------------------ Auction (lelang): bid for locked cards with Crystals
+# ------------------------------------------------------------------ Auction: bid for locked cards with Crystals
 
-const AUCTION_LOTS := 4  # cards on offer at the same time
+const AUCTION_LOTS := 5  # cards on offer at the same time
 const AUCTION_VALUE_MULT := 1  # market value in Crystals = the Crystal price of the card x this (Crystal prices are small: 1 / 2 / 4 / 10)
 const AUCTION_OPEN := 0.4  # the first bid is 40% of the value (same as the Auction on the board)
 const AUCTION_STEP := 0.10  # every raise is 10% of the value
@@ -560,7 +560,10 @@ static func auction_win(card_id: String, price: int) -> String:
 
 ## Bets are paid and won in Chips only (turn winnings into coins with the Exchange tab). Every game has a small house edge
 ## (expected return a little under 100%), so it is fast money with real risk.
-const GAMBLE_BETS := [100, 500, 1000, 5000]
+const GAMBLE_BETS := [100, 500, 1000, 5000]  # quick-pick stakes (the slider can also land anywhere between)
+const GAMBLE_MIN := 100  # slider range of the Gamble tab: GAMBLE_MIN .. GAMBLE_MAX in steps of GAMBLE_STEP chips
+const GAMBLE_MAX := 10000
+const GAMBLE_STEP := 100
 const GAMBLE_GAMES := ["coin", "dice", "slots"]
 const COIN_WIN_CHANCE := 0.48  # pays 2x the bet: expected return 96%
 const DICE_PAYOUT := {"low": 2.3, "high": 2.3, "seven": 5.5}  # two dice: Low 2-6 / High 8-12 (15/36 each), Seven (6/36)
@@ -569,6 +572,11 @@ const SLOT_JACKPOT := 30.0  # three 7s
 const SLOT_TRIPLE := 8.0  # any other three of a kind
 const SLOT_PAIR := 1.5  # exactly two alike
 const SLOT_EXPECTED_RETURN := (SLOT_JACKPOT + 5.0 * SLOT_TRIPLE) / 216.0 + 90.0 / 216.0 * SLOT_PAIR  # about 95%
+
+
+## True when `bet` is on the slider grid of the Gamble tab (GAMBLE_MIN..GAMBLE_MAX, multiples of GAMBLE_STEP).
+static func gamble_bet_ok(bet: int) -> bool:
+	return bet >= GAMBLE_MIN and bet <= GAMBLE_MAX and bet % GAMBLE_STEP == 0
 
 
 ## "" when `game` and `choice` are valid, otherwise what is wrong with them.
@@ -627,7 +635,7 @@ static func gamble_round(game: String, choice: String, bet: int, rng: RandomNumb
 ## Plays one round of the Shop > Gamble tab. Bets are paid and won in Chips; nothing is paid when ok is false.
 static func gamble(game: String, choice: String, bet: int, rng: RandomNumberGenerator) -> Dictionary:
 	var res := {"ok": false, "error": gamble_pick_error(game, choice), "win": false, "payout": 0, "net": 0, "bet": bet, "game": game, "detail": {}}
-	if res["error"] == "" and not GAMBLE_BETS.has(bet):
+	if res["error"] == "" and not gamble_bet_ok(bet):
 		res["error"] = "Pick a bet."
 	if res["error"] == "" and not SaveManager.spend_currency("chips", bet):
 		res["error"] = "Not enough Chips."

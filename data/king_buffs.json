@@ -108,63 +108,63 @@
 		"desc": "Attacks also deal 40% damage to enemies adjacent to the target."
 	},
 	"champion_bloodfang": {
-		"name": "Crimson Thirst",
-		"type": "lifesteal",
-		"value": 0.25,
-		"desc": "Heals itself for 25% of the damage dealt."
+		"name": "Reaver's Feast",
+		"type": "feast",
+		"value": 0.12,
+		"desc": "Heals 12% max HP for every enemy it defeats."
 	},
 	"champion_warborn": {
-		"name": "Warborn Resolve",
-		"type": "armor",
-		"value": 0.12,
-		"desc": "Takes 12% less damage."
+		"name": "Warband Bastion",
+		"type": "bastion",
+		"value": 0.25,
+		"desc": "No single hit can take more than 25% of max HP."
 	},
 	"champion_abyssal": {
-		"name": "Tidal Shackles",
-		"type": "chill",
-		"value": 5,
-		"desc": "Attacks slow the target for 5 ticks."
+		"name": "Abyssal Pressure",
+		"type": "weaken",
+		"value": 0.15,
+		"desc": "Attacks mark the target: it takes 15% more damage for 8 ticks."
 	},
 	"champion_pelagia": {
-		"name": "Tidemother's Blessing",
-		"type": "regen",
-		"value": 0.06,
-		"desc": "Every 8 ticks heals all allies for 6% max HP."
+		"name": "Tidemother's Call",
+		"type": "rally_cry",
+		"value": 0.12,
+		"desc": "On entering the arena, all allies gain +12% ATK for 12 ticks."
 	},
 	"champion_tempestra": {
-		"name": "Thunderstrike",
-		"type": "stun_proc",
-		"value": 3,
-		"desc": "Every 3rd attack stuns the target for 1 tick."
+		"name": "Chain Lightning",
+		"type": "chain",
+		"value": 0.4,
+		"desc": "Attacks arc to the nearest other enemy within 2 cells for 40% damage."
 	},
 	"champion_corsaria": {
-		"name": "Boarding Strike",
-		"type": "opener",
+		"name": "Broadside Volley",
+		"type": "crit",
 		"value": 0.6,
-		"desc": "The first attack deals +60% damage."
+		"desc": "Every 3rd attack deals +60% damage."
 	},
 	"champion_solstice": {
-		"name": "Solar Corona",
-		"type": "aura_atk",
-		"value": 0.12,
-		"desc": "Adjacent allies gain +12% ATK."
+		"name": "Solar Crescendo",
+		"type": "momentum",
+		"value": 0.03,
+		"desc": "Each attack adds +3% ATK (up to 8 times)."
 	},
 	"champion_paradox": {
-		"name": "Phase Shift",
-		"type": "evade",
-		"value": 2,
-		"desc": "Every 2nd hit taken is avoided."
+		"name": "Time Skip",
+		"type": "quickkill",
+		"value": 1,
+		"desc": "After defeating an enemy, attacks again at once."
 	},
 	"champion_eternis": {
-		"name": "Eternal Renewal",
-		"type": "mend_self",
-		"value": 0.06,
-		"desc": "Heals itself for 6% max HP every 8 ticks."
+		"name": "Unending",
+		"type": "undying",
+		"value": 0.25,
+		"desc": "Survives one lethal hit and returns with 25% max HP."
 	},
 	"champion_oblivion": {
-		"name": "Harbinger's Mark",
-		"type": "execute",
-		"value": 0.35,
-		"desc": "Deals +35% damage to enemies below 30% HP."
+		"name": "Unmaking Strike",
+		"type": "shatter",
+		"value": 0.4,
+		"desc": "Deals 40% more damage to shielded targets."
 	}
 }

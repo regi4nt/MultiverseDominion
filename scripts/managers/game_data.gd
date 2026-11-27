@@ -18,6 +18,7 @@ var special_dice: Array = []  # ACTIVE Special Dice of the continent being playe
 var base_special_dice: Array = []  # neutral dice from data/special_dice.json
 var monsters: Dictionary = {}  # continent id -> Array of 4 hidden territory monsters (data/monsters.json)
 var map_skins: Dictionary = {}  # continent id -> {territory, battle, backdrop} look of the boards (data/map_skins.json, see MapSkin)
+var skills: Dictionary = {}  # skill id -> {name, fx: [effect ops]}: the composed active skills of the Kings and Monsters (data/skills.json, see BattleEngine._run_skill_fx)
 var deposits: Dictionary = {}  # continent id -> Array of 4 hidden deposits: 2 treasures + 2 mines (data/deposits.json)
 
 
@@ -35,6 +36,7 @@ func _ready() -> void:
 	base_special_dice = _load_json("res://data/special_dice.json").get("dice", [])
 	monsters = _load_json("res://data/monsters.json").get("continents", {})
 	deposits = _load_json("res://data/deposits.json").get("continents", {})
+	skills = _load_json("res://data/skills.json").get("skills", {})
 	map_skins = _load_json("res://data/map_skins.json").get("continents", {})
 	apply_flavor("")
 

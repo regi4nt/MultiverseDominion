@@ -87,6 +87,7 @@ var _surrendered: bool = false  # the duel was surrendered: the result is report
 var _forfeited: bool = false  # "End Run" in a 10-round run: the wager counts as lost
 var _series_over: bool = false  # the run is finished (or was a single battle): the result screen offers New Battle / Main Menu
 var _result_dim: ColorRect  # the result screen of the round that was just played
+var _mate_side: int = -1  # side whose Champion fell (CHECKMATE) in the battle just played; -1 = none. Kept on the result screen.
 
 
 func _ready() -> void:
@@ -580,7 +581,7 @@ func _refresh_prep() -> void:
 		var card := CardDatabase.get_unit(selected.card_id)
 		var st := selected.stats()
 		sel_label.add_theme_color_override("font_color", UiTheme.rarity_color(String(card["rarity"])))
-		sel_label.text = "[%s] %s %s | HP %d ATK %d | Rng %d Mov %d | cost %d | %s: %s" % [String(card["rarity"]).capitalize(), card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], card["range"], card["move"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]] + _buff_line(selected.card_id) + "\n" + ChessMove.describe(selected.chess())
+		sel_label.text = "[%s] %s %s | HP %d ATK %d | cost %d | %s: %s" % [String(card["rarity"]).capitalize(), card["name"], "*".repeat(selected.stars), st["hp"], st["atk"], CardDatabase.capacity_cost(selected.chess()), card["skill"]["name"], card["skill"]["desc"]] + _buff_line(selected.card_id) + "\n" + ChessMove.describe(selected.chess())
 	if selected_support >= prep.hand.size() or (selected_support >= 0 and not prep.can_sell_support(prep.hand[selected_support])):
 		selected_support = -1
 	if selected_support >= 0:
@@ -960,6 +961,7 @@ func _on_start_battle() -> void:
 	prep_actions.visible = false
 	battle_panel.visible = true
 	battle_left.visible = true
+	_mate_side = -1  # new battle: no CHECKMATE yet
 	grid.show_engine(engine)
 	_log_index = 0
 	_rebuild_supports()
@@ -1014,8 +1016,9 @@ func _on_tick() -> void:
 	if engine.finished:
 		timer.stop()
 		for ev in engine.events:
-			if ev["type"] == "mate":  # let the CHECKMATE banner be seen before the result screen covers it
-				await get_tree().create_timer(1.4).timeout
+			if ev["type"] == "mate":  # let the CHECKMATE banner be seen on the board before the result screen opens (it then stays on the result screen)
+				_mate_side = int(ev["side"])
+				await get_tree().create_timer(1.5).timeout
 				break
 		_show_result()
 
@@ -1236,7 +1239,7 @@ func _show_result() -> void:
 	_rebuild_supports()
 	var won := engine.winner == 0
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
+	dim.color = Color(0, 0, 0, 0.3 if _mate_side >= 0 else 0.6)  # after a CHECKMATE the board stays readable behind the result
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	_result_dim = dim  # every result screen (Battle Chess AND multi-round duels) must be removed by _next_round
@@ -1246,6 +1249,8 @@ func _show_result() -> void:
 	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	dim.add_child(cc)
 	cc.add_child(panel)
+	if _mate_side >= 0:
+		_place_result_beside_board.call_deferred(dim, cc)  # the CHECKMATE band stays visible on the board until the player leaves the result
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	panel.add_child(v)
@@ -1288,6 +1293,28 @@ func _show_result() -> void:
 		var cont := UiTheme.make_button("Continue", 60)
 		cont.pressed.connect(_finish_duel)
 		v.add_child(cont)
+
+
+## After a CHECKMATE the result panel must not cover the board: the CenterContainer is shrunk to the free area beside
+## (right, left or below) the board, whichever is the largest, so the CHECKMATE band stays on screen as long as the result is open.
+func _place_result_beside_board(dim: ColorRect, cc: CenterContainer) -> void:
+	if not is_instance_valid(dim) or not is_instance_valid(cc) or grid == null:
+		return
+	var gr := grid.get_global_rect()
+	var origin := dim.get_global_rect().position
+	var screen := dim.get_global_rect().size
+	var right := screen.x - (gr.end.x - origin.x)
+	var left := gr.position.x - origin.x
+	var below := screen.y - (gr.end.y - origin.y)
+	var best := maxf(right, maxf(left, below))
+	if best < 240.0:
+		return  # no free area: keep the panel centred
+	if best == right:
+		cc.offset_left = gr.end.x - origin.x
+	elif best == left:
+		cc.offset_right = -(screen.x - (gr.position.x - origin.x))
+	else:
+		cc.offset_top = gr.end.y - origin.y
 
 
 ## Battle Chess run (10 rounds / Survival): counts this round for the King's faction mission (CommanderSystem, "bc_*" metrics:
@@ -1404,6 +1431,7 @@ func _next_round() -> void:
 		_result_dim.queue_free()
 		_result_dim = null
 	_result_shown = false
+	_mate_side = -1
 	engine = null
 	_bm_done = false  # a new round starts its Continent mission from 0
 	phase = "prep"

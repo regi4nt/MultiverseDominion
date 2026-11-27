@@ -112,7 +112,7 @@ func _ready() -> void:
 	if not gs.visible or gs.pull10.disabled:
 		fails += 1
 		push_error("the Card Gacha tab opens with usable pull buttons")
-	if gs.pity_bars.size() != 3 or gs.pity_bars["legendary"].max_value != ShopSystem.PITY_LIMITS["legendary"] or gs._chips.get_child_count() != ShopSystem.RATES.size():
+	if gs.pity_bar == null or gs.pity_label.text == "" or not ShopSystem.PITY_LIMITS.values().has(int(gs.pity_bar.max_value)) or gs._chips.get_child_count() != ShopSystem.RATES.size():
 		fails += 1
 		push_error("the Card Gacha shows the rates and pity")
 	gs._on_pull(10)

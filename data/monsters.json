@@ -6,85 +6,109 @@
 				"id": "crownstone_golem",
 				"name": "Crownstone Golem",
 				"region": 0,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 415,
 				"atk": 27,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "armor",
 					"value": 0.15,
 					"name": "Crownstone Hide",
 					"desc": "Takes 15% less damage."
 				},
-				"skill_id": "banner_of_iron",
+				"skill_id": "crownstone_bulwark",
 				"active_name": "Crownstone Bulwark",
-				"active_value": 0.35,
-				"active_desc": "Manual, once: gains a shield worth 35% of max HP.",
-				"lore": "A guardian of cracked marble that never left the throne road."
+				"active_value": 0.4,
+				"active_desc": "Manual, once: gains a shield worth 40% of max HP, takes 50% less damage for 10 ticks, and stuns enemies within 1 cells for 2 ticks.",
+				"lore": "A guardian of cracked marble that never left the throne road.",
+				"plus": {
+					"type": "bastion",
+					"value": 0.2,
+					"name": "Keystone Plating",
+					"desc": "No single hit can take more than 20% of max HP."
+				}
 			},
 			{
 				"id": "sunscorch_manticore",
 				"name": "Sunscorch Manticore",
 				"region": 1,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 360,
 				"atk": 29,
-				"range": 1,
-				"move": 2,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "burn",
 					"value": 0.25,
 					"name": "Sunfire Sting",
 					"desc": "Attacks burn the target for 25% of ATK every 4 ticks for 12 ticks."
 				},
-				"skill_id": "inferno_burst",
+				"skill_id": "sunfire_eruption",
 				"active_name": "Sunfire Eruption",
-				"active_value": 1.8,
-				"active_desc": "Manual, once: enemies within 3 cells take 180% ATK.",
-				"lore": "Stalks the sun-baked marches and sears whatever it bites."
+				"active_value": 0.3,
+				"active_desc": "Manual, once: burns all enemies for 30% ATK every 4 ticks for 12 ticks and enemies within 3 cells take 160% ATK.",
+				"lore": "Stalks the sun-baked marches and sears whatever it bites.",
+				"plus": {
+					"type": "crit",
+					"value": 0.5,
+					"name": "Scorpion Sting",
+					"desc": "Every 3rd attack deals +50% damage."
+				}
 			},
 			{
 				"id": "vale_thornstag",
 				"name": "Vale Thornstag",
 				"region": 2,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 380,
 				"atk": 28,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "thorns",
 					"value": 0.2,
 					"name": "Briar Antlers",
 					"desc": "Reflects 20% of the damage taken back at the attacker."
 				},
-				"skill_id": "overcharge",
+				"skill_id": "thornstag_rut",
 				"active_name": "Thornstag Rut",
 				"active_value": 0.5,
-				"active_desc": "Manual, once: +50% ATK for 12 ticks.",
-				"lore": "A stag grown over with thorns; striking it hurts the striker."
+				"active_desc": "Manual, once: gains +50% ATK for 12 ticks, enemies within 1 cells take 140% ATK, and gains a shield worth 15% of max HP.",
+				"lore": "A stag grown over with thorns; striking it hurts the striker.",
+				"plus": {
+					"type": "vengeance",
+					"value": 0.2,
+					"name": "Stag's Wrath",
+					"desc": "When an ally falls, gains +20% ATK for 8 ticks."
+				}
 			},
 			{
 				"id": "keep_wraith",
 				"name": "Dusk Keep Wraith",
 				"region": 3,
-				"chess": "bishop",
+				"chess": "queen",
 				"hp": 345,
 				"atk": 29,
-				"range": 3,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "lifesteal",
 					"value": 0.2,
 					"name": "Soul Sip",
 					"desc": "Heals itself for 20% of the damage dealt."
 				},
-				"skill_id": "soul_drain",
+				"skill_id": "wraith_siphon",
 				"active_name": "Wraith Siphon",
 				"active_value": 2.2,
-				"active_desc": "Manual, once: hits the toughest enemy for 220% ATK and heals the same amount.",
-				"lore": "The last garrison of the Keep, drinking life from the living."
+				"active_desc": "Manual, once: hits the toughest enemy for 220% ATK and heals 100% of the damage and drains 2 energy from the enemy side.",
+				"lore": "The last garrison of the Keep, drinking life from the living.",
+				"plus": {
+					"type": "feast",
+					"value": 0.1,
+					"name": "Garrison Feast",
+					"desc": "Heals 10% max HP for every enemy it defeats."
+				}
 			}
 		],
 		"arcanum": [
@@ -92,85 +116,109 @@
 				"id": "spire_sentinel",
 				"name": "Spire Arcane Sentinel",
 				"region": 0,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 380,
 				"atk": 26,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "ward",
 					"value": 0.25,
 					"name": "Runic Ward",
 					"desc": "Starts with a shield worth 25% of max HP."
 				},
-				"skill_id": "eclipse_veil",
+				"skill_id": "sentinel_ward_shroud",
 				"active_name": "Sentinel Ward-Shroud",
-				"active_value": 0.15,
-				"active_desc": "Manual, once: takes 50% less damage for 12 ticks and heals 15% HP.",
-				"lore": "A construct sealed with wards by the first spellwrights."
+				"active_value": 10,
+				"active_desc": "Manual, once: every ally takes 50% less damage for 10 ticks, heals every ally for 10% of its max HP, and gains a shield worth 20% of max HP.",
+				"lore": "A construct sealed with wards by the first spellwrights.",
+				"plus": {
+					"type": "siphon",
+					"value": 1,
+					"name": "Arcane Siphon",
+					"desc": "Every 3rd attack restores 1 energy to its side."
+				}
 			},
 			{
 				"id": "cinder_phoenix",
 				"name": "Cinder Phoenix",
 				"region": 1,
-				"chess": "bishop",
+				"chess": "queen",
 				"hp": 325,
 				"atk": 27,
-				"range": 3,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "second_life",
 					"value": 0.4,
 					"name": "Ashes Reborn",
 					"desc": "The first time it falls, it returns with 40% HP."
 				},
-				"skill_id": "inferno_burst",
-				"active_name": "Phoenix Nova",
-				"active_value": 2.2,
-				"active_desc": "Manual, once: enemies within 3 cells take 220% ATK.",
-				"lore": "Burns to cinders and rises again once."
+				"skill_id": "phoenix_rebirth",
+				"active_name": "Phoenix Rebirth",
+				"active_value": 0.5,
+				"active_desc": "Manual, once: revives the last fallen ally at 50% HP, deals 90% ATK to all enemies, and heals 15% of its max HP.",
+				"lore": "Burns to cinders and rises again once.",
+				"plus": {
+					"type": "momentum",
+					"value": 0.03,
+					"name": "Rising Flame",
+					"desc": "Each attack adds +3% ATK (up to 8 times)."
+				}
 			},
 			{
 				"id": "rimeclaw_yeti",
 				"name": "Rimeclaw Yeti",
 				"region": 2,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 380,
 				"atk": 27,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "chill",
 					"value": 5,
 					"name": "Rime Touch",
 					"desc": "Attacks slow the target for 5 ticks."
 				},
-				"skill_id": "frost_veil",
-				"active_name": "Rimeclaw Blizzard",
-				"active_value": 8,
-				"active_desc": "Manual, once: slows all enemies for 8 ticks.",
-				"lore": "Its claws leave frost that slows everything it hits."
+				"skill_id": "yeti_avalanche",
+				"active_name": "Yeti Avalanche",
+				"active_value": 10,
+				"active_desc": "Manual, once: slows all enemies for 10 ticks, enemies within 2 cells take 180% ATK, and enemies take 10% more damage for 10 ticks.",
+				"lore": "Its claws leave frost that slows everything it hits.",
+				"plus": {
+					"type": "weaken",
+					"value": 0.12,
+					"name": "Rime Mark",
+					"desc": "Attacks mark the target: it takes 12% more damage for 8 ticks."
+				}
 			},
 			{
 				"id": "vault_shadehound",
 				"name": "Vault Shadehound",
 				"region": 3,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 350,
 				"atk": 29,
-				"range": 1,
-				"move": 2,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "execute",
 					"value": 0.3,
 					"name": "Finishing Bite",
 					"desc": "Deals +30% damage to enemies below 30% HP."
 				},
-				"skill_id": "rift_strike",
-				"active_name": "Shade Pounce",
+				"skill_id": "shadehound_pounce",
+				"active_name": "Shadehound Pounce",
 				"active_value": 2.8,
-				"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 280% ATK.",
-				"lore": "Hunts the wounded through the Umbral Vault."
+				"active_desc": "Manual, once: teleports to the weakest enemy and hits it for 280% ATK and enemies below 30% HP take 160% ATK.",
+				"lore": "Hunts the wounded through the Umbral Vault.",
+				"plus": {
+					"type": "quickkill",
+					"value": 1,
+					"name": "Hunter's Pace",
+					"desc": "After defeating an enemy, attacks again at once."
+				}
 			}
 		],
 		"machina": [
@@ -178,64 +226,82 @@
 				"id": "gearwork_behemoth",
 				"name": "Gearwork Behemoth",
 				"region": 0,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 490,
 				"atk": 28,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "mend_self",
 					"value": 0.05,
 					"name": "Self-Repair",
 					"desc": "Heals itself for 5% max HP every 8 ticks."
 				},
-				"skill_id": "banner_of_iron",
-				"active_name": "Behemoth Plating",
-				"active_value": 0.45,
-				"active_desc": "Manual, once: gains a shield worth 45% of max HP.",
-				"lore": "A siege engine whose gears reknit after every blow."
+				"skill_id": "behemoth_overclock",
+				"active_name": "Behemoth Overclock",
+				"active_value": 0.5,
+				"active_desc": "Manual, once: gains a shield worth 50% of max HP, gains +40% ATK for 12 ticks, and allies attack faster for 10 ticks.",
+				"lore": "A siege engine whose gears reknit after every blow.",
+				"plus": {
+					"type": "shatter",
+					"value": 0.35,
+					"name": "Piston Breaker",
+					"desc": "Deals 35% more damage to shielded targets."
+				}
 			},
 			{
 				"id": "arc_hound",
 				"name": "Voltage Arc Hound",
 				"region": 1,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 440,
 				"atk": 35,
-				"range": 1,
-				"move": 2,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "stun_proc",
 					"value": 4,
 					"name": "Arc Jolt",
 					"desc": "Every 4th attack stuns the target for 1 tick."
 				},
-				"skill_id": "chrono_stasis",
-				"active_name": "Arc Lockdown",
+				"skill_id": "arc_hound_storm",
+				"active_name": "Arc Hound Storm",
 				"active_value": 2,
-				"active_desc": "Manual, once: stuns all enemies for 2 ticks.",
-				"lore": "A dynamo beast that jolts its prey stiff."
+				"active_desc": "Manual, once: stuns the 3 highest-ATK enemies for 2 ticks and enemies in its row take 150% ATK.",
+				"lore": "A dynamo beast that jolts its prey stiff.",
+				"plus": {
+					"type": "chain",
+					"value": 0.4,
+					"name": "Arc Chain",
+					"desc": "Attacks arc to the nearest other enemy within 2 cells for 40% damage."
+				}
 			},
 			{
 				"id": "foundry_drone",
 				"name": "Chrono Foundry Drone",
 				"region": 2,
-				"chess": "bishop",
+				"chess": "queen",
 				"hp": 445,
 				"atk": 35,
-				"range": 3,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "aura_atk",
 					"value": 0.12,
 					"name": "Overclock Field",
 					"desc": "Adjacent allies gain +12% ATK."
 				},
-				"skill_id": "starfall_decree",
-				"active_name": "Foundry Barrage",
-				"active_value": 2.5,
-				"active_desc": "Manual, once: hits 3 random enemies for 250% ATK.",
-				"lore": "Hovers over the forge and overclocks its allies."
+				"skill_id": "drone_swarm",
+				"active_name": "Drone Swarm",
+				"active_value": 1.5,
+				"active_desc": "Manual, once: hits 4 random enemies for 150% ATK and grants 2 energy.",
+				"lore": "Hovers over the forge and overclocks its allies.",
+				"plus": {
+					"type": "rally_cry",
+					"value": 0.1,
+					"name": "Hive Signal",
+					"desc": "On entering the arena, all allies gain +10% ATK for 12 ticks."
+				}
 			},
 			{
 				"id": "nexus_overseer",
@@ -245,18 +311,24 @@
 				"hp": 465,
 				"atk": 31,
 				"range": 2,
-				"move": 1,
+				"move": 4,
 				"buff": {
 					"type": "splash",
 					"value": 0.35,
 					"name": "Arc Lattice",
 					"desc": "Attacks also deal 35% damage to enemies adjacent to the target."
 				},
-				"skill_id": "sun_judgment",
-				"active_name": "Grid Overload",
-				"active_value": 1.2,
-				"active_desc": "Manual, once: deals 120% ATK to all enemies.",
-				"lore": "Its beams arc across the grid to hit nearby targets."
+				"skill_id": "overseer_lockdown",
+				"active_name": "Overseer Lockdown",
+				"active_value": 2,
+				"active_desc": "Manual, once: stuns all enemies for 2 ticks and enemies take 20% more damage for 10 ticks.",
+				"lore": "Its beams arc across the grid to hit nearby targets.",
+				"plus": {
+					"type": "siphon",
+					"value": 2,
+					"name": "Grid Tap",
+					"desc": "Every 3rd attack restores 2 energy to its side."
+				}
 			}
 		],
 		"sylvaris": [
@@ -264,85 +336,109 @@
 				"id": "canopy_treant",
 				"name": "Canopy Elder Treant",
 				"region": 0,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 425,
 				"atk": 26,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "regen",
 					"value": 0.04,
 					"name": "Verdant Pulse",
 					"desc": "Heals its whole side for 4% max HP every 8 ticks."
 				},
-				"skill_id": "life_surge",
-				"active_name": "Elder Bloom",
-				"active_value": 0.3,
-				"active_desc": "Manual, once: heals 30% max HP and gains +25% ATK for 16 ticks.",
-				"lore": "An ancient tree whose sap mends its whole side."
+				"skill_id": "treant_rooting",
+				"active_name": "Treant Rooting",
+				"active_value": 3,
+				"active_desc": "Manual, once: stuns enemies within 2 cells for 3 ticks, heals 25% of its max HP, and gains a shield worth 15% of max HP.",
+				"lore": "An ancient tree whose sap mends its whole side.",
+				"plus": {
+					"type": "bastion",
+					"value": 0.25,
+					"name": "Heartwood Bark",
+					"desc": "No single hit can take more than 25% of max HP."
+				}
 			},
 			{
 				"id": "petal_dryad",
 				"name": "Petal Dryad",
 				"region": 1,
-				"chess": "bishop",
+				"chess": "queen",
 				"hp": 365,
 				"atk": 29,
-				"range": 3,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "regen",
 					"value": 0.05,
 					"name": "Bloom Song",
 					"desc": "Heals its whole side for 5% max HP every 8 ticks."
 				},
-				"skill_id": "life_surge",
-				"active_name": "Petal Renewal",
-				"active_value": 0.35,
-				"active_desc": "Manual, once: heals 35% max HP and gains +25% ATK for 16 ticks.",
-				"lore": "A meadow spirit whose song makes wounds close."
+				"skill_id": "petal_storm",
+				"active_name": "Petal Storm",
+				"active_value": 0.8,
+				"active_desc": "Manual, once: deals 80% ATK to all enemies, heals every ally for 12% of its max HP, and slows all enemies for 6 ticks.",
+				"lore": "A meadow spirit whose song makes wounds close.",
+				"plus": {
+					"type": "vengeance",
+					"value": 0.15,
+					"name": "Petal Vengeance",
+					"desc": "When an ally falls, gains +15% ATK for 8 ticks."
+				}
 			},
 			{
 				"id": "hollow_direbear",
 				"name": "Hollowfang Direbear",
 				"region": 2,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 405,
 				"atk": 29,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "rage",
 					"value": 0.3,
 					"name": "Cornered Fury",
 					"desc": "Gains +30% ATK while below 50% HP."
 				},
-				"skill_id": "overcharge",
-				"active_name": "Direbear Fury",
+				"skill_id": "direbear_maul",
+				"active_name": "Direbear Maul",
 				"active_value": 0.6,
-				"active_desc": "Manual, once: +60% ATK for 12 ticks.",
-				"lore": "Fiercest when it is hurt."
+				"active_desc": "Manual, once: gains +60% ATK for 12 ticks and hits the toughest enemy for 180% ATK and heals 50% of the damage.",
+				"lore": "Fiercest when it is hurt.",
+				"plus": {
+					"type": "feast",
+					"value": 0.12,
+					"name": "Maw Feast",
+					"desc": "Heals 12% max HP for every enemy it defeats."
+				}
 			},
 			{
 				"id": "rootmaw_behemoth",
 				"name": "Rootmaw Behemoth",
 				"region": 3,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 435,
 				"atk": 27,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "guard",
 					"value": 0.2,
 					"name": "Root Bulwark",
 					"desc": "It and allies within 2 cells take 20% less damage."
 				},
-				"skill_id": "banner_of_iron",
-				"active_name": "Rootmaw Bark",
-				"active_value": 0.4,
-				"active_desc": "Manual, once: gains a shield worth 40% of max HP.",
-				"lore": "Roots coil around it and its allies, softening blows."
+				"skill_id": "rootmaw_devour",
+				"active_name": "Rootmaw Devour",
+				"active_value": 2.0,
+				"active_desc": "Manual, once: enemies in its column take 200% ATK, heals 20% of its max HP, and takes 50% less damage for 8 ticks.",
+				"lore": "Roots coil around it and its allies, softening blows.",
+				"plus": {
+					"type": "undying",
+					"value": 0.2,
+					"name": "Rootbound",
+					"desc": "Survives one lethal hit and returns with 20% max HP."
+				}
 			}
 		],
 		"drakmor": [
@@ -354,81 +450,105 @@
 				"hp": 420,
 				"atk": 33,
 				"range": 2,
-				"move": 1,
+				"move": 4,
 				"buff": {
 					"type": "burn",
 					"value": 0.3,
 					"name": "Dragonfire",
 					"desc": "Attacks burn the target for 30% of ATK every 4 ticks for 12 ticks."
 				},
-				"skill_id": "inferno_burst",
-				"active_name": "Drake Flare",
-				"active_value": 2.0,
-				"active_desc": "Manual, once: enemies within 3 cells take 200% ATK.",
-				"lore": "A young drake that scorches from the ridge."
+				"skill_id": "drake_strafe",
+				"active_name": "Drake Strafe",
+				"active_value": 2.2,
+				"active_desc": "Manual, once: enemies in its column take 220% ATK, burns all enemies for 25% ATK every 4 ticks for 10 ticks, and allies attack faster for 8 ticks.",
+				"lore": "A young drake that scorches from the ridge.",
+				"plus": {
+					"type": "momentum",
+					"value": 0.04,
+					"name": "Strafing Speed",
+					"desc": "Each attack adds +4% ATK (up to 8 times)."
+				}
 			},
 			{
 				"id": "hellforge_infernal",
 				"name": "Hellforge Infernal",
 				"region": 1,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 485,
 				"atk": 32,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "death_burst",
 					"value": 0.8,
 					"name": "Forge Blast",
 					"desc": "When it falls, deals 80% of its ATK to adjacent enemies."
 				},
-				"skill_id": "sun_judgment",
-				"active_name": "Hellforge Blast",
-				"active_value": 1.3,
-				"active_desc": "Manual, once: deals 130% ATK to all enemies.",
-				"lore": "A demon of slag that detonates when it dies."
+				"skill_id": "hellforge_detonation",
+				"active_name": "Hellforge Detonation",
+				"active_value": 1.1,
+				"active_desc": "Manual, once: deals 110% ATK to all enemies, enemies within 2 cells take 100% ATK, and burns all enemies for 15% ATK every 4 ticks for 8 ticks.",
+				"lore": "A demon of slag that detonates when it dies.",
+				"plus": {
+					"type": "crit",
+					"value": 0.6,
+					"name": "Forge Hammer",
+					"desc": "Every 3rd attack deals +60% damage."
+				}
 			},
 			{
 				"id": "pit_fiend",
 				"name": "Bloodfang Pit Fiend",
 				"region": 2,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 425,
 				"atk": 33,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "frenzy",
 					"value": 0.08,
 					"name": "Blood Frenzy",
 					"desc": "Gains +8% ATK for each enemy defeated (max 5 times)."
 				},
-				"skill_id": "soul_drain",
-				"active_name": "Bloodfang Feast",
-				"active_value": 2.5,
-				"active_desc": "Manual, once: hits the toughest enemy for 250% ATK and heals the same amount.",
-				"lore": "Every kill in the pits makes it hit harder."
+				"skill_id": "pit_fiend_rend",
+				"active_name": "Pit Fiend Rend",
+				"active_value": 2.8,
+				"active_desc": "Manual, once: hits the toughest enemy for 280% ATK and heals 60% of the damage and enemies take 15% more damage for 10 ticks.",
+				"lore": "Every kill in the pits makes it hit harder.",
+				"plus": {
+					"type": "weaken",
+					"value": 0.15,
+					"name": "Fiend's Mark",
+					"desc": "Attacks mark the target: it takes 15% more damage for 8 ticks."
+				}
 			},
 			{
 				"id": "bastion_warlord",
 				"name": "Warborn Ogre Warlord",
 				"region": 3,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 480,
 				"atk": 31,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "opener",
 					"value": 0.5,
 					"name": "Warcry Charge",
 					"desc": "The first attack deals +50% damage."
 				},
-				"skill_id": "rift_strike",
-				"active_name": "Warlord Charge",
-				"active_value": 2.8,
-				"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 280% ATK.",
-				"lore": "Opens every fight with a crushing blow."
+				"skill_id": "warlord_charge",
+				"active_name": "Warlord's Charge",
+				"active_value": 2.6,
+				"active_desc": "Manual, once: teleports to the weakest enemy and hits it for 260% ATK, gains +30% ATK for 12 ticks, and gains a shield worth 20% of max HP.",
+				"lore": "Opens every fight with a crushing blow.",
+				"plus": {
+					"type": "shatter",
+					"value": 0.4,
+					"name": "Siege Breaker",
+					"desc": "Deals 40% more damage to shielded targets."
+				}
 			}
 		],
 		"thalassia": [
@@ -440,81 +560,105 @@
 				"hp": 430,
 				"atk": 29,
 				"range": 2,
-				"move": 1,
+				"move": 4,
 				"buff": {
 					"type": "chill",
 					"value": 4,
 					"name": "Tidal Chill",
 					"desc": "Attacks slow the target for 4 ticks."
 				},
-				"skill_id": "frost_veil",
-				"active_name": "Tempest Tide",
-				"active_value": 10,
-				"active_desc": "Manual, once: slows all enemies for 10 ticks.",
-				"lore": "Its wake drags ships and warriors to a crawl."
+				"skill_id": "leviathan_maelstrom",
+				"active_name": "Leviathan Maelstrom",
+				"active_value": 12,
+				"active_desc": "Manual, once: slows enemies within 5 cells for 12 ticks, enemies within 3 cells take 140% ATK, and takes 50% less damage for 8 ticks.",
+				"lore": "Its wake drags ships and warriors to a crawl.",
+				"plus": {
+					"type": "rally_cry",
+					"value": 0.08,
+					"name": "Leviathan's Roar",
+					"desc": "On entering the arena, all allies gain +8% ATK for 12 ticks."
+				}
 			},
 			{
 				"id": "atoll_hydra",
 				"name": "Coral Atoll Hydra",
 				"region": 1,
-				"chess": "bishop",
+				"chess": "queen",
 				"hp": 375,
 				"atk": 29,
-				"range": 3,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "splash",
 					"value": 0.3,
 					"name": "Many Heads",
 					"desc": "Attacks also deal 30% damage to enemies adjacent to the target."
 				},
-				"skill_id": "starfall_decree",
-				"active_name": "Hydra Spray",
-				"active_value": 2.5,
-				"active_desc": "Manual, once: hits 3 random enemies for 250% ATK.",
-				"lore": "Several heads strike at once."
+				"skill_id": "hydra_heads",
+				"active_name": "Hydra Heads",
+				"active_value": 1.3,
+				"active_desc": "Manual, once: hits 5 random enemies for 130% ATK and heals 15% of its max HP.",
+				"lore": "Several heads strike at once.",
+				"plus": {
+					"type": "chain",
+					"value": 0.3,
+					"name": "Hydra Lash",
+					"desc": "Attacks arc to the nearest other enemy within 2 cells for 30% damage."
+				}
 			},
 			{
 				"id": "abyssal_kraken",
 				"name": "Abyssal Kraken",
 				"region": 2,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 430,
 				"atk": 27,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "evade",
 					"value": 4,
 					"name": "Slippery Hide",
 					"desc": "Every 4th hit taken is avoided."
 				},
-				"skill_id": "chrono_stasis",
-				"active_name": "Abyssal Grasp",
-				"active_value": 2,
-				"active_desc": "Manual, once: stuns all enemies for 2 ticks.",
-				"lore": "Slips away from every fourth blow."
+				"skill_id": "kraken_grasp",
+				"active_name": "Kraken Grasp",
+				"active_value": 4,
+				"active_desc": "Manual, once: stuns the 2 highest-ATK enemies for 4 ticks and hits the toughest enemy for 160% ATK and heals 50% of the damage.",
+				"lore": "Slips away from every fourth blow.",
+				"plus": {
+					"type": "quickkill",
+					"value": 1,
+					"name": "Tentacle Frenzy",
+					"desc": "After defeating an enemy, attacks again at once."
+				}
 			},
 			{
 				"id": "cove_ghostcaptain",
 				"name": "Corsair Cove Ghostcaptain",
 				"region": 3,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 395,
 				"atk": 30,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "lifesteal",
 					"value": 0.15,
 					"name": "Plundered Vigor",
 					"desc": "Heals itself for 15% of the damage dealt."
 				},
-				"skill_id": "rift_strike",
-				"active_name": "Ghost Boarding",
-				"active_value": 2.8,
-				"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 280% ATK.",
-				"lore": "A drowned captain who steals the life of those he cuts."
+				"skill_id": "ghostcaptain_boarding",
+				"active_name": "Ghostcaptain's Boarding",
+				"active_value": 2.4,
+				"active_desc": "Manual, once: teleports to the weakest enemy and hits it for 240% ATK, drains 3 energy from the enemy side, and takes 50% less damage for 8 ticks.",
+				"lore": "A drowned captain who steals the life of those he cuts.",
+				"plus": {
+					"type": "undying",
+					"value": 0.25,
+					"name": "Ghost Ship",
+					"desc": "Survives one lethal hit and returns with 25% max HP."
+				}
 			}
 		],
 		"eclipsia": [
@@ -526,81 +670,105 @@
 				"hp": 410,
 				"atk": 30,
 				"range": 2,
-				"move": 1,
+				"move": 4,
 				"buff": {
 					"type": "second_life",
 					"value": 0.35,
 					"name": "Rewound Moment",
 					"desc": "The first time it falls, it returns with 35% HP."
 				},
-				"skill_id": "chrono_stasis",
-				"active_name": "Dial Freeze",
-				"active_value": 3,
-				"active_desc": "Manual, once: stuns all enemies for 3 ticks.",
-				"lore": "Rewinds its own death once."
+				"skill_id": "chronowyrm_rewind",
+				"active_name": "Chronowyrm Rewind",
+				"active_value": 0.12,
+				"active_desc": "Manual, once: heals every ally for 12% of its max HP, cleanses allies of stun, slow and burn, and stuns enemies within 3 cells for 3 ticks.",
+				"lore": "Rewinds its own death once.",
+				"plus": {
+					"type": "siphon",
+					"value": 1,
+					"name": "Time Siphon",
+					"desc": "Every 3rd attack restores 1 energy to its side."
+				}
 			},
 			{
 				"id": "paradox_stalker",
 				"name": "Paradox Echo Stalker",
 				"region": 1,
-				"chess": "knight",
+				"chess": "queen",
 				"hp": 385,
 				"atk": 31,
-				"range": 1,
-				"move": 2,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "evade",
 					"value": 3,
 					"name": "Echo Step",
 					"desc": "Every 3th hit taken is avoided."
 				},
-				"skill_id": "rift_strike",
-				"active_name": "Echo Ambush",
-				"active_value": 3.0,
-				"active_desc": "Manual, once: teleports next to the weakest enemy and hits for 300% ATK.",
-				"lore": "Half a second ahead of every blow."
+				"skill_id": "echo_stalk",
+				"active_name": "Echo Stalk",
+				"active_value": 2.2,
+				"active_desc": "Manual, once: teleports to the weakest enemy and hits it for 220% ATK, enemies below 35% HP take 200% ATK, and grants 1 energy.",
+				"lore": "Half a second ahead of every blow.",
+				"plus": {
+					"type": "momentum",
+					"value": 0.035,
+					"name": "Echo Momentum",
+					"desc": "Each attack adds +3.5% ATK (up to 8 times)."
+				}
 			},
 			{
 				"id": "hour_sentinel",
 				"name": "Eternal Hour Sentinel",
 				"region": 2,
-				"chess": "rook",
+				"chess": "queen",
 				"hp": 460,
 				"atk": 28,
-				"range": 1,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "ward",
 					"value": 0.3,
 					"name": "Frozen Time Ward",
 					"desc": "Starts with a shield worth 30% of max HP."
 				},
-				"skill_id": "eclipse_veil",
-				"active_name": "Hourglass Shroud",
-				"active_value": 0.2,
-				"active_desc": "Manual, once: takes 50% less damage for 12 ticks and heals 20% HP.",
-				"lore": "Shielded by a held breath of time."
+				"skill_id": "hour_judgment",
+				"active_name": "Hour Judgment",
+				"active_value": 2,
+				"active_desc": "Manual, once: stuns all enemies for 2 ticks, every ally gains a shield worth 12% of its max HP, and takes 50% less damage for 8 ticks.",
+				"lore": "Shielded by a held breath of time.",
+				"plus": {
+					"type": "weaken",
+					"value": 0.1,
+					"name": "Hourglass Mark",
+					"desc": "Attacks mark the target: it takes 10% more damage for 8 ticks."
+				}
 			},
 			{
 				"id": "rim_voidmaw",
 				"name": "Oblivion Rim Voidmaw",
 				"region": 3,
-				"chess": "bishop",
+				"chess": "queen",
 				"hp": 420,
 				"atk": 34,
-				"range": 3,
-				"move": 1,
+				"range": 2,
+				"move": 4,
 				"buff": {
 					"type": "execute",
 					"value": 0.35,
 					"name": "Unmaking",
 					"desc": "Deals +35% damage to enemies below 30% HP."
 				},
-				"skill_id": "soul_drain",
+				"skill_id": "voidmaw_devour",
 				"active_name": "Voidmaw Devour",
-				"active_value": 2.5,
-				"active_desc": "Manual, once: hits the toughest enemy for 250% ATK and heals the same amount.",
-				"lore": "Erases whatever is already fading."
+				"active_value": 3.0,
+				"active_desc": "Manual, once: enemies below 45% HP take 300% ATK, heals 25% of its max HP, and drains 2 energy from the enemy side.",
+				"lore": "Erases whatever is already fading.",
+				"plus": {
+					"type": "vengeance",
+					"value": 0.25,
+					"name": "Voidmaw Hunger",
+					"desc": "When an ally falls, gains +25% ATK for 8 ticks."
+				}
 			}
 		]
 	}

@@ -57,8 +57,9 @@ func _test_allied_land() -> void:
 	c.current = 0
 	c.players[0].position = t.index
 	var g := c.players[0].gold
+	var g2 := c.players[2].gold
 	c._resolve_landing(c.players[0])
-	check(c.pending.is_empty() and c.players[0].gold == g and c.players[2].gold == g, "landing on an ally's land: no encounter, no rent")
+	check(c.pending.is_empty() and c.players[0].gold == g and c.players[2].gold == g2, "landing on an ally's land: no encounter, no rent")
 	t.owner_id = 1
 	c.pending = {}
 	c._resolve_landing(c.players[0])

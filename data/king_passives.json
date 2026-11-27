@@ -3,168 +3,224 @@
 		"name": "Radiant Command",
 		"type": "team_atk",
 		"value": 0.05,
-		"desc": "All your units gain +5% ATK."
+		"desc": "All your units gain +5% ATK; the King enters with +8% ATK.",
+		"type2": "king_atk",
+		"value2": 0.08
 	},
 	"champion_nocthyr": {
 		"name": "Shadow Pact",
 		"type": "team_armor",
 		"value": 0.05,
-		"desc": "All your units take 5% less damage."
+		"desc": "All your units take 5% less damage; the King enters with +15% ATK.",
+		"type2": "king_atk",
+		"value2": 0.15
 	},
 	"champion_valdoria": {
 		"name": "Iron Discipline",
 		"type": "team_hp",
 		"value": 0.08,
-		"desc": "All your units gain +8% max HP."
+		"desc": "All your units gain +8% max HP; the King enters with +12% max HP.",
+		"type2": "king_hp",
+		"value2": 0.12
 	},
 	"champion_elarion": {
 		"name": "Astral Ward",
 		"type": "team_shield",
 		"value": 0.08,
-		"desc": "All your units start with a shield worth 8% of max HP."
+		"desc": "All your units start with a shield worth 8% of max HP; all units gain +3% ATK.",
+		"type2": "team_atk",
+		"value2": 0.03
 	},
 	"champion_astralis": {
 		"name": "Celestial Focus",
 		"type": "team_atk",
 		"value": 0.06,
-		"desc": "All your units gain +6% ATK."
+		"desc": "All your units gain +6% ATK; the King enters with +15% max HP.",
+		"type2": "king_hp",
+		"value2": 0.15
 	},
 	"champion_ignivar": {
 		"name": "Ember Aura",
 		"type": "team_atk",
 		"value": 0.07,
-		"desc": "All your units gain +7% ATK."
+		"desc": "All your units gain +7% ATK; all units gain +4% max HP.",
+		"type2": "team_hp",
+		"value2": 0.04
 	},
 	"champion_cryndel": {
 		"name": "Frozen Resolve",
 		"type": "team_armor",
 		"value": 0.06,
-		"desc": "All your units take 6% less damage."
+		"desc": "All your units take 6% less damage; all units start with a shield of 5% max HP.",
+		"type2": "team_shield",
+		"value2": 0.05
 	},
 	"champion_umbrael": {
 		"name": "Hollow Vigil",
 		"type": "king_hp",
 		"value": 0.3,
-		"desc": "The King enters with +30% max HP."
+		"desc": "The King enters with +30% max HP; all units take 3% less damage.",
+		"type2": "team_armor",
+		"value2": 0.03
 	},
 	"champion_ferrum": {
 		"name": "Reinforced Hulls",
 		"type": "team_hp",
 		"value": 0.1,
-		"desc": "All your units gain +10% max HP."
+		"desc": "All your units gain +10% max HP; the King enters with +10% ATK.",
+		"type2": "king_atk",
+		"value2": 0.1
 	},
 	"champion_voltrix": {
 		"name": "Live Current",
 		"type": "team_atk",
 		"value": 0.08,
-		"desc": "All your units gain +8% ATK."
+		"desc": "All your units gain +8% ATK; all units start with a shield of 3% max HP.",
+		"type2": "team_shield",
+		"value2": 0.03
 	},
 	"champion_chronex": {
 		"name": "Temporal Barrier",
 		"type": "team_shield",
 		"value": 0.1,
-		"desc": "All your units start with a shield worth 10% of max HP."
+		"desc": "All your units start with a shield worth 10% of max HP; all units gain +4% max HP.",
+		"type2": "team_hp",
+		"value2": 0.04
 	},
 	"champion_nexaris": {
 		"name": "Arbiter's Edict",
 		"type": "team_armor",
 		"value": 0.05,
-		"desc": "All your units take 5% less damage."
+		"desc": "All your units take 5% less damage; all units gain +4% ATK.",
+		"type2": "team_atk",
+		"value2": 0.04
 	},
 	"champion_verdantia": {
 		"name": "Living Roots",
 		"type": "team_hp",
 		"value": 0.08,
-		"desc": "All your units gain +8% max HP."
+		"desc": "All your units gain +8% max HP; the King enters with +15% max HP.",
+		"type2": "king_hp",
+		"value2": 0.15
 	},
 	"champion_besthara": {
 		"name": "Alpha's Call",
 		"type": "team_atk",
 		"value": 0.06,
-		"desc": "All your units gain +6% ATK."
+		"desc": "All your units gain +6% ATK; all units take 3% less damage.",
+		"type2": "team_armor",
+		"value2": 0.03
 	},
 	"champion_floralis": {
 		"name": "Petal Ward",
 		"type": "team_shield",
 		"value": 0.08,
-		"desc": "All your units start with a shield worth 8% of max HP."
+		"desc": "All your units start with a shield worth 8% of max HP; all units gain +5% max HP.",
+		"type2": "team_hp",
+		"value2": 0.05
 	},
 	"champion_terragorn": {
 		"name": "Bedrock Bulwark",
 		"type": "team_hp",
 		"value": 0.12,
-		"desc": "All your units gain +12% max HP."
+		"desc": "All your units gain +12% max HP; all units take 2% less damage.",
+		"type2": "team_armor",
+		"value2": 0.02
 	},
 	"champion_drakhan": {
 		"name": "Dragon's Wrath",
 		"type": "king_atk",
 		"value": 0.4,
-		"desc": "The King enters with +40% ATK."
+		"desc": "The King enters with +40% ATK; all units gain +5% max HP.",
+		"type2": "team_hp",
+		"value2": 0.05
 	},
 	"champion_inferna": {
 		"name": "Hellbound Pact",
 		"type": "team_atk",
 		"value": 0.08,
-		"desc": "All your units gain +8% ATK."
+		"desc": "All your units gain +8% ATK; the King enters with +10% ATK.",
+		"type2": "king_atk",
+		"value2": 0.1
 	},
 	"champion_bloodfang": {
 		"name": "Bloodlust",
 		"type": "king_atk",
 		"value": 0.35,
-		"desc": "The King enters with +35% ATK."
+		"desc": "The King enters with +35% ATK; all units gain +3% ATK.",
+		"type2": "team_atk",
+		"value2": 0.03
 	},
 	"champion_warborn": {
 		"name": "Warband Might",
 		"type": "team_hp",
 		"value": 0.1,
-		"desc": "All your units gain +10% max HP."
+		"desc": "All your units gain +10% max HP; all units gain +3% ATK.",
+		"type2": "team_atk",
+		"value2": 0.03
 	},
 	"champion_abyssal": {
 		"name": "Deep Pressure",
 		"type": "team_armor",
 		"value": 0.06,
-		"desc": "All your units take 6% less damage."
+		"desc": "All your units take 6% less damage; all units gain +4% max HP.",
+		"type2": "team_hp",
+		"value2": 0.04
 	},
 	"champion_pelagia": {
 		"name": "Tidal Embrace",
 		"type": "team_shield",
 		"value": 0.1,
-		"desc": "All your units start with a shield worth 10% of max HP."
+		"desc": "All your units start with a shield worth 10% of max HP; all units take 3% less damage.",
+		"type2": "team_armor",
+		"value2": 0.03
 	},
 	"champion_tempestra": {
 		"name": "Storm Surge",
 		"type": "team_atk",
 		"value": 0.07,
-		"desc": "All your units gain +7% ATK."
+		"desc": "All your units gain +7% ATK; all units start with a shield of 4% max HP.",
+		"type2": "team_shield",
+		"value2": 0.04
 	},
 	"champion_corsaria": {
 		"name": "Captain's Grit",
 		"type": "king_hp",
 		"value": 0.25,
-		"desc": "The King enters with +25% max HP."
+		"desc": "The King enters with +25% max HP; the King enters with +10% ATK.",
+		"type2": "king_atk",
+		"value2": 0.1
 	},
 	"champion_solstice": {
 		"name": "Solar Vigor",
 		"type": "team_hp",
 		"value": 0.08,
-		"desc": "All your units gain +8% max HP."
+		"desc": "All your units gain +8% max HP; all units gain +3% ATK.",
+		"type2": "team_atk",
+		"value2": 0.03
 	},
 	"champion_paradox": {
 		"name": "Paradox Haze",
 		"type": "team_armor",
 		"value": 0.05,
-		"desc": "All your units take 5% less damage."
+		"desc": "All your units take 5% less damage; all units start with a shield of 4% max HP.",
+		"type2": "team_shield",
+		"value2": 0.04
 	},
 	"champion_eternis": {
 		"name": "Undying Will",
 		"type": "king_hp",
 		"value": 0.4,
-		"desc": "The King enters with +40% max HP."
+		"desc": "The King enters with +40% max HP; all units gain +4% max HP.",
+		"type2": "team_hp",
+		"value2": 0.04
 	},
 	"champion_oblivion": {
 		"name": "Void Hunger",
 		"type": "king_atk",
 		"value": 0.3,
-		"desc": "The King enters with +30% ATK."
+		"desc": "The King enters with +30% ATK; all units gain +4% ATK.",
+		"type2": "team_atk",
+		"value2": 0.04
 	}
 }

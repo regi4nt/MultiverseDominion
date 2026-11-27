@@ -17,6 +17,7 @@ static var tax_mult: float = 1.0          # Thalassia: Sea Trade
 static var shop_reroll_price: int = -1    # Thalassia: Sea Trade (-1 = balance.json)
 static var start_token: int = 0           # Eclipsia: Time Fold
 static var bonus_rolls_extra: int = 0     # Eclipsia: Time Fold
+static var corner_bonus: Dictionary = {}  # data/continents.json -> "corner_bonus": {"sanctuary"|"rift"|"crossroads": {text, effect keys}} (see MatchController._apply_corner_bonus)
 
 
 static func reset() -> void:
@@ -33,6 +34,7 @@ static func reset() -> void:
 	shop_reroll_price = -1
 	start_token = 0
 	bonus_rolls_extra = 0
+	corner_bonus = {}
 
 
 static func apply(continent: Dictionary) -> void:
@@ -51,6 +53,12 @@ static func apply(continent: Dictionary) -> void:
 	shop_reroll_price = int(m.get("shop_reroll_price", -1))
 	start_token = int(m.get("start_token", 0))
 	bonus_rolls_extra = int(m.get("bonus_rolls_extra", 0))
+	corner_bonus = (continent.get("corner_bonus", {}) as Dictionary).duplicate(true)
+
+
+## Continent bonus of a corner ("sanctuary" / "rift" / "crossroads"); {} when the continent has none.
+static func corner_extra(kind: String) -> Dictionary:
+	return corner_bonus.get(kind, {})
 
 
 ## Price of a Reroll Token in the Territory Shop.

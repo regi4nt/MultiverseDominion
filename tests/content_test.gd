@@ -3,8 +3,7 @@ extends Node
 ## every Support effect. Run: godot --headless --path . res://tests/content_test.tscn
 
 var failures := 0
-const PASSIVES := ["royal_treasury", "shadow_ledger", "landlord", "fortune_weave", "toll_keeper", "treasure_hunter", "spoils", "quartermaster", "mender", "vanguard"]
-const ACTIVES := ["sun_judgment", "starfall_decree", "eclipse_veil", "banner_of_iron", "inferno_burst", "chrono_stasis", "soul_drain", "frost_veil", "overcharge", "rift_strike", "life_surge"]
+const PASSIVES := ["royal_treasury", "shadow_ledger", "landlord", "fortune_weave", "toll_keeper", "treasure_hunter", "spoils", "quartermaster", "mender", "vanguard", "interest", "war_chest", "rent_cut", "tax_cut", "upgrader"]
 
 
 func check(cond: bool, msg: String) -> void:
@@ -35,7 +34,7 @@ func _test_data() -> void:
 		for f in c["factions"]:
 			factions += 1
 			var ch := GameData.get_champion(String(f["champion"]))
-			all_ok = all_ok and not ch.is_empty() and PASSIVES.has(ch["passive"]) and ACTIVES.has(ch["skill_id"]) and String(ch["faction"]) == String(f["id"])
+			all_ok = all_ok and not ch.is_empty() and PASSIVES.has(ch["passive"]) and PASSIVES.has(String(ch.get("passive2", ""))) and GameData.skills.has(String(ch["skill_id"])) and String(ch["faction"]) == String(f["id"])
 	check(factions == 28, "28 factions")
 	check(all_ok, "every continent is playable with 4 regions, 10 prefixes and 4 factions with valid champions")
 	check(GameData.champions.size() == 28, "28 distinct champions")
@@ -48,7 +47,7 @@ func _test_data() -> void:
 	for k in GameData.champions:
 		used_p[GameData.champions[k]["passive"]] = true
 		used_a[GameData.champions[k]["skill_id"]] = true
-	check(used_p.size() == PASSIVES.size() and used_a.size() == ACTIVES.size(), "all %d passives and %d actives are used" % [PASSIVES.size(), ACTIVES.size()])
+	check(used_p.size() == PASSIVES.size() - 5 and used_a.size() == 28, "10 base Territory skills are used as primary and all 28 actives are different (%d / %d)" % [used_p.size(), used_a.size()])
 	check(CardDatabase.validate_database().is_empty(), "card database valid")
 
 
@@ -181,8 +180,8 @@ func _test_champions() -> void:
 	e = BattleEngine.new()
 	e.setup({"seed": 3, "ai_supports": [false, false], "free_supports": true, "sides": [
 		{"units": [], "champion": "champion_chronex", "supports": []},
-		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(2, 2)}], "champion": "champion_solvaris", "supports": []}]})
-	check(e.units_of(1)[0].stun_until > 0, "Chrono Stasis stuns enemies on entry")
+		{"units": [{"card_id": "pawn_royal_guard", "stars": 1, "cell": Vector2i(3, 5)}], "champion": "champion_solvaris", "supports": []}]})
+	check(e.units_of(1)[0].stun_until > 0, "Stasis Field stuns the enemies near the King on entry")
 
 
 func _make_support_engine(hand: Array) -> BattleEngine:

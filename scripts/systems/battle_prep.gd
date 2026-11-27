@@ -264,7 +264,7 @@ func deploy(u: UnitInstance, cell: Vector2i) -> String:
 		if o != u and o.cell == cell:
 			return "Cell is occupied."
 	if not Terrain.can_stand(terrain, int(CardDatabase.get_unit(u.card_id)["range"]), cell):
-		return "Highland: ranged units only (Range 2+)."
+		return "Highland: ranged roles only (Marksman, Mage, Support, Controller)."
 	if u.cell.x < 0:
 		if used_capacity() + CardDatabase.capacity_cost(u.chess()) > capacity():
 			return "Not enough capacity (%d/%d)." % [used_capacity(), capacity()]
@@ -283,10 +283,10 @@ func swap_units(a: UnitInstance, b: UnitInstance) -> String:
 		b = t
 	var ca := a.cell
 	if not Terrain.can_stand(terrain, int(CardDatabase.get_unit(b.card_id)["range"]), ca):
-		return "Highland: ranged units only (Range 2+)."
+		return "Highland: ranged roles only (Marksman, Mage, Support, Controller)."
 	if b.cell.x >= 0:
 		if not Terrain.can_stand(terrain, int(CardDatabase.get_unit(a.card_id)["range"]), b.cell):
-			return "Highland: ranged units only (Range 2+)."
+			return "Highland: ranged roles only (Marksman, Mage, Support, Controller)."
 		a.cell = b.cell
 		b.cell = ca
 		return ""

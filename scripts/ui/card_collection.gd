@@ -277,9 +277,9 @@ func _describe(id: String) -> String:
 	for st in range(1, 4):
 		var stt := CardDatabase.unit_stats(id, st)
 		lines += "%d-star (%d cards): HP %d  ATK %d\n" % [st, copies[st - 1], stt["hp"], stt["atk"]]
-	return "[color=#d4af37][b]%s[/b][/color]\n%s %s - %s - %s\nCapacity cost: %d\nRange %d   Movement %d\n\n%s\n\n[b]%s:[/b] %s%s\n\nOwned copies: %d / %d" % [
+	return "[color=#d4af37][b]%s[/b][/color]\n%s %s - %s - %s\nCapacity cost: %d\n%s\n\n%s\n\n[b]%s:[/b] %s%s\n\nOwned copies: %d / %d" % [
 		u["name"], "All factions" if CardDatabase.is_shared(u) else String(u["faction"]).capitalize(), String(u["chess"]).capitalize(), u["role"], String(u["rarity"]).capitalize(),
-		CardDatabase.capacity_cost(u["chess"]), u["range"], u["move"], lines, u["skill"]["name"], u["skill"]["desc"], _buff_text(id), owned if _faction_open(u) else 0, int(GameData.b("unit_copies"))] + lock_note
+		CardDatabase.capacity_cost(u["chess"]), ChessMove.describe(String(u["chess"])), lines, u["skill"]["name"], u["skill"]["desc"], _buff_text(id), owned if _faction_open(u) else 0, int(GameData.b("unit_copies"))] + lock_note
 
 
 
@@ -307,7 +307,7 @@ func _describe_king(id: String) -> String:
 	var out := "[color=#d4af37][b]%s[/b][/color]\n%s - King - %s   [b]B%d[/b] (%s)\nContinent: %s\n" % [
 		ch["name"], String(fac.get("name", ch.get("faction", ""))), String(ch.get("rarity", "legendary")).capitalize(), b, owned_txt, String(ch.get("continent", "")).capitalize()]
 	# Stats and levels
-	out += "\n[b]Stats[/b]\nHP %d   ATK %d   Range 1   Movement 2\nCapacity cost: %d\n" % [hp, atk, CardDatabase.capacity_cost("king")]
+	out += "\n[b]Stats[/b]\nHP %d   ATK %d   %s\nCapacity cost: %d\n" % [hp, atk, ChessMove.tag("king"), CardDatabase.capacity_cost("king")]
 	for st in range(1, CommanderSystem.max_star() + 1):
 		out += "Lv %d: HP %d  ATK %d%s\n" % [st, int(round(hp * CommanderSystem.hp_mult(st))), int(round(atk * CommanderSystem.atk_mult(st))), "" if st > 1 else "  (start of every match)"]
 	var missions: Array = CommanderSystem.missions_for(id)
@@ -1276,8 +1276,8 @@ func _info_roles() -> String:
 	var out := _info_head("The 7 roles") + "\nEvery faction deals these 7 roles to its 7 pieces (2 Rook, 2 Knight, 2 Bishop, Queen) in its own arrangement. A piece's role decides its HP, ATK, range and skill; the chess piece decides its movement and Capacity cost. The values below are the base numbers; each faction varies them slightly.\n\n"
 	for b in CardDatabase.SLOT_BASE:
 		var role := String(b["role"])
-		out += "%s  [color=#9aa0b5](base piece: %s)[/color]\nHP %d   ATK %d   Range %d   Move %d\n%s\n%s\n\n" % [
-			_info_head(role), String(b["chess"]).capitalize(), int(b["hp"]), int(b["atk"]), int(b["range"]), int(b["move"]),
+		out += "%s  [color=#9aa0b5](base piece: %s)[/color]\nHP %d   ATK %d   %s\n%s\n%s\n\n" % [
+			_info_head(role), String(b["chess"]).capitalize(), int(b["hp"]), int(b["atk"]), ChessMove.tag(String(b["chess"])),
 			String(MECHANIC_INFO.get(String(b["mechanic"]), "")), String(ROLE_TARGETING.get(role, "Attacks the nearest enemy."))]
 	out += "[color=#9aa0b5]Pawns have their own small skills (for example Moon Chill slows its target). Each unit card also carries one continent Buff, shown on its detail card.[/color]"
 	return out

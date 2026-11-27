@@ -292,13 +292,12 @@ func _spawn_unit(side: int, card_id: String, stars: int, cell: Vector2i, bonus: 
 	u.role = card["role"]
 	u.faction = CardDatabase.effective_faction(card, _side_faction(side))
 	u.stars = stars
-	var sp: Dictionary = side_passive[side]
-	var sp_hp := float(sp.get("value", 0.0)) if sp.get("type", "") == "team_hp" else 0.0
-	var sp_atk := float(sp.get("value", 0.0)) if sp.get("type", "") == "team_atk" else 0.0
+	var sp_hp := _sp(side, "team_hp")
+	var sp_atk := _sp(side, "team_atk")
 	u.max_hp = int(round(float(st["hp"]) * (1.0 + bonus) * (1.0 + role_hp) * (1.0 + sp_hp)))
 	u.hp = u.max_hp
-	if sp.get("type", "") == "team_shield":
-		u.shield += int(round(u.max_hp * float(sp["value"])))
+	if _sp(side, "team_shield") > 0.0:
+		u.shield += int(round(u.max_hp * _sp(side, "team_shield")))
 	u.base_atk = int(round(float(st["atk"]) * (1.0 + bonus) * (1.0 + role_atk) * (1.0 + sp_atk) * WorldMods.atk_mult))
 	u.atk_range = int(card["range"]) + int(mods.get("range", 0))
 	u.move = int(card["move"]) + int(mods.get("move", 0))
@@ -348,12 +347,27 @@ func _spawn_monster(side: int, monster_id: String, cell: Vector2i, star: int = 1
 	u.extra_value = float(bf.get("value", 0.0))
 	u.active_id = String(m.get("skill_id", ""))
 	u.active_value = float(m.get("active_value", 0.0))
+	var plus: Dictionary = m.get("plus", {})  # the "King+" trait: a second buff on top of the monster's own
+	if not plus.is_empty():
+		u.fx[String(plus.get("type", ""))] = float(plus.get("value", 0.0))
 	_init_buff(u)
 	if u.buff_next_tick != 0:
 		u.buff_next_tick = tick + BUFF_INTERVAL
 	units.append(u)
 	grid[cell] = u
+	_rally_cry(u)
 	return u
+
+
+## Strength of a King battle passive of `side` (data/king_passives.json: `type` / `value`, plus an optional second pair `type2` / `value2`); 0 = none.
+func _sp(side: int, type: String) -> float:
+	var kp: Dictionary = side_passive[side]
+	var v := 0.0
+	if String(kp.get("type", "")) == type:
+		v += float(kp.get("value", 0.0))
+	if String(kp.get("type2", "")) == type:
+		v += float(kp.get("value2", 0.0))
+	return v
 
 
 ## A numeric skill parameter of a unit (data: skill.params), falling back to the base value.
@@ -442,6 +456,13 @@ func _blocked(c: Vector2i) -> bool:
 	return grid.has(c) or walls.has(c)
 
 
+## Real-chess attack: can unit `u`, standing on `from`, hit the cell `to`? Slides are stopped by units and walls (its own start cell counts as free).
+func _can_hit(u: BattleUnit, from: Vector2i, to: Vector2i) -> bool:
+	var start := u.cell
+	var blk := func(c: Vector2i) -> bool: return c != start and (grid.has(c) or walls.has(c))
+	return ChessMove.can_capture(u.chess, from, to, u.side, blk)
+
+
 func _in_bounds(c: Vector2i) -> bool:
 	return c.x >= 0 and c.y >= 0 and c.x < COLS and c.y < ROWS
 
@@ -458,6 +479,8 @@ func atk_now(u: BattleUnit) -> int:
 		m *= 1.0 + _x(u, "rage")
 	if _x(u, "frenzy") > 0.0:
 		m *= 1.0 + _x(u, "frenzy") * mini(u.kills, 5)
+	if _x(u, "momentum") > 0.0:
+		m *= 1.0 + _x(u, "momentum") * mini(u.attacks_made, 8)  # Momentum: every attack adds ATK (max 8 stacks)
 	var aura := 0.0
 	for a in units:
 		if a != u and a.side == u.side and a.alive and _dist(a.cell, u.cell) <= 1 and _x(a, "aura_atk") > 0.0:
@@ -548,10 +571,11 @@ func _act(u: BattleUnit) -> void:
 	var target := _pick_target(u)
 	if target == null:
 		return
-	if _dist(u.cell, target.cell) <= u.atk_range:
+	if _can_hit(u, u.cell, target.cell):
 		if tick >= u.next_attack_tick:
 			_attack(u, target)
-			u.next_attack_tick = tick + _attack_interval(u)
+			u.next_attack_tick = tick if u.refresh_attack else tick + _attack_interval(u)
+			u.refresh_attack = false
 	else:
 		_move_toward(u, target)
 
@@ -573,7 +597,7 @@ func _pick_target(u: BattleUnit) -> BattleUnit:
 			"Assassin":
 				key = float(e.hp) * 10.0 + d  # weakest first
 			"Marksman", "Mage":
-				if d <= float(u.atk_range):
+				if _can_hit(u, u.cell, e.cell):
 					key = float(e.hp) + d  # weakest enemy already in range
 				else:
 					key = 100000.0 + d * 1000.0 + float(e.uid)
@@ -596,11 +620,11 @@ func _move_toward(u: BattleUnit, target: BattleUnit) -> void:
 	while qi < queue.size() and goal.x < 0:
 		var c: Vector2i = queue[qi]
 		qi += 1
-		for n in ChessMove.move_cells(u.chess, c, u.move, u.side, blocked):
+		for n in ChessMove.move_cells(u.chess, c, ChessMove.steps_for(u.chess, u.move, u.moved or c != start), u.side, blocked):
 			if first.has(n):
 				continue
 			first[n] = n if c == start else first[c]
-			if _dist(n, target.cell) <= u.atk_range:
+			if _can_hit(u, n, target.cell):
 				goal = n
 				break
 			queue.append(n)
@@ -610,7 +634,7 @@ func _move_toward(u: BattleUnit, target: BattleUnit) -> void:
 	# No route (walled in): take the legal move that gets closest, if any.
 	var best := Vector2i(-1, -1)
 	var best_d := _dist(start, target.cell)
-	for n in ChessMove.move_cells(u.chess, start, u.move, u.side, blocked):
+	for n in ChessMove.move_cells(u.chess, start, ChessMove.steps_for(u.chess, u.move, u.moved), u.side, blocked):
 		if _dist(n, target.cell) < best_d:
 			best_d = _dist(n, target.cell)
 			best = n
@@ -620,6 +644,7 @@ func _move_toward(u: BattleUnit, target: BattleUnit) -> void:
 
 func _move_unit(u: BattleUnit, c: Vector2i) -> void:
 	grid.erase(u.cell)
+	u.moved = true
 	u.cell = c
 	grid[c] = u
 
@@ -634,6 +659,10 @@ func _attack(u: BattleUnit, t: BattleUnit) -> void:
 		u.strike_bonus = 0.0
 	if _x(u, "execute") > 0.0 and t.hp * 10 < t.max_hp * 3:
 		dmg *= 1.0 + _x(u, "execute")
+	if _x(u, "crit") > 0.0 and u.attacks_made % 3 == 0:
+		dmg *= 1.0 + _x(u, "crit")  # Crit: every 3rd attack hits harder
+	if _x(u, "shatter") > 0.0 and t.shield > 0:
+		dmg *= 1.0 + _x(u, "shatter")  # Shatter: bonus damage to shielded targets
 	match u.skill_id:
 		"radiant_strike":
 			if u.attacks_made % 3 == 0:
@@ -650,6 +679,10 @@ func _attack(u: BattleUnit, t: BattleUnit) -> void:
 	var dealt := _damage(t, amount)
 	if not t.alive:
 		u.kills += 1
+		if _x(u, "feast") > 0.0:
+			_heal(u, int(round(u.max_hp * _x(u, "feast"))))  # Feast: a kill heals
+		if _x(u, "quickkill") > 0.0:
+			u.refresh_attack = true  # Quick Kill: the next attack comes at once
 	events.append({"type": "attack", "from": u.cell, "to": tcell, "dmg": dealt})
 	if float(lifesteal[u.side]) > 0.0:
 		_heal(u, int(round(dealt * float(lifesteal[u.side]))))
@@ -675,6 +708,18 @@ func _attack(u: BattleUnit, t: BattleUnit) -> void:
 		var burning := t.burn_until > tick  # a stronger burn replaces a weaker one, never the other way round
 		t.burn_until = tick + 12
 		t.burn_amount = maxi(t.burn_amount if burning else 0, maxi(1, int(round(u.base_atk * _x(u, "burn")))))
+	if _x(u, "weaken") > 0.0 and t.alive:
+		t.mark_until = tick + 8  # Weaken: the target takes extra damage from everyone for a while
+		t.mark_mult = maxf(t.mark_mult if t.mark_until > tick else 0.0, _x(u, "weaken"))
+	if _x(u, "chain") > 0.0:
+		var arc: BattleUnit = null  # Chain: the hit arcs to the nearest other enemy within 2 cells
+		for e in units_of(1 - u.side):
+			if e != t and _dist(e.cell, tcell) <= 2 and (arc == null or _dist(e.cell, tcell) < _dist(arc.cell, tcell)):
+				arc = e
+		if arc != null:
+			_damage(arc, int(round(amount * _x(u, "chain"))))
+	if _x(u, "siphon") > 0.0 and u.attacks_made % 3 == 0:
+		energy[u.side] = mini(energy_max(), int(energy[u.side]) + int(_x(u, "siphon")))  # Siphon: every 3rd attack feeds the energy bar
 	if _x(u, "stun_proc") > 0.0 and t.alive and u.attacks_made % int(_x(u, "stun_proc")) == 0:
 		t.stun_until = maxi(t.stun_until, tick + 2)
 	if _x(t, "thorns") > 0.0 and t.alive and u.alive and dealt > 0 and not _reflecting:
@@ -711,12 +756,15 @@ func _damage(t: BattleUnit, amount: int) -> int:
 			guard = maxf(guard, _x(a, "guard"))
 	if guard > 0.0:
 		dmg *= 1.0 - minf(guard, float(ComboSystem.FX_CAP["guard"]))
-	var tp: Dictionary = side_passive[t.side]
-	if tp.get("type", "") == "team_armor":
-		dmg *= 1.0 - float(tp["value"])  # King passive of the target's side
+	if _sp(t.side, "team_armor") > 0.0:
+		dmg *= 1.0 - _sp(t.side, "team_armor")  # King passive of the target's side
+	if t.mark_until > tick:
+		dmg *= 1.0 + t.mark_mult  # Weaken / Mark
 	if t.reduce_until > tick:
 		dmg *= 0.5
 	var d := int(round(dmg))
+	if _x(t, "bastion") > 0.0:
+		d = mini(d, maxi(1, int(round(t.max_hp * _x(t, "bastion")))))  # Bastion: no single hit takes more than a share of max HP
 	if t.shield > 0:
 		var absorbed := mini(t.shield, d)
 		t.shield -= absorbed
@@ -738,6 +786,13 @@ func _kill(t: BattleUnit) -> void:
 		events.append({"type": "fx", "cells": [t.cell]})
 		_log("%s is revived by a Guardian Angel!" % t.display_name)
 		return
+	if _x(t, "undying") > 0.0 and not t.undying_used:
+		t.undying_used = true  # Undying: one lethal hit is survived at a share of max HP (Kings too)
+		t.hp = maxi(1, int(round(t.max_hp * _x(t, "undying"))))
+		t.shield = 0
+		events.append({"type": "fx", "cells": [t.cell]})
+		_log("%s refuses to fall (Undying)!" % t.display_name)
+		return
 	if _x(t, "second_life") > 0.0 and not t.second_life_used and not t.is_king:
 		t.second_life_used = true  # Queen of Eclipsia / second-life synergies: returns once at a share of max HP
 		t.hp = maxi(1, int(t.max_hp * _x(t, "second_life")))
@@ -752,6 +807,10 @@ func _kill(t: BattleUnit) -> void:
 	grid.erase(t.cell)
 	events.append({"type": "death", "cell": t.cell})
 	_log("%s (side %d) falls." % [t.display_name, t.side])
+	for a in units_of(t.side):  # Vengeance: the fall of an ally fires up the avengers
+		if a != t and _x(a, "vengeance") > 0.0:
+			a.buff_mult = maxf(a.buff_mult if a.buff_until > tick else 1.0, 1.0 + _x(a, "vengeance"))
+			a.buff_until = tick + 8
 	if _x(t, "last_rites") > 0.0:
 		for a in units_of(t.side):
 			if _dist(a.cell, t.cell) <= 1:
@@ -866,7 +925,7 @@ func king_threats(side: int) -> Array[BattleUnit]:
 	if k == null or not k.alive:
 		return out
 	for e in units_of(1 - side):
-		if _dist(e.cell, k.cell) <= e.atk_range:
+		if _can_hit(e, e.cell, k.cell):
 			out.append(e)
 	return out
 
@@ -915,9 +974,8 @@ func _enter_king(side: int) -> void:
 	u.chess = "king"
 	u.role = "Fighter"
 	u.faction = String(ch["faction"])
-	var kp: Dictionary = side_passive[side]
-	var kp_hp := float(kp.get("value", 0.0)) if kp.get("type", "") == "king_hp" else 0.0
-	var kp_atk := float(kp.get("value", 0.0)) if kp.get("type", "") == "king_atk" else 0.0
+	var kp_hp := _sp(side, "king_hp")
+	var kp_atk := _sp(side, "king_atk")
 	u.max_hp = int(round(float(ch["hp"]) * float(GameData.b("champion_hp_mult")) * (1.0 + kp_hp) * CommanderSystem.hp_mult(int(king_star[side]))))
 	u.hp = u.max_hp
 	u.base_atk = int(round(float(ch["atk"]) * (1.0 + kp_atk) * WorldMods.atk_mult * CommanderSystem.atk_mult(int(king_star[side]))))
@@ -937,6 +995,7 @@ func _enter_king(side: int) -> void:
 		u.buff_next_tick = tick + BUFF_INTERVAL
 	units.append(u)
 	grid[u.cell] = u
+	_rally_cry(u)
 	kings[side] = u
 	king_entered[side] = true
 	king_entry_tick[side] = tick
@@ -958,6 +1017,19 @@ func _enter_king(side: int) -> void:
 		_log("%s waits for the King skill (%s)." % [u.display_name, String(ch.get("active_name", "skill"))])
 	else:
 		_auto_king_skill(side)  # AI / auto sides cast it on entry, or as soon as they can pay for it
+
+
+## Rally Cry: a King / Monster with the buff inspires every ally when it enters the arena.
+func _rally_cry(u: BattleUnit) -> void:
+	var v := _x(u, "rally_cry")
+	if v <= 0.0:
+		return
+	for a in units_of(u.side):
+		if a != u:
+			a.buff_mult = maxf(a.buff_mult if a.buff_until > tick else 1.0, 1.0 + v)
+			a.buff_until = tick + 12
+	u.buff_mult = maxf(u.buff_mult if u.buff_until > tick else 1.0, 1.0 + v)
+	u.buff_until = tick + 12
 
 
 ## Early summon: a side with enough energy may call its King into the arena while regular units are still alive
@@ -1010,6 +1082,10 @@ func _cast_king_skill(side: int) -> void:
 ## The effect of an active skill (King skill or Monster skill): `u` is the caster, `skill_id` / `v` its mechanic and strength.
 func _apply_active_skill(u: BattleUnit, side: int, skill_id: String, v: float) -> void:
 	events.append({"type": "fx", "cells": [u.cell]})
+	var def: Dictionary = GameData.skills.get(skill_id, {})
+	if not def.is_empty():  # a composed skill (data/skills.json): a list of effect ops
+		_run_skill_fx(u, side, def.get("fx", []))
+		return
 	var foes := units_of(1 - side)
 	match skill_id:
 		"sun_judgment":  # damage to all enemies
@@ -1059,6 +1135,155 @@ func _apply_active_skill(u: BattleUnit, side: int, skill_id: String, v: float) -
 			_heal(u, int(round(u.max_hp * v)))
 			u.buff_mult = 1.25
 			u.buff_until = tick + 16
+
+
+## Effect ops that a composed skill (data/skills.json) is made of. Every King and every Monster has its own list, so no two skills are alike.
+const SKILL_OPS: Array[String] = [
+	"dmg_all", "dmg_rand", "dmg_near", "dmg_tough", "dmg_weak", "dmg_low", "dmg_col", "dmg_row", "dmg_top",
+	"stun_all", "stun_near", "stun_top", "slow_all", "slow_near", "burn_all", "mark_all", "drain_energy",
+	"shield_self", "shield_team", "heal_self", "heal_team", "heal_low", "reduce_self", "reduce_team",
+	"atk_self", "atk_team", "cleanse", "energy", "revive", "haste"]
+
+
+func _run_skill_fx(u: BattleUnit, side: int, fx: Array) -> void:
+	for op in fx:
+		var o: Dictionary = op
+		var foes := units_of(1 - side)  # re-read for every op: an earlier op may have killed somebody
+		var allies := units_of(side)
+		var m := float(o.get("m", 1.0))
+		var dmg := int(round(u.base_atk * m))
+		match String(o.get("op", "")):
+			"dmg_all":
+				for e in foes:
+					_damage(e, dmg)
+			"dmg_rand":
+				var pool := foes.duplicate()
+				for i in range(mini(int(o.get("n", 3)), pool.size())):
+					_damage(pool.pop_at(rng.randi() % pool.size()), dmg)
+			"dmg_near":
+				for e in foes:
+					if _dist(e.cell, u.cell) <= int(o.get("r", 3)):
+						_damage(e, dmg)
+			"dmg_tough":
+				var tough: BattleUnit = null
+				for e in foes:
+					if tough == null or e.hp > tough.hp:
+						tough = e
+				if tough != null:
+					var dealt := _damage(tough, dmg)
+					if float(o.get("leech", 0.0)) > 0.0:
+						_heal(u, int(round(dealt * float(o["leech"]))))
+			"dmg_weak":
+				var weak: BattleUnit = null
+				for e in foes:
+					if weak == null or e.hp < weak.hp:
+						weak = e
+				if weak != null:
+					if bool(o.get("jump", false)):
+						var c := _free_adjacent(weak.cell, u.cell)
+						if c.x >= 0:
+							_move_unit(u, c)
+					_damage(weak, dmg)
+			"dmg_low":
+				for e in foes:
+					if float(e.hp) <= float(e.max_hp) * float(o.get("thr", 0.4)):
+						_damage(e, dmg)
+			"dmg_col":
+				for e in foes:
+					if e.cell.x == u.cell.x:
+						_damage(e, dmg)
+			"dmg_row":
+				for e in foes:
+					if e.cell.y == u.cell.y:
+						_damage(e, dmg)
+			"dmg_top":  # the n enemies with the highest ATK
+				var list := foes.duplicate()
+				list.sort_custom(func(a: BattleUnit, b: BattleUnit) -> bool: return a.base_atk > b.base_atk)
+				for i in range(mini(int(o.get("n", 2)), list.size())):
+					_damage(list[i], dmg)
+			"stun_all":
+				for e in foes:
+					e.stun_until = maxi(e.stun_until, tick + int(o.get("t", 2)) + 1)
+			"stun_near":
+				for e in foes:
+					if _dist(e.cell, u.cell) <= int(o.get("r", 2)):
+						e.stun_until = maxi(e.stun_until, tick + int(o.get("t", 2)) + 1)
+			"stun_top":
+				var list2 := foes.duplicate()
+				list2.sort_custom(func(a: BattleUnit, b: BattleUnit) -> bool: return a.base_atk > b.base_atk)
+				for i in range(mini(int(o.get("n", 2)), list2.size())):
+					list2[i].stun_until = maxi(list2[i].stun_until, tick + int(o.get("t", 2)) + 1)
+			"slow_all":
+				for e in foes:
+					e.slow_until = maxi(e.slow_until, tick + int(o.get("t", 8)))
+			"slow_near":
+				for e in foes:
+					if _dist(e.cell, u.cell) <= int(o.get("r", 3)):
+						e.slow_until = maxi(e.slow_until, tick + int(o.get("t", 8)))
+			"burn_all":
+				for e in foes:
+					e.burn_until = tick + int(o.get("t", 12))
+					e.burn_amount = maxi(e.burn_amount if e.burn_until > tick else 0, maxi(1, int(round(u.base_atk * float(o.get("p", 0.25))))))
+			"mark_all":
+				for e in foes:
+					e.mark_until = tick + int(o.get("t", 10))
+					e.mark_mult = maxf(e.mark_mult if e.mark_until > tick else 0.0, float(o.get("p", 0.15)))
+			"drain_energy":
+				energy[1 - side] = maxi(0, int(energy[1 - side]) - int(o.get("n", 2)))
+			"shield_self":
+				u.shield += int(round(u.max_hp * float(o.get("p", 0.3))))
+			"shield_team":
+				for a in allies:
+					a.shield += int(round(a.max_hp * float(o.get("p", 0.1))))
+			"heal_self":
+				_heal(u, int(round(u.max_hp * float(o.get("p", 0.2)))))
+			"heal_team":
+				for a in allies:
+					_heal(a, int(round(a.max_hp * float(o.get("p", 0.15)))))
+			"heal_low":
+				var low: BattleUnit = null
+				for a in allies:
+					if low == null or float(a.hp) / a.max_hp < float(low.hp) / low.max_hp:
+						low = a
+				if low != null:
+					_heal(low, int(round(low.max_hp * float(o.get("p", 0.5)))))
+			"reduce_self":
+				u.reduce_until = maxi(u.reduce_until, tick + int(o.get("t", 10)))
+			"reduce_team":
+				for a in allies:
+					a.reduce_until = maxi(a.reduce_until, tick + int(o.get("t", 8)))
+			"atk_self":
+				u.buff_mult = 1.0 + float(o.get("m", 0.3))
+				u.buff_until = tick + int(o.get("t", 12))
+			"atk_team":
+				for a in allies:
+					a.buff_mult = maxf(a.buff_mult if a.buff_until > tick else 1.0, 1.0 + float(o.get("m", 0.2)))
+					a.buff_until = tick + int(o.get("t", 10))
+			"cleanse":
+				for a in allies:
+					a.stun_until = 0
+					a.slow_until = 0
+					a.burn_until = 0
+			"energy":
+				energy[side] = mini(energy_max(), int(energy[side]) + int(o.get("n", 2)))
+			"revive":  # the last fallen regular comes back at a share of its HP
+				var fallen: BattleUnit = null
+				for d in units:
+					if d.side == side and not d.alive and not d.is_king and not d.is_monster:
+						fallen = d
+				if fallen != null:
+					var cell := _free_cell_near(u.cell)
+					if cell.x >= 0:
+						fallen.alive = true
+						fallen.hp = maxi(1, int(round(fallen.max_hp * float(o.get("p", 0.4)))))
+						fallen.shield = 0
+						fallen.cell = cell
+						grid[cell] = fallen
+						kills[1 - side] = maxi(0, int(kills[1 - side]) - 1)
+						events.append({"type": "fx", "cells": [cell]})
+						_log("%s is called back from the dead!" % fallen.display_name)
+			"haste":
+				haste_until[side] = tick + int(o.get("t", 10))
 
 
 ## True while the side's King is in the arena and its active skill is still unused.

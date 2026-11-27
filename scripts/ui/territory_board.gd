@@ -403,7 +403,7 @@ func _refresh_players() -> void:
 		if ctrl.team_mode:
 			nm += "  [%s]" % ctrl.team_label(p)
 		if p.alive:
-			nm += "  " + CommanderSystem.star_text(p.commander_star) + ((" " + CommanderSystem.stars_marks(p.commander_star)) if p.commander_star > 1 else "")  # Commander level only ("Lv 1".."Lv 3"), no "Cmdr" text
+			nm += "  " + CommanderSystem.star_text(p.commander_star)  # Commander level text only ("Lv 1".."Lv 3"), no star marks on the Territory board
 		var name_l := UiTheme.make_label(nm, 17, UiTheme.COL_TEXT if p.alive else UiTheme.COL_MUTED)
 		name_l.clip_text = true
 		col.add_child(name_l)

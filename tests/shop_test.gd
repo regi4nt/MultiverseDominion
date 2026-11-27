@@ -52,7 +52,7 @@ func _ready() -> void:
 	# in-game bonus: human only, random map only
 	var mc := MatchController.new()
 	mc.setup({"mode": "custom_ai", "continent_id": "arcanum", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 3, "random_map": true})
-	check(mc.players[0].reroll_tokens >= 2 and mc.players[1].reroll_tokens == 0, "random map (Arcanum): the human starts with 2 Reroll Tokens, the AI with none")
+	check(mc.players[0].reroll_tokens >= 2 and mc.players[1].reroll_tokens == int(mc.players[1].pv("fortune_weave")), "random map (Arcanum): the human starts with 2 Reroll Tokens, the AI only with its King's own")
 	var mc2 := MatchController.new()
 	mc2.setup({"mode": "custom_ai", "continent_id": "arcanum", "faction_id": "solvaris", "difficulty": "normal", "ai_count": 1, "seed": 3})
 	check(mc2.players[0].reroll_tokens == 0, "no random-map bonus without a random map")
